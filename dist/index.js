@@ -69411,6 +69411,7 @@ const cache_manager_1 = __nccwpck_require__(7031);
 const skopeo_installer_1 = __nccwpck_require__(2619);
 const remote_registry_1 = __nccwpck_require__(2761);
 const utils_1 = __nccwpck_require__(1798);
+const getNormalizedPlatform = (platform) => platform ? platform.replace(/[/]/g, '_') : `${process.platform}_${process.arch}`;
 class ActionRunner {
     composeFiles;
     excludeImages;
@@ -69462,85 +69463,93 @@ class ActionRunner {
         const combinedContent = sortedFiles.reduce((content, file) => content + fs.readFileSync(file, 'utf8'), '');
         return crypto.createHash('sha256').update(combinedContent).digest('hex');
     }
-    generateCacheKey(imageName, remoteDigest, filesHash) {
+    generateCacheKey(imageName, platform, remoteDigest, filesHash) {
         const safeImageName = imageName.replace(/[/:]/g, '_');
-        return `${this.cacheKeyPrefix}-${process.env.RUNNER_OS}-${safeImageName}-${remoteDigest}-${filesHash}`;
+        const safePlatform = getNormalizedPlatform(platform);
+        return `${this.cacheKeyPrefix}-${process.env.RUNNER_OS}-${safeImageName}-plt_${safePlatform}-${remoteDigest}-${filesHash}`;
     }
-    generateCachePath(imageName, remoteDigest, filesHash) {
+    generateCachePath(imageName, platform, remoteDigest, filesHash) {
         const safeImageName = imageName.replace(/[/:]/g, '_');
+        const safePlatform = getNormalizedPlatform(platform);
         const tempDir = process.env.RUNNER_TEMP ?? '/tmp';
-        return path.join(tempDir, `docker-image-${safeImageName}-${remoteDigest}-${filesHash}.tar`);
+        return path.join(tempDir, `docker-image-${safeImageName}-plt_${safePlatform}-${remoteDigest}-${filesHash}.tar`);
     }
     async run() {
+        // Step 1: Ensure Skopeo is installed
         await this.skopeoInstaller.ensureInstalled();
         core.info(`Processing compose file(s): ${this.composeFiles.join(', ')}`);
+        // Step 2: Parse Compose files and identify images to process
         const parser = new compose_parser_1.ComposeParser(this.composeFiles);
-        const allImages = parser.getImageList();
-        const imagesToProcess = allImages.filter((imageName) => !this.excludeImages.has(imageName));
-        if (imagesToProcess.length === 0) {
+        const allImageInfos = parser.getImageList();
+        const imageInfosToProcess = allImageInfos.filter((info) => !this.excludeImages.has(info.imageName));
+        if (imageInfosToProcess.length === 0) {
             core.info('No images to process. Skipping operations.');
             core.setOutput('cache-hit', 'false');
             core.setOutput('image-list', '');
             return;
         }
-        core.setOutput('image-list', imagesToProcess.join(' '));
-        core.info(`Processing ${imagesToProcess.length} image(s)...`);
+        core.setOutput('image-list', imageInfosToProcess.map((info) => info.imageName).join(' '));
+        core.info(`Processing ${imageInfosToProcess.length} image(s)...`);
         const filesHash = this.calculateFilesHash();
-        const metadataResults = await Promise.allSettled(imagesToProcess.map(async (imageName) => {
-            const remoteDigest = await this.remoteRegistry.getRemoteDigest(imageName);
+        // Step 3: Fetch remote digests for target images
+        const metadataResults = await Promise.allSettled(imageInfosToProcess.map(async (imageInfo) => {
+            const remoteDigest = await this.remoteRegistry.getRemoteDigest(imageInfo.imageName, imageInfo.platform);
             if (!remoteDigest)
-                throw new Error(`Digest fetch failed for ${imageName}`);
-            return { imageName, remoteDigest };
+                throw new Error(`Digest fetch failed for ${imageInfo.imageName} (platform: ${imageInfo.platform ?? 'default'})`);
+            return { imageName: imageInfo.imageName, remoteDigest, platform: imageInfo.platform };
         }));
         const validMetadata = metadataResults
             .filter((result) => result.status === 'fulfilled')
             .map((result) => result.value);
         metadataResults
             .filter((result) => result.status === 'rejected')
-            .forEach((result) => core.warning((0, utils_1.getErrorMessage)(result.reason)));
+            .forEach((rejectedResult) => core.warning((0, utils_1.getErrorMessage)(rejectedResult.reason)));
         if (validMetadata.length === 0) {
             core.warning('Could not retrieve digest for any image.');
             core.setOutput('cache-hit', 'false');
             return;
         }
-        const initialInfos = validMetadata.map((meta) => ({
+        // Step 4: Attempt to restore image caches based on remote digests
+        const initialProcessingInfos = validMetadata.map((meta) => ({
             ...meta,
-            primaryKey: this.generateCacheKey(meta.imageName, meta.remoteDigest, filesHash),
-            cachePath: this.generateCachePath(meta.imageName, meta.remoteDigest, filesHash),
-            needsPull: true,
+            primaryKey: this.generateCacheKey(meta.imageName, meta.platform, meta.remoteDigest, filesHash),
+            cachePath: this.generateCachePath(meta.imageName, meta.platform, meta.remoteDigest, filesHash),
+            needsPull: true, // Assume needs pull initially
         }));
-        const restoredInfos = await Promise.all(initialInfos.map(async (info) => ({
+        const restoredProcessingInfos = await Promise.all(initialProcessingInfos.map(async (info) => ({
             ...info,
             needsPull: !(await this.cacheManager.restore(info.primaryKey, info.cachePath)),
         })));
-        const verifiedInfos = await Promise.all(restoredInfos.map(async (info) => {
+        // Step 5: Attempt to load restored images from cache
+        const verifiedProcessingInfos = await Promise.all(restoredProcessingInfos.map(async (info) => {
             if (info.needsPull)
-                return info;
-            let loadedSuccessfully = false;
+                return info; // Skip load if cache wasn't restored
             try {
-                core.info(`Loading image ${info.imageName} from cache: ${info.cachePath}`);
+                core.info(`Loading image ${info.imageName} (Platform: ${info.platform ?? getNormalizedPlatform(undefined)}) from cache: ${info.cachePath}`);
                 await this.dockerCommand.load(info.cachePath);
                 core.info(`Image ${info.imageName} loaded successfully from cache.`);
-                loadedSuccessfully = true;
+                return { ...info, needsPull: false }; // Load successful
             }
             catch (loadError) {
                 core.warning(`Failed to load ${info.imageName} from cache: ${(0, utils_1.getErrorMessage)(loadError)}.`);
+                return { ...info, needsPull: true }; // Load failed, requires pull
             }
-            return { ...info, needsPull: !loadedSuccessfully };
         }));
-        const imagesToPullInfo = verifiedInfos.filter((info) => info.needsPull);
-        const allCacheHit = imagesToPullInfo.length === 0 && verifiedInfos.length === validMetadata.length;
+        // Step 6: Determine final pull list and set overall cache-hit output
+        const imagesToPullInfo = verifiedProcessingInfos.filter((info) => info.needsPull);
+        const allCacheHit = imagesToPullInfo.length === 0 && verifiedProcessingInfos.length === validMetadata.length;
         core.setOutput('cache-hit', allCacheHit.toString());
         if (allCacheHit) {
             core.info('All required images were successfully restored from cache.');
             return;
         }
+        // Step 7: Pull missing or outdated images
         core.info(`Pulling ${imagesToPullInfo.length} image(s)...`);
         const pullResults = await Promise.allSettled(imagesToPullInfo.map((info) => this.dockerCommand.pull(info.imageName)));
         const successfullyPulledInfo = imagesToPullInfo.filter((info, index) => {
             // eslint-disable-next-line security/detect-object-injection
             const result = pullResults[index];
-            const wasFulfilled = result.status === 'fulfilled'; // Disable rule for this line
+            const wasFulfilled = result.status === 'fulfilled';
             if (!wasFulfilled) {
                 core.error(`Failed to pull image ${info.imageName}: ${(0, utils_1.getErrorMessage)(result.reason)}`);
             }
@@ -69550,9 +69559,11 @@ class ActionRunner {
             core.warning('No images were successfully pulled, skipping cache save.');
             return;
         }
+        // Step 8: Save successfully pulled and verified images to cache
         core.info(`Saving ${successfullyPulledInfo.length} image(s) to cache...`);
         await Promise.allSettled(successfullyPulledInfo.map(async (info) => {
             try {
+                // Verify digest AFTER pull
                 const pulledDigest = await this.dockerCommand.getDigest(info.imageName);
                 if (pulledDigest && pulledDigest === info.remoteDigest) {
                     await this.dockerCommand.save(info.cachePath, [info.imageName]);
@@ -69705,24 +69716,32 @@ const core = __importStar(__nccwpck_require__(7484));
 class ComposeParser {
     filePaths;
     constructor(filePaths) {
-        if (filePaths.length === 0) {
+        if (filePaths.length === 0)
             throw new Error('No Compose file paths provided.');
-        }
-        filePaths.forEach((file) => {
-            if (!fs.existsSync(file)) {
-                throw new Error(`Compose file not found: ${file}`);
-            }
+        // Ensure all specified files exist upon instantiation
+        filePaths.forEach((filePath) => {
+            if (!fs.existsSync(filePath))
+                throw new Error(`Compose file not found: ${filePath}`);
         });
         this.filePaths = filePaths;
     }
+    /**
+     * Reads and parses all specified Compose files to extract a sorted, unique list
+     * of image information (name and platform).
+     * @returns A readonly array of unique ImageInfo objects, sorted by name then platform.
+     */
     getImageList() {
-        const images = this.filePaths.flatMap((filePath) => {
+        const imageInfos = this.filePaths.flatMap((filePath) => {
             try {
                 const fileContents = fs.readFileSync(filePath, 'utf8');
                 const data = yaml.load(fileContents);
-                return data?.services
-                    ? Object.entries(data.services).reduce((acc, [, service]) => (service?.image ? [...acc, service.image] : acc), [])
-                    : [];
+                // Use optional chaining and nullish coalescing for safety
+                const services = data?.services ?? {};
+                // Extract ImageInfo objects using reduce
+                return Object.entries(services).reduce((accumulator, [, service]) => 
+                // Only add if service and service.image are defined
+                service?.image ? [...accumulator, { imageName: service.image, platform: service.platform }] : accumulator, [] // Initial value for the accumulator
+                );
             }
             catch (error) {
                 const message = error instanceof Error ? error.message : String(error);
@@ -69730,7 +69749,31 @@ class ComposeParser {
                 throw new Error(`Could not process compose file: ${filePath}`);
             }
         });
-        return [...new Set(images)].sort();
+        // Deduplicate based on the combination of imageName and platform using reduce
+        const uniqueImageInfos = imageInfos.reduce((uniqueList, currentInfo) => {
+            // Create a unique key for each image+platform combination
+            const key = `${currentInfo.imageName}@@${currentInfo.platform ?? 'default'}`;
+            // Check if an item with the same key already exists in the accumulator
+            const exists = uniqueList.some((item) => `${item.imageName}@@${item.platform ?? 'default'}` === key);
+            // If it doesn't exist, add it to the unique list
+            return exists ? uniqueList : [...uniqueList, currentInfo];
+        }, []); // Initial value for the accumulator
+        // Sort the unique list, primarily by image name, then by platform (undefined first)
+        // Create a mutable copy for sorting, then return as readonly
+        return [...uniqueImageInfos].sort((infoA, infoB) => {
+            const nameCompare = infoA.imageName.localeCompare(infoB.imageName);
+            if (nameCompare !== 0)
+                return nameCompare;
+            const platformA = infoA.platform;
+            const platformB = infoB.platform;
+            if (platformA === platformB)
+                return 0; // Both same (or both undefined)
+            if (platformA === undefined)
+                return -1; // Undefined platforms come first
+            if (platformB === undefined)
+                return 1;
+            return platformA.localeCompare(platformB); // Sort defined platforms alphabetically
+        });
     }
 }
 exports.ComposeParser = ComposeParser;
@@ -69946,42 +69989,76 @@ exports.RemoteRegistryClient = void 0;
 const core = __importStar(__nccwpck_require__(7484));
 const exec_1 = __nccwpck_require__(5236);
 const utils_1 = __nccwpck_require__(1798);
+// Helper to parse platform string like "os/arch[/variant]"
+const parsePlatform = (platformString) => {
+    const [os, arch, variant] = platformString.split('/');
+    return { os, arch, variant };
+};
 class RemoteRegistryClient {
     skopeoInstaller;
     constructor(skopeoInstaller) {
         this.skopeoInstaller = skopeoInstaller;
     }
-    async getRemoteDigest(imageName) {
+    /**
+     * Fetches the manifest digest for a specific image tag and platform from a remote registry.
+     * @param imageName - The full image name including tag (e.g., "nginx:stable-alpine").
+     * @param platform - Optional platform string (e.g., "linux/amd64").
+     * @returns The sha256 digest string if successful, otherwise null.
+     */
+    async getRemoteDigest(imageName, platform) {
+        const platformDesc = platform ?? 'default host';
         try {
-            // Move ensureInstalled inside the try block
             await this.skopeoInstaller.ensureInstalled();
-            const { exitCode, stdout, stderr } = await (0, exec_1.getExecOutput)('skopeo', ['inspect', `docker://${imageName}`], {
-                ignoreReturnCode: true,
-                silent: true,
+            // Build skopeo arguments, adding platform overrides if specified
+            const baseArgs = ['inspect'];
+            const platformArgs = platform
+                ? (() => {
+                    const { os, arch, variant } = parsePlatform(platform);
+                    const args = [];
+                    // Skopeo uses specific override flags
+                    if (os)
+                        args.push('--override-os', os);
+                    if (arch)
+                        args.push('--override-arch', arch);
+                    if (variant)
+                        args.push('--override-variant', variant);
+                    core.info(`Inspecting image ${imageName} for platform ${platform}`);
+                    return args;
+                })()
+                : [];
+            if (!platform) {
+                core.info(`Inspecting image ${imageName} for default platform`);
+            }
+            const inspectArgs = [...baseArgs, ...platformArgs, `docker://${imageName}`];
+            // Execute skopeo inspect
+            const { exitCode, stdout, stderr } = await (0, exec_1.getExecOutput)('skopeo', inspectArgs, {
+                ignoreReturnCode: true, // Handle non-zero exit codes manually
+                silent: true, // Reduce log verbosity
             });
             if (exitCode !== 0) {
-                // Log warning here, but let the catch block handle returning null if needed?
-                // Or return null directly. Returning null here is clearer.
-                core.warning(`skopeo inspect failed for ${imageName}: ${stderr.trim()}`);
+                core.warning(`skopeo inspect failed for ${imageName} (platform: ${platformDesc}): ${stderr.trim()}`);
                 return null;
             }
+            // Parse the output and extract the digest
             const inspectData = JSON.parse(stdout);
+            // Type guard to safely access the Digest property
             if (typeof inspectData === 'object' &&
                 inspectData !== null &&
                 'Digest' in inspectData &&
                 typeof inspectData.Digest === 'string' &&
                 inspectData.Digest.startsWith('sha256:')) {
-                return inspectData.Digest;
+                return inspectData.Digest; // Return the valid digest
             }
             else {
-                // Throw error to be caught below
+                // Throw an error if digest is not found or invalid
+                core.debug(`Inspect data for ${imageName} (platform: ${platformDesc}): ${JSON.stringify(inspectData)}`);
                 throw new Error('Digest not found or invalid in skopeo inspect output.');
             }
         }
         catch (error) {
-            // Catch errors from ensureInstalled, getExecOutput, JSON.parse, or the explicit throw
-            core.warning(`Failed to get remote digest for ${imageName}: ${(0, utils_1.getErrorMessage)(error)}`);
-            return null;
+            // Catch any error (install, exec, parse, validation) and log warning
+            core.warning(`Failed to get remote digest for ${imageName} (platform: ${platformDesc}): ${(0, utils_1.getErrorMessage)(error)}`);
+            return null; // Return null on any failure
         }
     }
 }
