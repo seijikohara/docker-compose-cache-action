@@ -3,6 +3,12 @@ import { getExecOutput } from '@actions/exec';
 import { SkopeoInstaller } from './skopeo-installer';
 import { getErrorMessage } from './utils';
 
+// Helper to parse platform string like "os/arch[/variant]"
+const parsePlatform = (platformString: string): { os?: string; arch?: string; variant?: string } => {
+  const [os, arch, variant] = platformString.split('/');
+  return { os, arch, variant };
+};
+
 export class RemoteRegistryClient {
   private readonly skopeoInstaller: SkopeoInstaller;
 
@@ -10,25 +16,53 @@ export class RemoteRegistryClient {
     this.skopeoInstaller = skopeoInstaller;
   }
 
-  async getRemoteDigest(imageName: string): Promise<string | null> {
+  /**
+   * Fetches the manifest digest for a specific image tag and platform from a remote registry.
+   * @param imageName - The full image name including tag (e.g., "nginx:stable-alpine").
+   * @param platform - Optional platform string (e.g., "linux/amd64").
+   * @returns The sha256 digest string if successful, otherwise null.
+   */
+  async getRemoteDigest(imageName: string, platform?: string): Promise<string | null> {
+    const platformDesc = platform ?? 'default host';
     try {
-      // Move ensureInstalled inside the try block
       await this.skopeoInstaller.ensureInstalled();
 
-      const { exitCode, stdout, stderr } = await getExecOutput('skopeo', ['inspect', `docker://${imageName}`], {
-        ignoreReturnCode: true,
-        silent: true,
+      // Build skopeo arguments, adding platform overrides if specified
+      const baseArgs = ['inspect'];
+      const platformArgs = platform
+        ? (() => {
+            const { os, arch, variant } = parsePlatform(platform);
+            const args: string[] = [];
+            // Skopeo uses specific override flags
+            if (os) args.push('--override-os', os);
+            if (arch) args.push('--override-arch', arch);
+            if (variant) args.push('--override-variant', variant);
+            core.info(`Inspecting image ${imageName} for platform ${platform}`);
+            return args;
+          })()
+        : [];
+
+      if (!platform) {
+        core.info(`Inspecting image ${imageName} for default platform`);
+      }
+
+      const inspectArgs = [...baseArgs, ...platformArgs, `docker://${imageName}`];
+
+      // Execute skopeo inspect
+      const { exitCode, stdout, stderr } = await getExecOutput('skopeo', inspectArgs, {
+        ignoreReturnCode: true, // Handle non-zero exit codes manually
+        silent: true, // Reduce log verbosity
       });
 
       if (exitCode !== 0) {
-        // Log warning here, but let the catch block handle returning null if needed?
-        // Or return null directly. Returning null here is clearer.
-        core.warning(`skopeo inspect failed for ${imageName}: ${stderr.trim()}`);
+        core.warning(`skopeo inspect failed for ${imageName} (platform: ${platformDesc}): ${stderr.trim()}`);
         return null;
       }
 
+      // Parse the output and extract the digest
       const inspectData: unknown = JSON.parse(stdout);
 
+      // Type guard to safely access the Digest property
       if (
         typeof inspectData === 'object' &&
         inspectData !== null &&
@@ -36,15 +70,18 @@ export class RemoteRegistryClient {
         typeof inspectData.Digest === 'string' &&
         inspectData.Digest.startsWith('sha256:')
       ) {
-        return inspectData.Digest;
+        return inspectData.Digest; // Return the valid digest
       } else {
-        // Throw error to be caught below
+        // Throw an error if digest is not found or invalid
+        core.debug(`Inspect data for ${imageName} (platform: ${platformDesc}): ${JSON.stringify(inspectData)}`);
         throw new Error('Digest not found or invalid in skopeo inspect output.');
       }
     } catch (error) {
-      // Catch errors from ensureInstalled, getExecOutput, JSON.parse, or the explicit throw
-      core.warning(`Failed to get remote digest for ${imageName}: ${getErrorMessage(error)}`);
-      return null;
+      // Catch any error (install, exec, parse, validation) and log warning
+      core.warning(
+        `Failed to get remote digest for ${imageName} (platform: ${platformDesc}): ${getErrorMessage(error)}`
+      );
+      return null; // Return null on any failure
     }
   }
 }
