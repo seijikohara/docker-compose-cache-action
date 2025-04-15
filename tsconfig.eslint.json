@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json", // Inherit base settings
+  "compilerOptions": {
+    "noEmit": true // Don't emit JS files when using this config
+  },
+  "include": [
+    "src/**/*", // Include source files
+    "__tests__/**/*" // Include test files
+  ],
+  "exclude": [
+    // Override exclude from base tsconfig.json
+    "node_modules",
+    "dist"
+    // Do NOT include "**/*.test.ts" here
+  ]
+}
