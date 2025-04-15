@@ -2,7 +2,7 @@ import * as core from '@actions/core';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
-import { ComposeParser } from './compose-parser';
+import { ComposeParser, ImageInfo } from './compose-parser';
 import { DockerCommand } from './docker-command';
 import { CacheManager } from './cache-manager';
 import { SkopeoInstaller } from './skopeo-installer';
@@ -13,17 +13,22 @@ type ImageName = string;
 type Digest = string;
 type CacheKey = string;
 type FilePath = string;
+type Platform = string | undefined;
 
 type ImageMetadata = {
   readonly imageName: ImageName;
   readonly remoteDigest: Digest;
+  readonly platform: Platform;
 };
 
 type ImageProcessingInfo = ImageMetadata & {
   readonly primaryKey: CacheKey;
   readonly cachePath: FilePath;
-  readonly needsPull: boolean;
+  readonly needsPull: boolean; // True if cache miss or load failure
 };
+
+const getNormalizedPlatform = (platform: Platform): string =>
+  platform ? platform.replace(/[/]/g, '_') : `${process.platform}_${process.arch}`;
 
 export class ActionRunner {
   private readonly composeFiles: readonly FilePath[];
@@ -81,48 +86,66 @@ export class ActionRunner {
     return crypto.createHash('sha256').update(combinedContent).digest('hex');
   }
 
-  private generateCacheKey(imageName: ImageName, remoteDigest: Digest, filesHash: Digest): CacheKey {
+  private generateCacheKey(
+    imageName: ImageName,
+    platform: Platform,
+    remoteDigest: Digest,
+    filesHash: Digest
+  ): CacheKey {
     const safeImageName = imageName.replace(/[/:]/g, '_');
-    return `${this.cacheKeyPrefix}-${process.env.RUNNER_OS}-${safeImageName}-${remoteDigest}-${filesHash}`;
+    const safePlatform = getNormalizedPlatform(platform);
+    return `${this.cacheKeyPrefix}-${process.env.RUNNER_OS}-${safeImageName}-plt_${safePlatform}-${remoteDigest}-${filesHash}`;
   }
 
-  private generateCachePath(imageName: ImageName, remoteDigest: Digest, filesHash: Digest): FilePath {
+  private generateCachePath(
+    imageName: ImageName,
+    platform: Platform,
+    remoteDigest: Digest,
+    filesHash: Digest
+  ): FilePath {
     const safeImageName = imageName.replace(/[/:]/g, '_');
+    const safePlatform = getNormalizedPlatform(platform);
     const tempDir = process.env.RUNNER_TEMP ?? '/tmp';
-    return path.join(tempDir, `docker-image-${safeImageName}-${remoteDigest}-${filesHash}.tar`);
+    return path.join(tempDir, `docker-image-${safeImageName}-plt_${safePlatform}-${remoteDigest}-${filesHash}.tar`);
   }
 
   async run(): Promise<void> {
+    // Step 1: Ensure Skopeo is installed
     await this.skopeoInstaller.ensureInstalled();
 
     core.info(`Processing compose file(s): ${this.composeFiles.join(', ')}`);
+    // Step 2: Parse Compose files and identify images to process
     const parser = new ComposeParser(this.composeFiles);
-    const allImages = parser.getImageList();
-    const imagesToProcess = allImages.filter((imageName) => !this.excludeImages.has(imageName));
+    const allImageInfos: readonly ImageInfo[] = parser.getImageList();
+    const imageInfosToProcess = allImageInfos.filter((info) => !this.excludeImages.has(info.imageName));
 
-    if (imagesToProcess.length === 0) {
+    if (imageInfosToProcess.length === 0) {
       core.info('No images to process. Skipping operations.');
       core.setOutput('cache-hit', 'false');
       core.setOutput('image-list', '');
       return;
     }
-    core.setOutput('image-list', imagesToProcess.join(' '));
-    core.info(`Processing ${imagesToProcess.length} image(s)...`);
+    core.setOutput('image-list', imageInfosToProcess.map((info) => info.imageName).join(' '));
+    core.info(`Processing ${imageInfosToProcess.length} image(s)...`);
     const filesHash = this.calculateFilesHash();
 
+    // Step 3: Fetch remote digests for target images
     const metadataResults = await Promise.allSettled(
-      imagesToProcess.map(async (imageName): Promise<ImageMetadata> => {
-        const remoteDigest = await this.remoteRegistry.getRemoteDigest(imageName);
-        if (!remoteDigest) throw new Error(`Digest fetch failed for ${imageName}`);
-        return { imageName, remoteDigest };
+      imageInfosToProcess.map(async (imageInfo): Promise<ImageMetadata> => {
+        const remoteDigest = await this.remoteRegistry.getRemoteDigest(imageInfo.imageName, imageInfo.platform);
+        if (!remoteDigest)
+          throw new Error(
+            `Digest fetch failed for ${imageInfo.imageName} (platform: ${imageInfo.platform ?? 'default'})`
+          );
+        return { imageName: imageInfo.imageName, remoteDigest, platform: imageInfo.platform };
       })
     );
-    const validMetadata = metadataResults
+    const validMetadata: readonly ImageMetadata[] = metadataResults
       .filter((result): result is PromiseFulfilledResult<ImageMetadata> => result.status === 'fulfilled')
       .map((result) => result.value);
     metadataResults
       .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
-      .forEach((result) => core.warning(getErrorMessage(result.reason)));
+      .forEach((rejectedResult) => core.warning(getErrorMessage(rejectedResult.reason)));
 
     if (validMetadata.length === 0) {
       core.warning('Could not retrieve digest for any image.');
@@ -130,38 +153,42 @@ export class ActionRunner {
       return;
     }
 
-    const initialInfos: readonly ImageProcessingInfo[] = validMetadata.map((meta) => ({
+    // Step 4: Attempt to restore image caches based on remote digests
+    const initialProcessingInfos: readonly ImageProcessingInfo[] = validMetadata.map((meta) => ({
       ...meta,
-      primaryKey: this.generateCacheKey(meta.imageName, meta.remoteDigest, filesHash),
-      cachePath: this.generateCachePath(meta.imageName, meta.remoteDigest, filesHash),
-      needsPull: true,
+      primaryKey: this.generateCacheKey(meta.imageName, meta.platform, meta.remoteDigest, filesHash),
+      cachePath: this.generateCachePath(meta.imageName, meta.platform, meta.remoteDigest, filesHash),
+      needsPull: true, // Assume needs pull initially
     }));
 
-    const restoredInfos: readonly ImageProcessingInfo[] = await Promise.all(
-      initialInfos.map(async (info) => ({
+    const restoredProcessingInfos: readonly ImageProcessingInfo[] = await Promise.all(
+      initialProcessingInfos.map(async (info) => ({
         ...info,
         needsPull: !(await this.cacheManager.restore(info.primaryKey, info.cachePath)),
       }))
     );
 
-    const verifiedInfos: readonly ImageProcessingInfo[] = await Promise.all(
-      restoredInfos.map(async (info): Promise<ImageProcessingInfo> => {
-        if (info.needsPull) return info;
-        let loadedSuccessfully = false;
+    // Step 5: Attempt to load restored images from cache
+    const verifiedProcessingInfos: readonly ImageProcessingInfo[] = await Promise.all(
+      restoredProcessingInfos.map(async (info): Promise<ImageProcessingInfo> => {
+        if (info.needsPull) return info; // Skip load if cache wasn't restored
         try {
-          core.info(`Loading image ${info.imageName} from cache: ${info.cachePath}`);
+          core.info(
+            `Loading image ${info.imageName} (Platform: ${info.platform ?? getNormalizedPlatform(undefined)}) from cache: ${info.cachePath}`
+          );
           await this.dockerCommand.load(info.cachePath);
           core.info(`Image ${info.imageName} loaded successfully from cache.`);
-          loadedSuccessfully = true;
+          return { ...info, needsPull: false }; // Load successful
         } catch (loadError) {
           core.warning(`Failed to load ${info.imageName} from cache: ${getErrorMessage(loadError)}.`);
+          return { ...info, needsPull: true }; // Load failed, requires pull
         }
-        return { ...info, needsPull: !loadedSuccessfully };
       })
     );
 
-    const imagesToPullInfo = verifiedInfos.filter((info) => info.needsPull);
-    const allCacheHit = imagesToPullInfo.length === 0 && verifiedInfos.length === validMetadata.length;
+    // Step 6: Determine final pull list and set overall cache-hit output
+    const imagesToPullInfo = verifiedProcessingInfos.filter((info) => info.needsPull);
+    const allCacheHit = imagesToPullInfo.length === 0 && verifiedProcessingInfos.length === validMetadata.length;
     core.setOutput('cache-hit', allCacheHit.toString());
 
     if (allCacheHit) {
@@ -169,14 +196,16 @@ export class ActionRunner {
       return;
     }
 
+    // Step 7: Pull missing or outdated images
     core.info(`Pulling ${imagesToPullInfo.length} image(s)...`);
     const pullResults = await Promise.allSettled(
       imagesToPullInfo.map((info) => this.dockerCommand.pull(info.imageName))
     );
+
     const successfullyPulledInfo = imagesToPullInfo.filter((info, index) => {
       // eslint-disable-next-line security/detect-object-injection
       const result = pullResults[index];
-      const wasFulfilled = result.status === 'fulfilled'; // Disable rule for this line
+      const wasFulfilled = result.status === 'fulfilled';
       if (!wasFulfilled) {
         core.error(`Failed to pull image ${info.imageName}: ${getErrorMessage(result.reason)}`);
       }
@@ -188,10 +217,12 @@ export class ActionRunner {
       return;
     }
 
+    // Step 8: Save successfully pulled and verified images to cache
     core.info(`Saving ${successfullyPulledInfo.length} image(s) to cache...`);
     await Promise.allSettled(
       successfullyPulledInfo.map(async (info) => {
         try {
+          // Verify digest AFTER pull
           const pulledDigest = await this.dockerCommand.getDigest(info.imageName);
           if (pulledDigest && pulledDigest === info.remoteDigest) {
             await this.dockerCommand.save(info.cachePath, [info.imageName]);

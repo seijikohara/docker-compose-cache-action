@@ -1,0 +1,5 @@
+services:
+  postgres_for_exclude:
+    image: postgres:16-alpine
+  redis_to_exclude:
+    image: redis:7-alpine # This will be excluded by workflow input

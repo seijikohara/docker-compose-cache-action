@@ -1,9 +1,8 @@
 import * as core from '@actions/core';
 import * as fs from 'fs';
-import { ComposeParser } from '../src/compose-parser';
-// js-yaml is not mocked, use the actual implementation
+import { ComposeParser, ImageInfo } from '../src/compose-parser'; // Import ImageInfo type
 
-// Mock dependencies
+// Mocks
 jest.mock('@actions/core');
 jest.mock('fs', () => {
   const originalFs = jest.requireActual('fs');
@@ -19,193 +18,159 @@ const coreMock = core as jest.Mocked<typeof core>;
 
 const fsMock = fs as jest.Mocked<typeof fs>;
 
+// Helper for sorting expected results consistently (same as production logic)
+const sortImageInfos = (infos: ImageInfo[]): ImageInfo[] => {
+  return [...infos].sort((infoA, infoB) => {
+    const nameCompare = infoA.imageName.localeCompare(infoB.imageName);
+    if (nameCompare !== 0) return nameCompare;
+    const platformA = infoA.platform;
+    const platformB = infoB.platform;
+    if (platformA === platformB) return 0;
+    if (platformA === undefined) return -1;
+    if (platformB === undefined) return 1;
+    return platformA.localeCompare(platformB);
+  });
+};
+
 describe('ComposeParser', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    // Reset mocks to default behavior if needed (existsSync already defaults to true)
+    // Reset mocks to default behavior
     fsMock.existsSync.mockReturnValue(true);
     fsMock.readFileSync.mockReturnValue('');
   });
 
   describe('constructor', () => {
     test('should create instance successfully with valid file paths', () => {
-      // Arrange
       const filePaths = ['docker-compose.yml', 'override.yml'];
-      fsMock.existsSync.mockReturnValue(true); // Ensure existsSync returns true
-
-      // Act & Assert
       expect(() => new ComposeParser(filePaths)).not.toThrow();
       expect(fsMock.existsSync).toHaveBeenCalledTimes(2);
-      expect(fsMock.existsSync).toHaveBeenCalledWith('docker-compose.yml');
-      expect(fsMock.existsSync).toHaveBeenCalledWith('override.yml');
     });
 
     test('should throw error if filePaths array is empty', () => {
-      // Arrange
-      const filePaths: string[] = [];
-
-      // Act & Assert
-      expect(() => new ComposeParser(filePaths)).toThrow('No Compose file paths provided.');
+      expect(() => new ComposeParser([])).toThrow('No Compose file paths provided.');
     });
 
     test('should throw error if any file path does not exist', () => {
-      // Arrange
       const filePaths = ['exists.yml', 'not-exists.yml'];
-      fsMock.existsSync.mockImplementation((path) => path === 'exists.yml'); // Only first file exists
-
-      // Act & Assert
+      fsMock.existsSync.mockImplementation((path) => path === 'exists.yml');
       expect(() => new ComposeParser(filePaths)).toThrow('Compose file not found: not-exists.yml');
-      expect(fsMock.existsSync).toHaveBeenCalledWith('exists.yml');
-      expect(fsMock.existsSync).toHaveBeenCalledWith('not-exists.yml');
     });
   });
 
   describe('getImageList', () => {
-    test('should return sorted unique image names from a single file', () => {
+    test('should return sorted unique ImageInfo objects from a single file', () => {
       // Arrange
       const yamlContent = `
 services:
   app:
     image: my-app:1.0
+    platform: linux/amd64
   db:
-    image: postgres:14-alpine
+    image: postgres:14-alpine # No platform specified
   redis:
     image: redis:latest
+    platform: linux/arm64
   worker:
-    image: my-app:1.0 # Duplicate
+    image: my-app:1.0 # Duplicate image name, different platform
+    platform: linux/arm64
+  another_worker:
+    image: my-app:1.0 # Duplicate image name and platform
+    platform: linux/arm64
 `;
       fsMock.readFileSync.mockReturnValue(yamlContent);
       const parser = new ComposeParser(['docker-compose.yml']);
-      const expectedImages = ['my-app:1.0', 'postgres:14-alpine', 'redis:latest'];
+      const expectedImageInfos: readonly ImageInfo[] = sortImageInfos([
+        { imageName: 'my-app:1.0', platform: 'linux/amd64' },
+        { imageName: 'my-app:1.0', platform: 'linux/arm64' }, // Unique combination
+        { imageName: 'postgres:14-alpine', platform: undefined },
+        { imageName: 'redis:latest', platform: 'linux/arm64' },
+      ]);
 
       // Act
-      const images = parser.getImageList();
+      const imageInfos = parser.getImageList();
 
       // Assert
-      expect(images).toEqual(expectedImages);
+      expect(imageInfos).toEqual(expectedImageInfos);
       expect(fsMock.readFileSync).toHaveBeenCalledTimes(1);
       expect(fsMock.readFileSync).toHaveBeenCalledWith('docker-compose.yml', 'utf8');
       expect(coreMock.error).not.toHaveBeenCalled();
     });
 
-    test('should merge, deduplicate, and sort image names from multiple files', () => {
+    test('should merge, deduplicate, and sort ImageInfo objects from multiple files', () => {
       // Arrange
       const yamlContent1 = `
 services:
-  web:
-    image: nginx:stable
-  api:
-    image: my-api:v2
+  web: { image: nginx:stable, platform: linux/amd64 }
+  api: { image: my-api:v2 } # Platform undefined
 `;
       const yamlContent2 = `
 services:
-  api: # Override api service (but image might be same or different)
-    image: my-api:v2 # Duplicate
-  db:
-    image: mysql:8
+  api: { image: my-api:v2, platform: linux/amd64 } # Add platform
+  db: { image: mysql:8, platform: linux/amd64 }
+  web: { image: nginx:stable, platform: linux/amd64 } # Duplicate from file 1
 `;
       fsMock.readFileSync.mockReturnValueOnce(yamlContent1).mockReturnValueOnce(yamlContent2);
-      const parser = new ComposeParser(['docker-compose.yml', 'override.yml']);
-      const expectedImages = ['my-api:v2', 'mysql:8', 'nginx:stable']; // Sorted unique list
+      const parser = new ComposeParser(['compose.yml', 'override.yml']);
+      const expectedImageInfos: readonly ImageInfo[] = sortImageInfos([
+        { imageName: 'my-api:v2', platform: undefined },
+        { imageName: 'my-api:v2', platform: 'linux/amd64' },
+        { imageName: 'mysql:8', platform: 'linux/amd64' },
+        { imageName: 'nginx:stable', platform: 'linux/amd64' },
+      ]);
 
       // Act
-      const images = parser.getImageList();
+      const imageInfos = parser.getImageList();
 
       // Assert
-      expect(images).toEqual(expectedImages);
+      expect(imageInfos).toEqual(expectedImageInfos);
       expect(fsMock.readFileSync).toHaveBeenCalledTimes(2);
-      expect(fsMock.readFileSync).toHaveBeenCalledWith('docker-compose.yml', 'utf8');
-      expect(fsMock.readFileSync).toHaveBeenCalledWith('override.yml', 'utf8');
     });
 
     test('should return an empty array if no services have image keys', () => {
-      // Arrange
+      const yamlContent = `services:\n  app:\n    build: .\n    platform: linux/amd64`;
+      fsMock.readFileSync.mockReturnValue(yamlContent);
+      const parser = new ComposeParser(['compose.yml']);
+      expect(parser.getImageList()).toEqual([]);
+    });
+
+    test('should return an empty array if services key is missing', () => {
+      const yamlContent = `version: '3.8'`;
+      fsMock.readFileSync.mockReturnValue(yamlContent);
+      const parser = new ComposeParser(['compose.yml']);
+      expect(parser.getImageList()).toEqual([]);
+    });
+
+    test('should ignore services with null or empty image values but return valid ones', () => {
       const yamlContent = `
 services:
-  app:
-    build: .
-  db:
-    # No image key
+  app: { image: valid:tag, platform: linux/amd64 }
+  invalid1: { image: null, platform: linux/amd64 }
+  invalid2: { image: "", platform: linux/amd64 }
 `;
       fsMock.readFileSync.mockReturnValue(yamlContent);
-      const parser = new ComposeParser(['docker-compose.yml']);
-
-      // Act
-      const images = parser.getImageList();
-
-      // Assert
-      expect(images).toEqual([]);
+      const parser = new ComposeParser(['compose.yml']);
+      expect(parser.getImageList()).toEqual([{ imageName: 'valid:tag', platform: 'linux/amd64' }]);
     });
 
-    test('should return an empty array if services key is missing or empty', () => {
-      // Arrange
-      const yamlContent = `
-version: '3.8'
-# No services key
-`;
-      fsMock.readFileSync.mockReturnValue(yamlContent);
-      const parser = new ComposeParser(['docker-compose.yml']);
-
-      // Act
-      const images = parser.getImageList();
-
-      // Assert
-      expect(images).toEqual([]);
-    });
-
-    test('should ignore services with null or empty image values', () => {
-      // Arrange
-      const yamlContent = `
-services:
-  app:
-    image: my-app:1.0
-  invalid1:
-    image: null
-  invalid2:
-    image: ""
-  valid:
-      image: another/image:tag
-`;
-      fsMock.readFileSync.mockReturnValue(yamlContent);
-      const parser = new ComposeParser(['docker-compose.yml']);
-      const expectedImages = ['another/image:tag', 'my-app:1.0'];
-
-      // Act
-      const images = parser.getImageList();
-
-      // Assert
-      expect(images).toEqual(expectedImages);
-    });
-
-    test('should throw error and log core.error if readFileSync fails', () => {
-      // Arrange
-      const readError = new Error('Permission denied');
+    test('should handle readFileSync errors', () => {
+      const readError = new Error('Read fail');
       fsMock.readFileSync.mockImplementation(() => {
         throw readError;
       });
-      const parser = new ComposeParser(['docker-compose.yml']);
-
-      // Act & Assert
-      expect(() => parser.getImageList()).toThrow('Could not process compose file: docker-compose.yml');
-      expect(coreMock.error).toHaveBeenCalledTimes(1);
+      const parser = new ComposeParser(['fail.yml']);
+      expect(() => parser.getImageList()).toThrow('Could not process compose file: fail.yml');
       expect(coreMock.error).toHaveBeenCalledWith(
-        `Failed to read/parse YAML file 'docker-compose.yml': ${readError.message}`
+        expect.stringContaining("Failed to read/parse YAML file 'fail.yml': Read fail")
       );
     });
 
-    test('should throw error and log core.error if yaml.load fails', () => {
-      // Arrange
-      const invalidYamlContent = `services: { image: bad-yaml`; // Invalid YAML
-      fsMock.readFileSync.mockReturnValue(invalidYamlContent);
-      const parser = new ComposeParser(['docker-compose.yml']);
-
-      // Act & Assert
-      // Use a broader error check as js-yaml error messages can vary
-      expect(() => parser.getImageList()).toThrow(Error); // Expect any error
-      expect(coreMock.error).toHaveBeenCalledTimes(1);
-      expect(coreMock.error).toHaveBeenCalledWith(
-        expect.stringContaining(`Failed to read/parse YAML file 'docker-compose.yml':`)
-      );
+    test('should handle yaml.load errors', () => {
+      const invalidYaml = `services: { image: bad`;
+      fsMock.readFileSync.mockReturnValue(invalidYaml);
+      const parser = new ComposeParser(['bad.yml']);
+      expect(() => parser.getImageList()).toThrow('Could not process compose file: bad.yml');
+      expect(coreMock.error).toHaveBeenCalledWith(expect.stringContaining("Failed to read/parse YAML file 'bad.yml':"));
     });
   });
 });

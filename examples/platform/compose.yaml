@@ -1,0 +1,4 @@
+services:
+  hello_platform:
+    image: hello-world:linux
+    platform: linux/amd64
