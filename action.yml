@@ -1,0 +1,30 @@
+name: 'Docker Compose Cache'
+description: 'Caches Docker images from Docker Compose files to speed up builds. Supports digest checks and image exclusion.'
+author: 'Seiji Kohara (https://github.com/seijikohara)'
+branding:
+  icon: 'zap'
+  color: 'blue'
+inputs:
+  compose-files:
+    description: |
+      Path(s) to the Docker Compose file(s).
+      Specify multiple files using YAML list format.
+      If omitted, defaults to searching for default compose files.
+    required: false
+  exclude-images:
+    description: |
+      Images to exclude from caching.
+      Specify multiple images using YAML list format.
+    required: false
+  cache-key-prefix:
+    description: 'Prefix for the generated cache key.'
+    required: false
+    default: 'docker-compose-image'
+outputs:
+  cache-hit:
+    description: "Boolean value ('true' or 'false') indicating if *all* required images were restored from cache (and digests matched). Example: 'true'"
+  image-list:
+    description: "Space-separated string of unique image names targeted for caching. Example: 'mysql:8.0 redis:alpine myapp:latest'"
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
