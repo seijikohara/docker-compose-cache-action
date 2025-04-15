@@ -1,0 +1,5 @@
+services:
+  app_build_only:
+    build: .
+    ports:
+      - '5001:80'

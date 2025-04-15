@@ -1,0 +1,14 @@
+# Combined content for override scenario
+services:
+  nginx_base: # From simple
+    image: nginx:stable-alpine
+    ports:
+      - '8081:80'
+  postgres_base: # From simple, with overrides applied
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: override_password # Overridden
+      POSTGRES_DB: override_db # Added
+    command: ['postgres', '-c', 'max_connections=200'] # Added command
+  redis_override: # Added from override
+    image: redis:7-alpine

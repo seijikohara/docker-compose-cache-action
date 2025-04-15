@@ -1,0 +1,9 @@
+services:
+  nginx_base:
+    image: nginx:stable-alpine
+    ports:
+      - '8081:80'
+  postgres_base:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: base_password

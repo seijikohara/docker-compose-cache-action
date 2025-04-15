@@ -1,0 +1,121 @@
+name: Test Cache Action
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/test-action.yml'
+      - 'action.yml'
+      - 'dist/index.js'
+      - 'examples/**'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test-caching:
+    name: Run with Docker Compose Cache Action (${{ matrix.scenario.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario:
+          # --- Define Test Scenarios using directories ---
+          - name: Simple Compose
+            dir: examples/simple
+            exclude_images: ''
+            run_compose_up: true
+          - name: Override Compose
+            dir: examples/override # Uses the combined override compose file
+            exclude_images: ''
+            run_compose_up: true
+          - name: Platform Specific
+            dir: examples/platform
+            exclude_images: ''
+            run_compose_up: true
+          - name: Image Exclusion
+            dir: examples/exclude
+            exclude_images: | # Exclude redis defined in examples/exclude/compose.yaml
+              redis:7-alpine
+            run_compose_up: true
+          - name: No Images Defined
+            dir: examples/no-images
+            exclude_images: ''
+            run_compose_up: false
+          - name: Empty Compose File
+            dir: examples/empty
+            exclude_images: ''
+            run_compose_up: false # Cannot 'up' an empty file logically
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Docker Compose Images (${{ matrix.scenario.name }})
+        id: cache-docker
+        uses: ./
+        with:
+          # Point to the standard compose file within the scenario directory
+          compose-files: |
+            ${{ matrix.scenario.dir }}/compose.yaml
+          exclude-images: ${{ matrix.scenario.exclude_images }}
+
+      - name: Display Cache Information
+        run: |
+          echo "Scenario: ${{ matrix.scenario.name }}"
+          echo "Action Outputs:"
+          echo "  Cache Hit (All Images): ${{ steps.cache-docker.outputs.cache-hit }}"
+          echo "  Image List Processed: ${{ steps.cache-docker.outputs.image-list }}"
+          echo "-------------------------------------"
+          echo "Current Docker Images Before Up:"
+          docker images
+
+      - name: Start Services (${{ matrix.scenario.name }})
+        if: matrix.scenario.run_compose_up == true
+        # Set working directory to the scenario directory
+        working-directory: ${{ matrix.scenario.dir }}
+        run: |
+          echo "Starting Docker Compose services in $(pwd)..."
+          # No -f needed, docker compose automatically finds compose.yaml/docker-compose.yml
+          docker compose up -d
+          echo "Services started."
+
+      - name: Check Running Containers (${{ matrix.scenario.name }})
+        if: matrix.scenario.run_compose_up == true
+        run: |
+          echo "-------------------------------------"
+          echo "Running Docker Containers (docker ps -a):"
+          docker ps -a
+          echo "-------------------------------------"
+
+      - name: Stop Services (${{ matrix.scenario.name }})
+        if: always() && matrix.scenario.run_compose_up == true
+        # Set working directory to the scenario directory
+        working-directory: ${{ matrix.scenario.dir }}
+        run: |
+          echo "Stopping Docker Compose services in $(pwd)..."
+          # No -f needed
+          docker compose down --volumes
+          echo "Services stopped."
+
+      - name: Show Docker Images After Run
+        if: always()
+        run: |
+          echo "------ Docker Images After Run ------"
+          docker images
+
+  test-caching-summary:
+    name: Test Scenarios Summary
+    runs-on: ubuntu-latest
+    needs: test-caching
+    if: always()
+    steps:
+      - name: Report overall status
+        run: |
+          echo "All test scenarios completed."
+          echo "Overall matrix job status: ${{ needs.test-caching.result }}"
+          if [ "${{ needs.test-caching.result }}" != "success" ]; then
+            echo "::error::One or more test scenarios failed!"
+            exit 1
+          else
+            echo "All scenarios passed successfully."
+          fi
