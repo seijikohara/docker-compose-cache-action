@@ -69401,44 +69401,62 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.ActionRunner = void 0;
-const core = __importStar(__nccwpck_require__(7484));
 const crypto = __importStar(__nccwpck_require__(6982));
 const fs = __importStar(__nccwpck_require__(9896));
 const path = __importStar(__nccwpck_require__(6928));
-const compose_parser_1 = __nccwpck_require__(2595);
-const docker_command_1 = __nccwpck_require__(4919);
-const cache_manager_1 = __nccwpck_require__(7031);
-const skopeo_installer_1 = __nccwpck_require__(2619);
-const remote_registry_1 = __nccwpck_require__(2761);
-const utils_1 = __nccwpck_require__(1798);
-const getNormalizedPlatform = (platform) => platform ? platform.replace(/[/]/g, '_') : `${process.platform}_${process.arch}`;
+const core = __importStar(__nccwpck_require__(7484));
+const docker_compose_file_parser_1 = __nccwpck_require__(5780);
+const errors_1 = __nccwpck_require__(3916);
+const platform_1 = __nccwpck_require__(3728);
+/**
+ * Main runner class for the Docker Compose Cache action.
+ * Coordinates the entire caching workflow:
+ * 1. Parses Docker Compose files to identify images
+ * 2. Fetches remote image digests to validate caches
+ * 3. Restores images from cache when valid
+ * 4. Pulls and caches images when needed
+ */
 class ActionRunner {
     composeFiles;
     excludeImages;
     cacheKeyPrefix;
     dockerCommand;
     cacheManager;
-    remoteRegistry;
-    skopeoInstaller;
-    constructor() {
-        this.skopeoInstaller = new skopeo_installer_1.SkopeoInstaller();
-        this.dockerCommand = new docker_command_1.DockerCommand();
-        this.cacheManager = new cache_manager_1.CacheManager();
-        this.remoteRegistry = new remote_registry_1.RemoteRegistryClient(this.skopeoInstaller);
+    dockerBuildxCommand;
+    /**
+     * Creates a new ActionRunner with the necessary dependencies
+     * @param dockerCommand Docker command executor
+     * @param cacheManager Cache manager for GitHub Actions cache
+     * @param dockerBuildxCommand Docker buildx command executor
+     */
+    constructor(dockerCommand, cacheManager, dockerBuildxCommand) {
+        this.dockerCommand = dockerCommand;
+        this.cacheManager = cacheManager;
+        this.dockerBuildxCommand = dockerBuildxCommand;
         this.cacheKeyPrefix = core.getInput('cache-key-prefix', { required: true });
         this.excludeImages = new Set(core.getMultilineInput('exclude-images'));
         this.composeFiles = this.determineComposeFiles(core.getMultilineInput('compose-files'));
         if (this.excludeImages.size > 0) {
             core.info(`Excluding images: ${[...this.excludeImages].join(', ')}`);
         }
+        if (!(0, platform_1.getCurrentOciPlatform)()) {
+            core.warning(`Could not determine OCI platform for the current runner environment (${process.platform}/${process.arch}). Default cache keys might be inconsistent.`);
+        }
     }
+    /**
+     * Determines which compose files to use based on input or defaults
+     * @param input User-provided file paths from action input
+     * @returns Array of validated file paths
+     */
     determineComposeFiles(input) {
         if (input.length > 0) {
             core.info(`Using specified compose files: ${input.join(', ')}`);
-            input.forEach((file) => {
-                if (!fs.existsSync(file))
-                    throw new Error(`Specified compose file not found: ${file}`);
-            });
+            // Check each file exists using every() method
+            const allFilesExist = input.every((file) => fs.existsSync(file));
+            if (!allFilesExist) {
+                const missingFiles = input.filter((file) => !fs.existsSync(file));
+                throw new Error(`Specified compose file not found: ${missingFiles[0]}`);
+            }
             return input;
         }
         core.info('Compose files not specified, searching for default files...');
@@ -69449,6 +69467,10 @@ class ActionRunner {
         }
         throw new Error('No default compose files found.');
     }
+    /**
+     * Tries to find a default compose file
+     * @returns Path to found file or undefined
+     */
     findDefaultComposeFile() {
         const defaultFiles = [
             'compose.yaml',
@@ -69458,28 +69480,51 @@ class ActionRunner {
         ];
         return defaultFiles.find(fs.existsSync);
     }
+    /**
+     * Calculates hash of compose file contents
+     * @returns SHA-256 hash of combined file contents
+     */
     calculateFilesHash() {
+        // 安全な型の流れを確保しつつ、イミュータブルな操作を行う
         const sortedFiles = [...this.composeFiles].sort();
-        const combinedContent = sortedFiles.reduce((content, file) => content + fs.readFileSync(file, 'utf8'), '');
+        const fileContents = sortedFiles.map((file) => fs.readFileSync(file, 'utf8'));
+        const combinedContent = fileContents.join('');
         return crypto.createHash('sha256').update(combinedContent).digest('hex');
     }
+    /**
+     * Generates cache key for an image
+     * @param imageName Image name
+     * @param platform Target platform
+     * @param remoteDigest Image digest
+     * @param filesHash Hash of compose files
+     * @returns Cache key string
+     */
     generateCacheKey(imageName, platform, remoteDigest, filesHash) {
         const safeImageName = imageName.replace(/[/:]/g, '_');
-        const safePlatform = getNormalizedPlatform(platform);
+        const safePlatform = (0, platform_1.normalizePlatform)(platform);
         return `${this.cacheKeyPrefix}-${process.env.RUNNER_OS}-${safeImageName}-plt_${safePlatform}-${remoteDigest}-${filesHash}`;
     }
+    /**
+     * Generates filesystem path for cached image
+     * @param imageName Image name
+     * @param platform Target platform
+     * @param remoteDigest Image digest
+     * @param filesHash Hash of compose files
+     * @returns Path for tar file
+     */
     generateCachePath(imageName, platform, remoteDigest, filesHash) {
         const safeImageName = imageName.replace(/[/:]/g, '_');
-        const safePlatform = getNormalizedPlatform(platform);
+        const safePlatform = (0, platform_1.normalizePlatform)(platform);
         const tempDir = process.env.RUNNER_TEMP ?? '/tmp';
         return path.join(tempDir, `docker-image-${safeImageName}-plt_${safePlatform}-${remoteDigest}-${filesHash}.tar`);
     }
+    /**
+     * Main execution method for the action
+     * @returns Promise that resolves when all operations are complete
+     */
     async run() {
-        // Step 1: Ensure Skopeo is installed
-        await this.skopeoInstaller.ensureInstalled();
         core.info(`Processing compose file(s): ${this.composeFiles.join(', ')}`);
-        // Step 2: Parse Compose files and identify images to process
-        const parser = new compose_parser_1.ComposeParser(this.composeFiles);
+        const parser = new docker_compose_file_parser_1.DockerComposeFileParser(this.composeFiles);
         const allImageInfos = parser.getImageList();
         const imageInfosToProcess = allImageInfos.filter((info) => !this.excludeImages.has(info.imageName));
         if (imageInfosToProcess.length === 0) {
@@ -69491,9 +69536,9 @@ class ActionRunner {
         core.setOutput('image-list', imageInfosToProcess.map((info) => info.imageName).join(' '));
         core.info(`Processing ${imageInfosToProcess.length} image(s)...`);
         const filesHash = this.calculateFilesHash();
-        // Step 3: Fetch remote digests for target images
+        // Fetch remote digests for all images in parallel
         const metadataResults = await Promise.allSettled(imageInfosToProcess.map(async (imageInfo) => {
-            const remoteDigest = await this.remoteRegistry.getRemoteDigest(imageInfo.imageName, imageInfo.platform);
+            const remoteDigest = await this.dockerBuildxCommand.getRemoteDigest(imageInfo.imageName, imageInfo.platform);
             if (!remoteDigest)
                 throw new Error(`Digest fetch failed for ${imageInfo.imageName} (platform: ${imageInfo.platform ?? 'default'})`);
             return { imageName: imageInfo.imageName, remoteDigest, platform: imageInfo.platform };
@@ -69503,39 +69548,40 @@ class ActionRunner {
             .map((result) => result.value);
         metadataResults
             .filter((result) => result.status === 'rejected')
-            .forEach((rejectedResult) => core.warning((0, utils_1.getErrorMessage)(rejectedResult.reason)));
+            .forEach((rejectedResult) => core.warning((0, errors_1.getErrorMessage)(rejectedResult.reason)));
         if (validMetadata.length === 0) {
             core.warning('Could not retrieve digest for any image.');
             core.setOutput('cache-hit', 'false');
             return;
         }
-        // Step 4: Attempt to restore image caches based on remote digests
+        // Prepare processing information with cache keys and paths
         const initialProcessingInfos = validMetadata.map((meta) => ({
             ...meta,
             primaryKey: this.generateCacheKey(meta.imageName, meta.platform, meta.remoteDigest, filesHash),
             cachePath: this.generateCachePath(meta.imageName, meta.platform, meta.remoteDigest, filesHash),
-            needsPull: true, // Assume needs pull initially
+            needsPull: true,
         }));
+        // Try to restore each image from cache
         const restoredProcessingInfos = await Promise.all(initialProcessingInfos.map(async (info) => ({
             ...info,
             needsPull: !(await this.cacheManager.restore(info.primaryKey, info.cachePath)),
         })));
-        // Step 5: Attempt to load restored images from cache
+        // Try to load cached images into Docker
         const verifiedProcessingInfos = await Promise.all(restoredProcessingInfos.map(async (info) => {
             if (info.needsPull)
-                return info; // Skip load if cache wasn't restored
+                return info;
             try {
-                core.info(`Loading image ${info.imageName} (Platform: ${info.platform ?? getNormalizedPlatform(undefined)}) from cache: ${info.cachePath}`);
+                core.info(`Loading image ${info.imageName} (Platform: ${(0, platform_1.normalizePlatform)(info.platform)}) from cache: ${info.cachePath}`);
                 await this.dockerCommand.load(info.cachePath);
                 core.info(`Image ${info.imageName} loaded successfully from cache.`);
-                return { ...info, needsPull: false }; // Load successful
+                return { ...info, needsPull: false };
             }
             catch (loadError) {
-                core.warning(`Failed to load ${info.imageName} from cache: ${(0, utils_1.getErrorMessage)(loadError)}.`);
-                return { ...info, needsPull: true }; // Load failed, requires pull
+                core.warning(`Failed to load ${info.imageName} from cache: ${(0, errors_1.getErrorMessage)(loadError)}.`);
+                return { ...info, needsPull: true };
             }
         }));
-        // Step 6: Determine final pull list and set overall cache-hit output
+        // Determine if we had a complete cache hit
         const imagesToPullInfo = verifiedProcessingInfos.filter((info) => info.needsPull);
         const allCacheHit = imagesToPullInfo.length === 0 && verifiedProcessingInfos.length === validMetadata.length;
         core.setOutput('cache-hit', allCacheHit.toString());
@@ -69543,27 +69589,29 @@ class ActionRunner {
             core.info('All required images were successfully restored from cache.');
             return;
         }
-        // Step 7: Pull missing or outdated images
+        // Pull images that couldn't be restored from cache
         core.info(`Pulling ${imagesToPullInfo.length} image(s)...`);
-        const pullResults = await Promise.allSettled(imagesToPullInfo.map((info) => this.dockerCommand.pull(info.imageName)));
-        const successfullyPulledInfo = imagesToPullInfo.filter((info, index) => {
-            // eslint-disable-next-line security/detect-object-injection
-            const result = pullResults[index];
-            const wasFulfilled = result.status === 'fulfilled';
-            if (!wasFulfilled) {
-                core.error(`Failed to pull image ${info.imageName}: ${(0, utils_1.getErrorMessage)(result.reason)}`);
+        // Process each image with its own pull operation and track results
+        const pullResultsWithInfo = await Promise.all(imagesToPullInfo.map(async (info) => {
+            try {
+                await this.dockerCommand.pull(info.imageName);
+                return { info, successful: true };
             }
-            return wasFulfilled;
-        });
+            catch (error) {
+                core.error(`Failed to pull image ${info.imageName}: ${(0, errors_1.getErrorMessage)(error)}`);
+                return { info, successful: false };
+            }
+        }));
+        // Extract only successfully pulled images
+        const successfullyPulledInfo = pullResultsWithInfo.filter(({ successful }) => successful).map(({ info }) => info);
         if (successfullyPulledInfo.length === 0) {
             core.warning('No images were successfully pulled, skipping cache save.');
             return;
         }
-        // Step 8: Save successfully pulled and verified images to cache
+        // Save successfully pulled images to cache
         core.info(`Saving ${successfullyPulledInfo.length} image(s) to cache...`);
         await Promise.allSettled(successfullyPulledInfo.map(async (info) => {
             try {
-                // Verify digest AFTER pull
                 const pulledDigest = await this.dockerCommand.getDigest(info.imageName);
                 if (pulledDigest && pulledDigest === info.remoteDigest) {
                     await this.dockerCommand.save(info.cachePath, [info.imageName]);
@@ -69574,7 +69622,7 @@ class ActionRunner {
                 }
             }
             catch (saveError) {
-                core.warning(`Failed to save image ${info.imageName} to cache: ${(0, utils_1.getErrorMessage)(saveError)}`);
+                core.warning(`Failed to save image ${info.imageName} to cache: ${(0, errors_1.getErrorMessage)(saveError)}`);
             }
         }));
     }
@@ -69624,38 +69672,62 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.CacheManager = void 0;
+const fs = __importStar(__nccwpck_require__(9896));
 const cache = __importStar(__nccwpck_require__(5116));
 const core = __importStar(__nccwpck_require__(7484));
-const fs = __importStar(__nccwpck_require__(9896));
-const utils_1 = __nccwpck_require__(1798);
+const errors_1 = __nccwpck_require__(3916);
+/**
+ * Manages GitHub Actions cache operations for Docker images.
+ * Provides a wrapper around the @actions/cache module with enhanced:
+ * - Error handling and reporting
+ * - File existence validation
+ * - Detailed logging for cache operations
+ */
 class CacheManager {
+    /**
+     * Restores a cached file from the GitHub Actions cache
+     * @param key Primary cache key
+     * @param path Path to restore the cached file to
+     * @param restoreKeys Optional fallback cache keys
+     * @returns True if cache was successfully restored, otherwise false
+     */
     async restore(key, path, restoreKeys) {
         try {
             const mutableRestoreKeys = restoreKeys ? [...restoreKeys] : undefined;
             const cacheKey = await cache.restoreCache([path], key, mutableRestoreKeys);
-            if (cacheKey) {
-                core.info(`Cache restored for ${path} with key: ${cacheKey}`);
-                return fs.existsSync(path);
+            if (!cacheKey) {
+                core.info(`Cache not found for key: ${key}`);
+                return false;
             }
-            return false;
+            core.info(`Cache restored for ${path} with key: ${cacheKey}`);
+            if (!fs.existsSync(path)) {
+                core.warning(`Cache key '${cacheKey}' was found, but the file '${path}' is missing after restore.`);
+                return false;
+            }
+            return true;
         }
         catch (error) {
-            core.warning(`Failed to restore cache for key ${key}: ${(0, utils_1.getErrorMessage)(error)}`); // Use imported function
+            core.warning(`Failed to restore cache for key ${key}: ${(0, errors_1.getErrorMessage)(error)}`);
             return false;
         }
     }
+    /**
+     * Saves a file to the GitHub Actions cache
+     * @param key Cache key to save under
+     * @param path Path of the file to cache
+     */
     async save(key, path) {
         if (!fs.existsSync(path)) {
-            core.warning(`Cache file '${path}' does not exist. Cannot save cache with key ${key}.`);
+            core.warning(`Cache file or directory '${path}' does not exist. Cannot save cache with key ${key}.`);
             return;
         }
-        core.info(`Saving cache for ${path} with key: ${key}`);
+        core.info(`Attempting to save cache for path ${path} with key: ${key}`);
         try {
             await cache.saveCache([path], key);
             core.info(`Cache saved successfully for key: ${key}`);
         }
         catch (error) {
-            const message = (0, utils_1.getErrorMessage)(error); // Use imported function
+            const message = (0, errors_1.getErrorMessage)(error);
             if (error instanceof cache.ValidationError || error instanceof cache.ReserveCacheError) {
                 core.warning(`Cache save warning for key ${key}: ${message}`);
             }
@@ -69670,7 +69742,7 @@ exports.CacheManager = CacheManager;
 
 /***/ }),
 
-/***/ 2595:
+/***/ 1143:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -69709,79 +69781,96 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.ComposeParser = void 0;
-const fs = __importStar(__nccwpck_require__(9896));
-const yaml = __importStar(__nccwpck_require__(4281));
+exports.DockerBuildxCommand = void 0;
 const core = __importStar(__nccwpck_require__(7484));
-class ComposeParser {
-    filePaths;
-    constructor(filePaths) {
-        if (filePaths.length === 0)
-            throw new Error('No Compose file paths provided.');
-        // Ensure all specified files exist upon instantiation
-        filePaths.forEach((filePath) => {
-            if (!fs.existsSync(filePath))
-                throw new Error(`Compose file not found: ${filePath}`);
-        });
-        this.filePaths = filePaths;
+const exec_1 = __nccwpck_require__(5236);
+const errors_1 = __nccwpck_require__(3916);
+const platform_1 = __nccwpck_require__(3728);
+const image_manifest_parser_1 = __nccwpck_require__(2145);
+/**
+ * Handles Docker Buildx commands for inspecting remote image manifests
+ */
+class DockerBuildxCommand {
+    manifestParser;
+    /**
+     * Creates a new Docker Buildx command handler
+     * @param manifestParser Parser for image manifests
+     */
+    constructor(manifestParser) {
+        this.manifestParser = manifestParser;
     }
     /**
-     * Reads and parses all specified Compose files to extract a sorted, unique list
-     * of image information (name and platform).
-     * @returns A readonly array of unique ImageInfo objects, sorted by name then platform.
+     * Finds a specific platform digest in manifest list
+     * @param manifests List of manifests to search
+     * @param platform Target platform string (os/arch/variant)
+     * @returns Digest string or null if not found
      */
-    getImageList() {
-        const imageInfos = this.filePaths.flatMap((filePath) => {
-            try {
-                const fileContents = fs.readFileSync(filePath, 'utf8');
-                const data = yaml.load(fileContents);
-                // Use optional chaining and nullish coalescing for safety
-                const services = data?.services ?? {};
-                // Extract ImageInfo objects using reduce
-                return Object.entries(services).reduce((accumulator, [, service]) => 
-                // Only add if service and service.image are defined
-                service?.image ? [...accumulator, { imageName: service.image, platform: service.platform }] : accumulator, [] // Initial value for the accumulator
-                );
-            }
-            catch (error) {
-                const message = error instanceof Error ? error.message : String(error);
-                core.error(`Failed to read/parse YAML file '${filePath}': ${message}`);
-                throw new Error(`Could not process compose file: ${filePath}`);
-            }
+    findDigestForPlatform(manifests, platform) {
+        const [targetOs, targetArch, targetVariant] = platform.split('/');
+        if (!targetOs || !targetArch) {
+            core.warning(`Invalid target platform string provided for search: ${platform}`);
+            return null;
+        }
+        const foundManifest = manifests.find((manifest) => {
+            const p = manifest?.platform;
+            return (p?.os === targetOs &&
+                p?.architecture === targetArch &&
+                ((!targetVariant && !p.variant) || (targetVariant && p.variant === targetVariant)));
         });
-        // Deduplicate based on the combination of imageName and platform using reduce
-        const uniqueImageInfos = imageInfos.reduce((uniqueList, currentInfo) => {
-            // Create a unique key for each image+platform combination
-            const key = `${currentInfo.imageName}@@${currentInfo.platform ?? 'default'}`;
-            // Check if an item with the same key already exists in the accumulator
-            const exists = uniqueList.some((item) => `${item.imageName}@@${item.platform ?? 'default'}` === key);
-            // If it doesn't exist, add it to the unique list
-            return exists ? uniqueList : [...uniqueList, currentInfo];
-        }, []); // Initial value for the accumulator
-        // Sort the unique list, primarily by image name, then by platform (undefined first)
-        // Create a mutable copy for sorting, then return as readonly
-        return [...uniqueImageInfos].sort((infoA, infoB) => {
-            const nameCompare = infoA.imageName.localeCompare(infoB.imageName);
-            if (nameCompare !== 0)
-                return nameCompare;
-            const platformA = infoA.platform;
-            const platformB = infoB.platform;
-            if (platformA === platformB)
-                return 0; // Both same (or both undefined)
-            if (platformA === undefined)
-                return -1; // Undefined platforms come first
-            if (platformB === undefined)
-                return 1;
-            return platformA.localeCompare(platformB); // Sort defined platforms alphabetically
-        });
+        return foundManifest?.digest ?? null;
+    }
+    /**
+     * Gets the digest for a specific platform from a remote image
+     * @param imageName Image name to inspect
+     * @param platform Optional target platform, defaults to current host platform
+     * @returns Digest string or null if not found/error
+     */
+    async getRemoteDigest(imageName, platform) {
+        const targetPlatform = platform ?? (0, platform_1.getCurrentOciPlatform)();
+        const platformDesc = platform ?? `default host (${targetPlatform ?? 'unknown'})`;
+        if (!targetPlatform) {
+            core.warning(`Could not determine valid OCI platform for ${imageName}.`);
+            return null;
+        }
+        try {
+            const inspectArgs = ['buildx', 'imagetools', 'inspect', '--format={{json .Manifest}}', imageName];
+            core.info(`Inspecting image ${imageName} manifest (targeting platform: ${platformDesc})`);
+            const { exitCode, stdout, stderr } = await (0, exec_1.getExecOutput)('docker', inspectArgs, {
+                silent: true,
+                ignoreReturnCode: true,
+            });
+            if (exitCode !== 0) {
+                core.warning(`'docker buildx imagetools inspect' command failed for ${imageName}: ${stderr.trim()}`);
+                return null;
+            }
+            if (!stdout.trim())
+                throw new Error(`Inspect command for ${imageName} returned empty output.`);
+            const manifestData = this.manifestParser.parse(stdout);
+            // Return appropriate digest based on manifest type
+            if ((0, image_manifest_parser_1.isMultiPlatformManifest)(manifestData)) {
+                core.debug(`Detected manifest list for ${imageName}. Searching for platform ${targetPlatform}...`);
+                const platformDigest = this.findDigestForPlatform(manifestData.manifests, targetPlatform);
+                if (!platformDigest) {
+                    throw new Error(`Could not extract a valid digest for platform ${platformDesc} from manifest list.`);
+                }
+                return platformDigest;
+            }
+            // Single platform manifest case
+            core.debug(`Detected single manifest digest for ${imageName}`);
+            return manifestData.digest;
+        }
+        catch (error) {
+            core.warning(`Failed to get remote digest for ${imageName} (platform: ${platformDesc}): ${(0, errors_1.getErrorMessage)(error)}`);
+            return null;
+        }
     }
 }
-exports.ComposeParser = ComposeParser;
+exports.DockerBuildxCommand = DockerBuildxCommand;
 
 
 /***/ }),
 
-/***/ 4919:
+/***/ 5146:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -69823,65 +69912,314 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.DockerCommand = void 0;
 const core = __importStar(__nccwpck_require__(7484));
 const exec_1 = __nccwpck_require__(5236);
+const errors_1 = __nccwpck_require__(3916);
+/** Type guard for digest validation */
+const isValidDigest = (digest) => typeof digest === 'string' && digest.startsWith('sha256:');
+/**
+ * Provides Docker CLI command wrappers for core Docker operations
+ */
 class DockerCommand {
+    /**
+     * Pulls a Docker image from a registry
+     * @param image Image name to pull
+     * @throws Error on pull failure
+     */
     async pull(image) {
         core.info(`Pulling image: ${image}`);
-        // Use exec directly if output isn't needed immediately
-        const exitCode = await (0, exec_1.exec)('docker', ['pull', image], { ignoreReturnCode: true, silent: true });
+        const exitCode = await (0, exec_1.exec)('docker', ['pull', image], {
+            ignoreReturnCode: true,
+            silent: true,
+        });
         if (exitCode !== 0) {
             throw new Error(`Failed to pull image: ${image} (exit code: ${exitCode})`);
         }
     }
+    /**
+     * Loads a Docker image from a tar archive
+     * @param filePath Path to the tar file
+     * @throws Error on load failure
+     */
     async load(filePath) {
-        const exitCode = await (0, exec_1.exec)('docker', ['load', '--input', filePath], { ignoreReturnCode: true, silent: true });
+        core.debug(`Loading image from tar: ${filePath}`);
+        const exitCode = await (0, exec_1.exec)('docker', ['load', '--input', filePath], {
+            ignoreReturnCode: true,
+            silent: true,
+        });
         if (exitCode !== 0) {
             throw new Error(`Failed to load images from ${filePath} (exit code: ${exitCode})`);
         }
     }
+    /**
+     * Saves a Docker image to a tar archive
+     * @param filePath Path to save the tar file
+     * @param images List of images to save (only first one is used)
+     * @throws Error on save failure
+     */
     async save(filePath, images) {
         if (images.length === 0) {
             core.warning('No images provided to save.');
             return;
         }
         const imageToSave = images[0];
+        core.debug(`Saving image ${imageToSave} to ${filePath}`);
         const args = ['save', '--output', filePath, imageToSave];
-        const exitCode = await (0, exec_1.exec)('docker', args, { ignoreReturnCode: true, silent: true });
+        const exitCode = await (0, exec_1.exec)('docker', args, {
+            ignoreReturnCode: true,
+            silent: true,
+        });
         if (exitCode !== 0) {
             throw new Error(`Failed to save image ${imageToSave} to ${filePath} (exit code: ${exitCode})`);
         }
     }
+    /**
+     * Gets the RepoDigest (manifest digest) of a locally available Docker image
+     * @param imageName Name of the image to get digest for
+     * @returns Digest string (sha256:...) or null if not found or on error
+     */
     async getDigest(imageName) {
+        core.debug(`Getting digest for local image: ${imageName}`);
         try {
-            const { exitCode, stdout, stderr } = await (0, exec_1.getExecOutput)('docker', 
-            // Use Go template for precise output, trim potential whitespace
-            ['inspect', '--format', '{{range .RepoDigests}}{{println .}}{{end}}', imageName], { ignoreReturnCode: true, silent: true });
-            // Find the digest corresponding to the specific image name (tag might differ)
-            // Example RepoDigest: myrepo/myimage@sha256:abcdef... or myimage:latest@sha256:abcdef...
-            // We need the sha256 part. RepoDigests can have multiple entries if multiple tags point to the same digest.
-            // A simpler approach for now might be to just grab the first valid digest found.
+            const { exitCode, stdout, stderr } = await (0, exec_1.getExecOutput)('docker', ['inspect', '--format', '{{range .RepoDigests}}{{println .}}{{end}}', imageName], { ignoreReturnCode: true, silent: true });
+            // Split output by lines and find the first line containing a sha256 digest
             const digests = stdout.trim().split('\n');
-            const digestLine = digests.find((line) => line.includes('@sha256:')); // Find a line with the digest format
-            if (exitCode === 0 && digestLine) {
-                const digest = digestLine.split('@')[1];
-                if (digest?.startsWith('sha256:')) {
+            const foundRepoDigest = digests.find((line) => line.includes('@sha256:'));
+            if (exitCode === 0 && foundRepoDigest) {
+                // Extract only the digest part after the @ symbol
+                const digest = foundRepoDigest.split('@')[1];
+                if (isValidDigest(digest)) {
                     core.info(`Found RepoDigest for ${imageName}: ${digest}`);
                     return digest;
                 }
             }
-            // Log stderr only if potentially useful (non-zero exit code or no digest found)
-            if (exitCode !== 0 || !digestLine) {
+            if (exitCode !== 0 || !foundRepoDigest) {
                 core.warning(`Could not retrieve a valid RepoDigest for local image ${imageName}. ExitCode: ${exitCode}, Stderr: ${stderr.trim()}`);
             }
             return null;
         }
         catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            core.error(`Error inspecting local image ${imageName}: ${message}`);
+            core.error(`Error inspecting local image ${imageName}: ${(0, errors_1.getErrorMessage)(error)}`);
             return null;
         }
     }
 }
 exports.DockerCommand = DockerCommand;
+
+
+/***/ }),
+
+/***/ 5780:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.DockerComposeFileParser = void 0;
+const fs = __importStar(__nccwpck_require__(9896));
+const core = __importStar(__nccwpck_require__(7484));
+const yaml = __importStar(__nccwpck_require__(4281));
+const errors_1 = __nccwpck_require__(3916);
+/**
+ * Parser for Docker Compose files that extracts image information
+ */
+class DockerComposeFileParser {
+    filePaths;
+    /**
+     * Creates a new Docker Compose file parser
+     * @param filePaths Paths to Docker Compose files to parse
+     * @throws Error if no paths provided or files not found
+     */
+    constructor(filePaths) {
+        if (filePaths.length === 0)
+            throw new Error('No Compose file paths provided.');
+        // Check if all files exist using every() method
+        const allFilesExist = filePaths.every((filePath) => fs.existsSync(filePath));
+        if (!allFilesExist) {
+            const missingFile = filePaths.find((filePath) => !fs.existsSync(filePath));
+            throw new Error(`Compose file not found: ${missingFile}`);
+        }
+        this.filePaths = filePaths;
+    }
+    /**
+     * Extracts unique, sorted list of images from all compose files
+     * @returns Array of unique ImageInfo objects
+     */
+    getImageList() {
+        const imageInfos = this.filePaths.flatMap((filePath) => {
+            try {
+                const fileContents = fs.readFileSync(filePath, 'utf8');
+                const data = yaml.load(fileContents);
+                const services = data?.services ?? {};
+                return Object.entries(services).reduce((accumulator, [, service]) => service?.image ? [...accumulator, { imageName: service.image, platform: service.platform }] : accumulator, []);
+            }
+            catch (error) {
+                core.error(`Failed to read/parse YAML file '${filePath}': ${(0, errors_1.getErrorMessage)(error)}`);
+                throw new Error(`Could not process compose file: ${filePath}`);
+            }
+        });
+        const uniqueImageInfos = imageInfos.reduce((uniqueList, currentInfo) => {
+            const key = `${currentInfo.imageName}@@${currentInfo.platform ?? 'default'}`;
+            const exists = uniqueList.some((item) => `${item.imageName}@@${item.platform ?? 'default'}` === key);
+            return exists ? uniqueList : [...uniqueList, currentInfo];
+        }, []);
+        return [...uniqueImageInfos].sort((infoA, infoB) => {
+            const nameCompare = infoA.imageName.localeCompare(infoB.imageName);
+            if (nameCompare !== 0)
+                return nameCompare;
+            const platformA = infoA.platform;
+            const platformB = infoB.platform;
+            if (platformA === platformB)
+                return 0;
+            if (platformA === undefined)
+                return -1;
+            if (platformB === undefined)
+                return 1;
+            return platformA.localeCompare(platformB);
+        });
+    }
+}
+exports.DockerComposeFileParser = DockerComposeFileParser;
+
+
+/***/ }),
+
+/***/ 2145:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.ImageManifestParser = void 0;
+exports.isMultiPlatformManifest = isMultiPlatformManifest;
+const errors_1 = __nccwpck_require__(3916);
+/** Type guard for validating sha256 digests */
+const isValidDigest = (digest) => typeof digest === 'string' && digest.startsWith('sha256:');
+/** Type guard for validating PlatformInfo structure */
+function isPlatformInfo(p) {
+    if (typeof p !== 'object' || p === null)
+        return false;
+    const platform = p;
+    const archOk = !('architecture' in platform) || typeof platform.architecture === 'string';
+    const osOk = !('os' in platform) || typeof platform.os === 'string';
+    const variantOk = !('variant' in platform) || typeof platform.variant === 'string';
+    return archOk && osOk && variantOk;
+}
+/** Type guard for validating ManifestListEntry structure */
+function isManifestListEntry(entry) {
+    if (typeof entry !== 'object' || entry === null)
+        return false;
+    if (!('digest' in entry) || !isValidDigest(entry.digest))
+        return false;
+    if ('platform' in entry && entry.platform !== undefined && !isPlatformInfo(entry.platform))
+        return false;
+    return true;
+}
+/**
+ * Type guard to differentiate between manifest types
+ * @param manifest Manifest to check
+ * @returns True if manifest is a multi-platform manifest
+ */
+function isMultiPlatformManifest(manifest) {
+    return Array.isArray(manifest.manifests);
+}
+/**
+ * Parser for Docker image manifests
+ */
+class ImageManifestParser {
+    /**
+     * Parse JSON output from docker inspect command
+     * @param jsonString JSON string from Docker manifest inspection
+     * @returns Typed ImageManifest object (single or multi-platform)
+     * @throws Error when parsing fails or structure is invalid
+     */
+    parse(jsonString) {
+        // Use try-catch with immediate assignment to a constant instead of let
+        try {
+            const parsedData = JSON.parse(jsonString);
+            if (typeof parsedData !== 'object' || parsedData === null) {
+                throw new Error('Parsed data is not an object.');
+            }
+            if (!('mediaType' in parsedData) || typeof parsedData.mediaType !== 'string') {
+                throw new Error('Parsed JSON lacks required top-level "mediaType" string.');
+            }
+            if ('manifests' in parsedData && Array.isArray(parsedData.manifests)) {
+                if (!parsedData.manifests.every(isManifestListEntry)) {
+                    throw new Error('Parsed JSON has invalid structure within "manifests" array.');
+                }
+                return parsedData;
+            }
+            else if ('digest' in parsedData && isValidDigest(parsedData.digest)) {
+                return parsedData;
+            }
+            throw new Error('Parsed JSON does not match expected single or multi-platform manifest structure.');
+        }
+        catch (error) {
+            throw new Error(`Failed to parse input as JSON: ${(0, errors_1.getErrorMessage)(error)}`);
+        }
+    }
+}
+exports.ImageManifestParser = ImageManifestParser;
+
+
+/***/ }),
+
+/***/ 3916:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+/**
+ * Utility functions for handling errors safely
+ */
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.getErrorMessage = getErrorMessage;
+/**
+ * Safely extracts an error message from an unknown caught value.
+ * Checks if the value is an Error instance and returns its message,
+ * otherwise converts the value to a string.
+ * @param error - The value caught in a catch block (type unknown)
+ * @returns A string representing the error message
+ */
+function getErrorMessage(error) {
+    // Check if it's an Error object to access message safely
+    if (error instanceof Error) {
+        return error.message;
+    }
+    // Otherwise, convert the caught value to a string
+    return String(error ?? 'Unknown error'); // Handle null/undefined case
+}
 
 
 /***/ }),
@@ -69925,232 +70263,129 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.main = main;
 const core = __importStar(__nccwpck_require__(7484));
 const action_runner_1 = __nccwpck_require__(8436);
+const cache_manager_1 = __nccwpck_require__(7031);
+const docker_buildx_command_1 = __nccwpck_require__(1143);
+const docker_command_1 = __nccwpck_require__(5146);
+const image_manifest_parser_1 = __nccwpck_require__(2145);
+/**
+ * Main entry point for the Docker Compose Cache Action.
+ * Sets up the dependency graph and executes the workflow.
+ *
+ * @returns Promise that resolves when the action completes
+ */
 async function main() {
     try {
-        const runner = new action_runner_1.ActionRunner();
+        // Instantiate dependencies with proper injection
+        const dockerCommand = new docker_command_1.DockerCommand();
+        const cacheManager = new cache_manager_1.CacheManager();
+        const manifestParser = new image_manifest_parser_1.ImageManifestParser();
+        const dockerBuildxCommand = new docker_buildx_command_1.DockerBuildxCommand(manifestParser);
+        // Execute the action workflow
+        const runner = new action_runner_1.ActionRunner(dockerCommand, cacheManager, dockerBuildxCommand);
         await runner.run();
     }
     catch (error) {
-        if (error instanceof Error) {
-            core.setFailed(error.message);
-        }
-        else {
-            core.setFailed('An unexpected error occurred.');
-        }
+        const message = error instanceof Error ? error.message : 'An unexpected error occurred';
+        core.setFailed(message);
     }
 }
-void main();
+// Execute main function unless being imported for testing
+if (require.main === require.cache[eval('__filename')]) {
+    void main();
+}
 
 
 /***/ }),
 
-/***/ 2761:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.RemoteRegistryClient = void 0;
-const core = __importStar(__nccwpck_require__(7484));
-const exec_1 = __nccwpck_require__(5236);
-const utils_1 = __nccwpck_require__(1798);
-// Helper to parse platform string like "os/arch[/variant]"
-const parsePlatform = (platformString) => {
-    const [os, arch, variant] = platformString.split('/');
-    return { os, arch, variant };
-};
-class RemoteRegistryClient {
-    skopeoInstaller;
-    constructor(skopeoInstaller) {
-        this.skopeoInstaller = skopeoInstaller;
-    }
-    /**
-     * Fetches the manifest digest for a specific image tag and platform from a remote registry.
-     * @param imageName - The full image name including tag (e.g., "nginx:stable-alpine").
-     * @param platform - Optional platform string (e.g., "linux/amd64").
-     * @returns The sha256 digest string if successful, otherwise null.
-     */
-    async getRemoteDigest(imageName, platform) {
-        const platformDesc = platform ?? 'default host';
-        try {
-            await this.skopeoInstaller.ensureInstalled();
-            // Build skopeo arguments, adding platform overrides if specified
-            const baseArgs = ['inspect'];
-            const platformArgs = platform
-                ? (() => {
-                    const { os, arch, variant } = parsePlatform(platform);
-                    const args = [];
-                    // Skopeo uses specific override flags
-                    if (os)
-                        args.push('--override-os', os);
-                    if (arch)
-                        args.push('--override-arch', arch);
-                    if (variant)
-                        args.push('--override-variant', variant);
-                    core.info(`Inspecting image ${imageName} for platform ${platform}`);
-                    return args;
-                })()
-                : [];
-            if (!platform) {
-                core.info(`Inspecting image ${imageName} for default platform`);
-            }
-            const inspectArgs = [...baseArgs, ...platformArgs, `docker://${imageName}`];
-            // Execute skopeo inspect
-            const { exitCode, stdout, stderr } = await (0, exec_1.getExecOutput)('skopeo', inspectArgs, {
-                ignoreReturnCode: true, // Handle non-zero exit codes manually
-                silent: true, // Reduce log verbosity
-            });
-            if (exitCode !== 0) {
-                core.warning(`skopeo inspect failed for ${imageName} (platform: ${platformDesc}): ${stderr.trim()}`);
-                return null;
-            }
-            // Parse the output and extract the digest
-            const inspectData = JSON.parse(stdout);
-            // Type guard to safely access the Digest property
-            if (typeof inspectData === 'object' &&
-                inspectData !== null &&
-                'Digest' in inspectData &&
-                typeof inspectData.Digest === 'string' &&
-                inspectData.Digest.startsWith('sha256:')) {
-                return inspectData.Digest; // Return the valid digest
-            }
-            else {
-                // Throw an error if digest is not found or invalid
-                core.debug(`Inspect data for ${imageName} (platform: ${platformDesc}): ${JSON.stringify(inspectData)}`);
-                throw new Error('Digest not found or invalid in skopeo inspect output.');
-            }
-        }
-        catch (error) {
-            // Catch any error (install, exec, parse, validation) and log warning
-            core.warning(`Failed to get remote digest for ${imageName} (platform: ${platformDesc}): ${(0, utils_1.getErrorMessage)(error)}`);
-            return null; // Return null on any failure
-        }
-    }
-}
-exports.RemoteRegistryClient = RemoteRegistryClient;
-
-
-/***/ }),
-
-/***/ 2619:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.SkopeoInstaller = void 0;
-const core = __importStar(__nccwpck_require__(7484));
-const exec = __importStar(__nccwpck_require__(5236));
-class SkopeoInstaller {
-    isInstalled = false; // Track installation status per instance
-    async ensureInstalled() {
-        if (this.isInstalled) {
-            return;
-        } // Skip if already installed in this run
-        core.info('Checking and installing skopeo if necessary...');
-        try {
-            // Using getExecOutput to check existence silently first might be an option,
-            // but apt-get install is idempotent, so running it is generally safe.
-            await exec.exec('sudo', ['apt-get', 'update', '-y'], { ignoreReturnCode: true, silent: true });
-            await exec.exec('sudo', ['apt-get', 'install', '-y', 'skopeo'], { silent: true });
-            await exec.exec('skopeo', ['--version'], { silent: true }); // Verify
-            core.info('Skopeo installed or already present.');
-            this.isInstalled = true; // Mark as installed for this instance
-        }
-        catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            core.error(`Failed to install or verify skopeo: ${message}`);
-            throw new Error(`Skopeo installation failed.`);
-        }
-    }
-}
-exports.SkopeoInstaller = SkopeoInstaller;
-
-
-/***/ }),
-
-/***/ 1798:
+/***/ 3728:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
 
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.getErrorMessage = getErrorMessage;
 /**
- * Safely extracts an error message from an unknown type.
- * @param error - The error object or value caught.
- * @returns A string representation of the error message.
+ * Platform utility module for mapping between Node.js and OCI/Docker platform identifiers.
+ * Provides conversion and normalization of OS/Architecture values.
  */
-function getErrorMessage(error) {
-    return error instanceof Error ? error.message : String(error ?? 'Unknown error');
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.mapNodeArchToOciArch = mapNodeArchToOciArch;
+exports.mapNodeOsToOciOs = mapNodeOsToOciOs;
+exports.getCurrentOciPlatform = getCurrentOciPlatform;
+exports.normalizePlatform = normalizePlatform;
+/**
+ * Maps Node.js architecture identifiers to OCI architecture identifiers
+ */
+const NODE_TO_OCI_ARCH_MAP = new Map([
+    ['x64', 'amd64'],
+    ['arm64', 'arm64'],
+    ['ia32', '386'],
+    ['arm', 'arm'],
+    ['ppc64', 'ppc64le'],
+    ['s390x', 's390x'],
+    ['mips', 'mips'],
+    ['mipsel', 'mipsle'],
+    ['loong64', 'loong64'],
+    ['riscv64', 'riscv64'],
+    // Common Aliases
+    ['aarch64', 'arm64'],
+    ['x86_64', 'amd64'],
+    ['x86', '386'],
+    ['ppc', 'ppc'],
+    ['s390', 's390'],
+    ['mips64el', 'mips64le'],
+]);
+/** Set of known OCI architecture values for quick lookup */
+const OCI_ARCH_VALUES = new Set(NODE_TO_OCI_ARCH_MAP.values());
+/** Maps Node.js platform identifiers to OCI OS identifiers */
+const NODE_TO_OCI_OS_MAP = new Map([
+    ['linux', 'linux'],
+    ['win32', 'windows'],
+    ['darwin', 'darwin'],
+    ['aix', 'aix'],
+    ['freebsd', 'freebsd'],
+    ['openbsd', 'openbsd'],
+    ['sunos', 'solaris'],
+    ['android', 'android'],
+]);
+/** Set of known OCI OS values for quick lookup */
+const OCI_OS_VALUES = new Set(NODE_TO_OCI_OS_MAP.values());
+/**
+ * Maps Node.js process.arch to the corresponding OCI architecture identifier
+ * @param nodeArch Node.js architecture identifier
+ * @returns OCI architecture identifier or undefined if not found
+ */
+function mapNodeArchToOciArch(nodeArch) {
+    const mappedArch = NODE_TO_OCI_ARCH_MAP.get(nodeArch);
+    return mappedArch ?? (OCI_ARCH_VALUES.has(nodeArch) ? nodeArch : undefined);
+}
+/**
+ * Maps Node.js process.platform to the corresponding OCI OS identifier
+ * @param nodePlatform Node.js platform identifier
+ * @returns OCI OS identifier or undefined if not found
+ */
+function mapNodeOsToOciOs(nodePlatform) {
+    const mappedOs = NODE_TO_OCI_OS_MAP.get(nodePlatform);
+    return mappedOs ?? (OCI_OS_VALUES.has(nodePlatform) ? nodePlatform : undefined);
+}
+/**
+ * Gets the OCI-standard platform string for the current Node.js environment
+ * @returns Platform string in format "os/arch" or null if mapping failed
+ */
+function getCurrentOciPlatform() {
+    const os = mapNodeOsToOciOs(process.platform);
+    const arch = mapNodeArchToOciArch(process.arch);
+    return os && arch ? `${os}/${arch}` : null;
+}
+/**
+ * Normalizes a platform string for safe use in cache keys or file paths
+ * @param platform Platform string to normalize (e.g., "linux/amd64")
+ * @returns Normalized string with slashes replaced by underscores
+ */
+function normalizePlatform(platform) {
+    const targetPlatform = platform ?? getCurrentOciPlatform() ?? 'unknown_platform';
+    return targetPlatform.replace(/\//g, '_');
 }
 
 
