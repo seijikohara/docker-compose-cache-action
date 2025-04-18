@@ -17,7 +17,12 @@ export declare class DockerBuildxCommand {
      */
     private findDigestForPlatform;
     /**
-     * Gets the digest for a specific platform from a remote image
+     * Gets the digest for a specific platform from a remote image using consistent format
+     * This uses a two-step approach to get a digest compatible with the local RepoDigest format:
+     * 1. First, pull image by digest using the manifest digest
+     * 2. Then, inspect the pulled image to get its RepoDigest
+     * This ensures the remote and local digest formats match exactly
+     *
      * @param imageName Image name to inspect
      * @param platform Optional target platform, defaults to current host platform
      * @returns Digest string or null if not found/error

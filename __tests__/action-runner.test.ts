@@ -67,7 +67,6 @@ jest.mock('../src/platform', () => ({
 // Type definition for private methods
 type PrivateMethods = {
   determineComposeFiles: () => string[];
-  calculateFilesHash: () => string;
 };
 
 describe('ActionRunner', () => {
@@ -133,7 +132,6 @@ describe('ActionRunner', () => {
     jest
       .spyOn(actionRunner as unknown as PrivateMethods, 'determineComposeFiles')
       .mockReturnValue(['docker-compose.yml']);
-    jest.spyOn(actionRunner as unknown as PrivateMethods, 'calculateFilesHash').mockReturnValue('filehash123');
   });
 
   afterEach(() => {
@@ -303,7 +301,6 @@ describe('ActionRunner', () => {
         jest
           .spyOn(actionRunner as unknown as PrivateMethods, 'determineComposeFiles')
           .mockReturnValue(['docker-compose.yml']);
-        jest.spyOn(actionRunner as unknown as PrivateMethods, 'calculateFilesHash').mockReturnValue('filehash123');
 
         // Mock getRemoteDigest to track calls for different images
         mockDockerBuildxCommand.getRemoteDigest.mockImplementation((_imageName, _platform) => {
@@ -361,19 +358,22 @@ describe('ActionRunner', () => {
         expect(mockDockerCommand.save).not.toHaveBeenCalled(); // Shouldn't try to save
       });
 
-      it('should handle digest mismatch after pull', async () => {
+      it('should use local digest for caching after pull', async () => {
         // Arrange
         mockDockerBuildxCommand.getRemoteDigest.mockResolvedValue('sha256:remoteDigest');
         mockCacheManager.restore.mockResolvedValue(false); // Cache miss
         mockDockerCommand.pull.mockResolvedValue();
-        mockDockerCommand.getDigest.mockResolvedValue('sha256:differentDigest'); // Different digest
+        mockDockerCommand.getDigest.mockResolvedValue('sha256:localDigest'); // Different local digest
 
         // Act
         await actionRunner.run();
 
         // Assert
-        expect(core.warning).toHaveBeenCalledWith(expect.stringContaining('Digest check failed after pulling'));
-        expect(mockCacheManager.save).not.toHaveBeenCalled(); // Shouldn't save cache for mismatched digest
+        // Should save cache using local digest
+        expect(mockCacheManager.save).toHaveBeenCalledWith(
+          expect.stringContaining('sha256:localDigest'),
+          expect.any(String)
+        );
       });
     });
   });

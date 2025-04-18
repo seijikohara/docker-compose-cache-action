@@ -35,16 +35,10 @@ export declare class ActionRunner {
      */
     private findDefaultComposeFile;
     /**
-     * Calculates hash of compose file contents
-     * @returns SHA-256 hash of combined file contents
-     */
-    private calculateFilesHash;
-    /**
      * Generates cache key for an image
      * @param imageName Image name
      * @param platform Target platform
-     * @param remoteDigest Image digest
-     * @param filesHash Hash of compose files
+     * @param digest Image digest
      * @returns Cache key string
      */
     private generateCacheKey;
@@ -52,8 +46,7 @@ export declare class ActionRunner {
      * Generates filesystem path for cached image
      * @param imageName Image name
      * @param platform Target platform
-     * @param remoteDigest Image digest
-     * @param filesHash Hash of compose files
+     * @param digest Image digest
      * @returns Path for tar file
      */
     private generateCachePath;

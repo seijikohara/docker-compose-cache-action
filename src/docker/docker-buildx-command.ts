@@ -1,5 +1,5 @@
 import * as core from '@actions/core';
-import { getExecOutput } from '@actions/exec';
+import { exec, getExecOutput } from '@actions/exec';
 import { getErrorMessage } from '../errors';
 import { getCurrentOciPlatform } from '../platform';
 import { ImageManifestParser, isMultiPlatformManifest, ManifestListEntry } from './image-manifest-parser';
@@ -42,7 +42,12 @@ export class DockerBuildxCommand {
   }
 
   /**
-   * Gets the digest for a specific platform from a remote image
+   * Gets the digest for a specific platform from a remote image using consistent format
+   * This uses a two-step approach to get a digest compatible with the local RepoDigest format:
+   * 1. First, pull image by digest using the manifest digest
+   * 2. Then, inspect the pulled image to get its RepoDigest
+   * This ensures the remote and local digest formats match exactly
+   *
    * @param imageName Image name to inspect
    * @param platform Optional target platform, defaults to current host platform
    * @returns Digest string or null if not found/error
@@ -57,6 +62,7 @@ export class DockerBuildxCommand {
     }
 
     try {
+      // First step: Get manifest digest
       const inspectArgs = ['buildx', 'imagetools', 'inspect', '--format={{json .Manifest}}', imageName];
       core.info(`Inspecting image ${imageName} manifest (targeting platform: ${platformDesc})`);
       const { exitCode, stdout, stderr } = await getExecOutput('docker', inspectArgs, {
@@ -72,21 +78,73 @@ export class DockerBuildxCommand {
 
       const manifestData = this.manifestParser.parse(stdout);
 
-      // Return appropriate digest based on manifest type
+      // Extract manifest digest based on platform
+      let manifestDigest: string | null = null;
+
       if (isMultiPlatformManifest(manifestData)) {
         core.debug(`Detected manifest list for ${imageName}. Searching for platform ${targetPlatform}...`);
-        const platformDigest = this.findDigestForPlatform(manifestData.manifests, targetPlatform);
+        manifestDigest = this.findDigestForPlatform(manifestData.manifests, targetPlatform);
 
-        if (!platformDigest) {
+        if (!manifestDigest) {
           throw new Error(`Could not extract a valid digest for platform ${platformDesc} from manifest list.`);
         }
-
-        return platformDigest;
+      } else {
+        // Single platform manifest case
+        core.debug(`Detected single manifest digest for ${imageName}`);
+        manifestDigest = manifestData.digest;
       }
 
-      // Single platform manifest case
-      core.debug(`Detected single manifest digest for ${imageName}`);
-      return manifestData.digest;
+      if (!manifestDigest) {
+        throw new Error(`Failed to extract manifest digest for ${imageName}`);
+      }
+
+      core.debug(`Found manifest digest for ${imageName}: ${manifestDigest}`);
+
+      // Second step: Pull a temporary image using this digest to get its RepoDigest
+      // This is done by using the Docker CLI to pull just the image manifest
+      // Then we can get the RepoDigest which will match what local images report
+      const tempImageWithDigest = `${imageName.split(':')[0]}@${manifestDigest}`;
+
+      // Pull just the manifest without downloading the layers (--pull=false)
+      core.debug(`Pulling manifest for ${tempImageWithDigest} to get RepoDigest...`);
+
+      const pullArgs = ['pull', '--quiet', tempImageWithDigest];
+      try {
+        // Pull the image by digest
+        await exec('docker', pullArgs, { silent: true });
+
+        // Now get the RepoDigest from the pulled image
+        const { exitCode: inspectExitCode, stdout: inspectStdout } = await getExecOutput(
+          'docker',
+          ['inspect', '--format', '{{range .RepoDigests}}{{println .}}{{end}}', tempImageWithDigest],
+          { silent: true, ignoreReturnCode: true }
+        );
+
+        if (inspectExitCode !== 0) {
+          throw new Error(`Failed to inspect pulled image: ${tempImageWithDigest}`);
+        }
+
+        const digests = inspectStdout.trim().split('\n');
+        const foundRepoDigest = digests.find((line) => line.includes('@sha256:'));
+
+        if (foundRepoDigest) {
+          const repoDigest = foundRepoDigest.split('@')[1];
+          core.info(`Found remote digest (RepoDigest format) for ${imageName}: ${repoDigest}`);
+
+          // Clean up the temporary pulled image
+          await exec('docker', ['rmi', tempImageWithDigest], { silent: true, ignoreReturnCode: true });
+
+          return repoDigest;
+        } else {
+          throw new Error(`Could not find RepoDigest in the pulled image: ${tempImageWithDigest}`);
+        }
+      } catch (pullError) {
+        core.warning(`Failed to pull image by digest: ${getErrorMessage(pullError)}`);
+
+        // Fallback to using the manifest digest directly
+        core.warning(`Falling back to using manifest digest directly: ${manifestDigest}`);
+        return manifestDigest;
+      }
     } catch (error) {
       core.warning(
         `Failed to get remote digest for ${imageName} (platform: ${platformDesc}): ${getErrorMessage(error)}`

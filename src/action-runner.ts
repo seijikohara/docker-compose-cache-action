@@ -1,4 +1,3 @@
-import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as core from '@actions/core';
@@ -117,54 +116,30 @@ export class ActionRunner {
   }
 
   /**
-   * Calculates hash of compose file contents
-   * @returns SHA-256 hash of combined file contents
-   */
-  private calculateFilesHash(): Digest {
-    // 安全な型の流れを確保しつつ、イミュータブルな操作を行う
-    const sortedFiles = [...this.composeFiles].sort();
-    const fileContents = sortedFiles.map((file) => fs.readFileSync(file, 'utf8'));
-    const combinedContent = fileContents.join('');
-    return crypto.createHash('sha256').update(combinedContent).digest('hex');
-  }
-
-  /**
    * Generates cache key for an image
    * @param imageName Image name
    * @param platform Target platform
-   * @param remoteDigest Image digest
-   * @param filesHash Hash of compose files
+   * @param digest Image digest
    * @returns Cache key string
    */
-  private generateCacheKey(
-    imageName: ImageName,
-    platform: Platform,
-    remoteDigest: Digest,
-    filesHash: Digest
-  ): CacheKey {
+  private generateCacheKey(imageName: ImageName, platform: Platform, digest: Digest): CacheKey {
     const safeImageName = imageName.replace(/[/:]/g, '_');
     const safePlatform = normalizePlatform(platform);
-    return `${this.cacheKeyPrefix}-${process.env.RUNNER_OS}-${safeImageName}-plt_${safePlatform}-${remoteDigest}-${filesHash}`;
+    return `${this.cacheKeyPrefix}-${process.env.RUNNER_OS}-${safeImageName}-${safePlatform}-${digest}`;
   }
 
   /**
    * Generates filesystem path for cached image
    * @param imageName Image name
    * @param platform Target platform
-   * @param remoteDigest Image digest
-   * @param filesHash Hash of compose files
+   * @param digest Image digest
    * @returns Path for tar file
    */
-  private generateCachePath(
-    imageName: ImageName,
-    platform: Platform,
-    remoteDigest: Digest,
-    filesHash: Digest
-  ): FilePath {
+  private generateCachePath(imageName: ImageName, platform: Platform, digest: Digest): FilePath {
     const safeImageName = imageName.replace(/[/:]/g, '_');
     const safePlatform = normalizePlatform(platform);
     const tempDir = process.env.RUNNER_TEMP ?? '/tmp';
-    return path.join(tempDir, `docker-image-${safeImageName}-plt_${safePlatform}-${remoteDigest}-${filesHash}.tar`);
+    return path.join(tempDir, `docker-image-${safeImageName}-${safePlatform}-${digest}.tar`);
   }
 
   /**
@@ -185,7 +160,6 @@ export class ActionRunner {
     }
     core.setOutput('image-list', imageInfosToProcess.map((info) => info.imageName).join(' '));
     core.info(`Processing ${imageInfosToProcess.length} image(s)...`);
-    const filesHash = this.calculateFilesHash();
 
     // Fetch remote digests for all images in parallel
     const metadataResults = await Promise.allSettled(
@@ -214,8 +188,8 @@ export class ActionRunner {
     // Prepare processing information with cache keys and paths
     const initialProcessingInfos: readonly ImageProcessingInfo[] = validMetadata.map((meta) => ({
       ...meta,
-      primaryKey: this.generateCacheKey(meta.imageName, meta.platform, meta.remoteDigest, filesHash),
-      cachePath: this.generateCachePath(meta.imageName, meta.platform, meta.remoteDigest, filesHash),
+      primaryKey: this.generateCacheKey(meta.imageName, meta.platform, meta.remoteDigest),
+      cachePath: this.generateCachePath(meta.imageName, meta.platform, meta.remoteDigest),
       needsPull: true,
     }));
 
@@ -285,13 +259,16 @@ export class ActionRunner {
       successfullyPulledInfo.map(async (info) => {
         try {
           const pulledDigest = await this.dockerCommand.getDigest(info.imageName);
-          if (pulledDigest && pulledDigest === info.remoteDigest) {
-            await this.dockerCommand.save(info.cachePath, [info.imageName]);
-            await this.cacheManager.save(info.primaryKey, info.cachePath);
+          if (pulledDigest) {
+            // ローカルのダイジェスト値を使用して新しいキャッシュキーとパスを生成
+            const localCacheKey = this.generateCacheKey(info.imageName, info.platform, pulledDigest);
+            const localCachePath = this.generateCachePath(info.imageName, info.platform, pulledDigest);
+
+            await this.dockerCommand.save(localCachePath, [info.imageName]);
+            await this.cacheManager.save(localCacheKey, localCachePath);
+            core.info(`Image ${info.imageName} saved to cache with digest: ${pulledDigest}`);
           } else {
-            core.warning(
-              `Digest check failed after pulling ${info.imageName} (Local: ${pulledDigest ?? 'N/A'}, Expected: ${info.remoteDigest}). Skipping cache save.`
-            );
+            core.warning(`Could not retrieve digest for pulled image ${info.imageName}. Skipping cache save.`);
           }
         } catch (saveError) {
           core.warning(`Failed to save image ${info.imageName} to cache: ${getErrorMessage(saveError)}`);

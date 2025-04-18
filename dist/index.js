@@ -69401,7 +69401,6 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.ActionRunner = void 0;
-const crypto = __importStar(__nccwpck_require__(6982));
 const fs = __importStar(__nccwpck_require__(9896));
 const path = __importStar(__nccwpck_require__(6928));
 const core = __importStar(__nccwpck_require__(7484));
@@ -69481,42 +69480,29 @@ class ActionRunner {
         return defaultFiles.find(fs.existsSync);
     }
     /**
-     * Calculates hash of compose file contents
-     * @returns SHA-256 hash of combined file contents
-     */
-    calculateFilesHash() {
-        // 安全な型の流れを確保しつつ、イミュータブルな操作を行う
-        const sortedFiles = [...this.composeFiles].sort();
-        const fileContents = sortedFiles.map((file) => fs.readFileSync(file, 'utf8'));
-        const combinedContent = fileContents.join('');
-        return crypto.createHash('sha256').update(combinedContent).digest('hex');
-    }
-    /**
      * Generates cache key for an image
      * @param imageName Image name
      * @param platform Target platform
-     * @param remoteDigest Image digest
-     * @param filesHash Hash of compose files
+     * @param digest Image digest
      * @returns Cache key string
      */
-    generateCacheKey(imageName, platform, remoteDigest, filesHash) {
+    generateCacheKey(imageName, platform, digest) {
         const safeImageName = imageName.replace(/[/:]/g, '_');
         const safePlatform = (0, platform_1.normalizePlatform)(platform);
-        return `${this.cacheKeyPrefix}-${process.env.RUNNER_OS}-${safeImageName}-plt_${safePlatform}-${remoteDigest}-${filesHash}`;
+        return `${this.cacheKeyPrefix}-${process.env.RUNNER_OS}-${safeImageName}-${safePlatform}-${digest}`;
     }
     /**
      * Generates filesystem path for cached image
      * @param imageName Image name
      * @param platform Target platform
-     * @param remoteDigest Image digest
-     * @param filesHash Hash of compose files
+     * @param digest Image digest
      * @returns Path for tar file
      */
-    generateCachePath(imageName, platform, remoteDigest, filesHash) {
+    generateCachePath(imageName, platform, digest) {
         const safeImageName = imageName.replace(/[/:]/g, '_');
         const safePlatform = (0, platform_1.normalizePlatform)(platform);
         const tempDir = process.env.RUNNER_TEMP ?? '/tmp';
-        return path.join(tempDir, `docker-image-${safeImageName}-plt_${safePlatform}-${remoteDigest}-${filesHash}.tar`);
+        return path.join(tempDir, `docker-image-${safeImageName}-${safePlatform}-${digest}.tar`);
     }
     /**
      * Main execution method for the action
@@ -69535,7 +69521,6 @@ class ActionRunner {
         }
         core.setOutput('image-list', imageInfosToProcess.map((info) => info.imageName).join(' '));
         core.info(`Processing ${imageInfosToProcess.length} image(s)...`);
-        const filesHash = this.calculateFilesHash();
         // Fetch remote digests for all images in parallel
         const metadataResults = await Promise.allSettled(imageInfosToProcess.map(async (imageInfo) => {
             const remoteDigest = await this.dockerBuildxCommand.getRemoteDigest(imageInfo.imageName, imageInfo.platform);
@@ -69557,8 +69542,8 @@ class ActionRunner {
         // Prepare processing information with cache keys and paths
         const initialProcessingInfos = validMetadata.map((meta) => ({
             ...meta,
-            primaryKey: this.generateCacheKey(meta.imageName, meta.platform, meta.remoteDigest, filesHash),
-            cachePath: this.generateCachePath(meta.imageName, meta.platform, meta.remoteDigest, filesHash),
+            primaryKey: this.generateCacheKey(meta.imageName, meta.platform, meta.remoteDigest),
+            cachePath: this.generateCachePath(meta.imageName, meta.platform, meta.remoteDigest),
             needsPull: true,
         }));
         // Try to restore each image from cache
@@ -69613,12 +69598,16 @@ class ActionRunner {
         await Promise.allSettled(successfullyPulledInfo.map(async (info) => {
             try {
                 const pulledDigest = await this.dockerCommand.getDigest(info.imageName);
-                if (pulledDigest && pulledDigest === info.remoteDigest) {
-                    await this.dockerCommand.save(info.cachePath, [info.imageName]);
-                    await this.cacheManager.save(info.primaryKey, info.cachePath);
+                if (pulledDigest) {
+                    // ローカルのダイジェスト値を使用して新しいキャッシュキーとパスを生成
+                    const localCacheKey = this.generateCacheKey(info.imageName, info.platform, pulledDigest);
+                    const localCachePath = this.generateCachePath(info.imageName, info.platform, pulledDigest);
+                    await this.dockerCommand.save(localCachePath, [info.imageName]);
+                    await this.cacheManager.save(localCacheKey, localCachePath);
+                    core.info(`Image ${info.imageName} saved to cache with digest: ${pulledDigest}`);
                 }
                 else {
-                    core.warning(`Digest check failed after pulling ${info.imageName} (Local: ${pulledDigest ?? 'N/A'}, Expected: ${info.remoteDigest}). Skipping cache save.`);
+                    core.warning(`Could not retrieve digest for pulled image ${info.imageName}. Skipping cache save.`);
                 }
             }
             catch (saveError) {
@@ -69820,7 +69809,12 @@ class DockerBuildxCommand {
         return foundManifest?.digest ?? null;
     }
     /**
-     * Gets the digest for a specific platform from a remote image
+     * Gets the digest for a specific platform from a remote image using consistent format
+     * This uses a two-step approach to get a digest compatible with the local RepoDigest format:
+     * 1. First, pull image by digest using the manifest digest
+     * 2. Then, inspect the pulled image to get its RepoDigest
+     * This ensures the remote and local digest formats match exactly
+     *
      * @param imageName Image name to inspect
      * @param platform Optional target platform, defaults to current host platform
      * @returns Digest string or null if not found/error
@@ -69833,6 +69827,7 @@ class DockerBuildxCommand {
             return null;
         }
         try {
+            // First step: Get manifest digest
             const inspectArgs = ['buildx', 'imagetools', 'inspect', '--format={{json .Manifest}}', imageName];
             core.info(`Inspecting image ${imageName} manifest (targeting platform: ${platformDesc})`);
             const { exitCode, stdout, stderr } = await (0, exec_1.getExecOutput)('docker', inspectArgs, {
@@ -69846,18 +69841,58 @@ class DockerBuildxCommand {
             if (!stdout.trim())
                 throw new Error(`Inspect command for ${imageName} returned empty output.`);
             const manifestData = this.manifestParser.parse(stdout);
-            // Return appropriate digest based on manifest type
+            // Extract manifest digest based on platform
+            let manifestDigest = null;
             if ((0, image_manifest_parser_1.isMultiPlatformManifest)(manifestData)) {
                 core.debug(`Detected manifest list for ${imageName}. Searching for platform ${targetPlatform}...`);
-                const platformDigest = this.findDigestForPlatform(manifestData.manifests, targetPlatform);
-                if (!platformDigest) {
+                manifestDigest = this.findDigestForPlatform(manifestData.manifests, targetPlatform);
+                if (!manifestDigest) {
                     throw new Error(`Could not extract a valid digest for platform ${platformDesc} from manifest list.`);
                 }
-                return platformDigest;
             }
-            // Single platform manifest case
-            core.debug(`Detected single manifest digest for ${imageName}`);
-            return manifestData.digest;
+            else {
+                // Single platform manifest case
+                core.debug(`Detected single manifest digest for ${imageName}`);
+                manifestDigest = manifestData.digest;
+            }
+            if (!manifestDigest) {
+                throw new Error(`Failed to extract manifest digest for ${imageName}`);
+            }
+            core.debug(`Found manifest digest for ${imageName}: ${manifestDigest}`);
+            // Second step: Pull a temporary image using this digest to get its RepoDigest
+            // This is done by using the Docker CLI to pull just the image manifest
+            // Then we can get the RepoDigest which will match what local images report
+            const tempImageWithDigest = `${imageName.split(':')[0]}@${manifestDigest}`;
+            // Pull just the manifest without downloading the layers (--pull=false)
+            core.debug(`Pulling manifest for ${tempImageWithDigest} to get RepoDigest...`);
+            const pullArgs = ['pull', '--quiet', tempImageWithDigest];
+            try {
+                // Pull the image by digest
+                await (0, exec_1.exec)('docker', pullArgs, { silent: true });
+                // Now get the RepoDigest from the pulled image
+                const { exitCode: inspectExitCode, stdout: inspectStdout } = await (0, exec_1.getExecOutput)('docker', ['inspect', '--format', '{{range .RepoDigests}}{{println .}}{{end}}', tempImageWithDigest], { silent: true, ignoreReturnCode: true });
+                if (inspectExitCode !== 0) {
+                    throw new Error(`Failed to inspect pulled image: ${tempImageWithDigest}`);
+                }
+                const digests = inspectStdout.trim().split('\n');
+                const foundRepoDigest = digests.find((line) => line.includes('@sha256:'));
+                if (foundRepoDigest) {
+                    const repoDigest = foundRepoDigest.split('@')[1];
+                    core.info(`Found remote digest (RepoDigest format) for ${imageName}: ${repoDigest}`);
+                    // Clean up the temporary pulled image
+                    await (0, exec_1.exec)('docker', ['rmi', tempImageWithDigest], { silent: true, ignoreReturnCode: true });
+                    return repoDigest;
+                }
+                else {
+                    throw new Error(`Could not find RepoDigest in the pulled image: ${tempImageWithDigest}`);
+                }
+            }
+            catch (pullError) {
+                core.warning(`Failed to pull image by digest: ${(0, errors_1.getErrorMessage)(pullError)}`);
+                // Fallback to using the manifest digest directly
+                core.warning(`Falling back to using manifest digest directly: ${manifestDigest}`);
+                return manifestDigest;
+            }
         }
         catch (error) {
             core.warning(`Failed to get remote digest for ${imageName} (platform: ${platformDesc}): ${(0, errors_1.getErrorMessage)(error)}`);
