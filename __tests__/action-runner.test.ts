@@ -1,395 +1,380 @@
-import * as core from '@actions/core';
 import * as fs from 'fs';
-import * as path from 'path'; // Import path for helpers
-import { ActionRunner } from '../src/action-runner';
-import { ComposeParser, ImageInfo } from '../src/compose-parser';
-import { DockerCommand } from '../src/docker-command';
-import { CacheManager } from '../src/cache-manager';
-import { SkopeoInstaller } from '../src/skopeo-installer';
-import { RemoteRegistryClient } from '../src/remote-registry';
+import * as path from 'path';
 
-// Mock dependencies EXCEPT crypto
-jest.mock('@actions/core');
-jest.mock('fs', () => {
-  const originalFs = jest.requireActual('fs');
+// Mock standard libraries - must be before imports to avoid fs.promises issues
+jest.mock('fs');
+jest.mock('path');
+jest.mock('crypto');
+
+// Mock @actions/core
+jest.mock('@actions/core', () => ({
+  info: jest.fn(),
+  debug: jest.fn(),
+  warning: jest.fn(),
+  error: jest.fn(),
+  setOutput: jest.fn(),
+  getInput: jest.fn(),
+  getMultilineInput: jest.fn(),
+}));
+
+// Mock @actions/exec
+jest.mock('@actions/exec', () => ({
+  exec: jest.fn(),
+  getExecOutput: jest.fn(),
+}));
+
+// Mock @actions/cache
+jest.mock('@actions/cache', () => ({
+  restoreCache: jest.fn(),
+  saveCache: jest.fn(),
+}));
+
+// Import libraries after mocks are set up
+import * as core from '@actions/core';
+
+// Import project modules
+import { ActionRunner } from '../src/action-runner';
+import { CacheManager } from '../src/cache-manager';
+import { DockerBuildxCommand } from '../src/docker/docker-buildx-command';
+import { DockerCommand } from '../src/docker/docker-command';
+import { ImageManifestParser } from '../src/docker/image-manifest-parser';
+
+// Mock project modules
+jest.mock('../src/docker/docker-command');
+jest.mock('../src/cache-manager');
+jest.mock('../src/docker/docker-buildx-command');
+
+// Setup mock for DockerComposeFileParser
+const mockGetImageList = jest
+  .fn()
+  .mockReturnValue([{ imageName: 'image1:latest', platform: 'linux/amd64' }, { imageName: 'image2:latest' }]);
+
+jest.mock('../src/docker/docker-compose-file-parser', () => {
   return {
-    ...originalFs,
-    existsSync: jest.fn().mockReturnValue(true),
-    readFileSync: jest.fn().mockImplementation((filePath: string): string => {
-      if (typeof filePath === 'string' && filePath.includes('override')) return 'override content';
-      return 'mock file content';
+    DockerComposeFileParser: jest.fn().mockImplementation(() => {
+      return {
+        getImageList: mockGetImageList,
+      };
     }),
-    promises: {
-      ...originalFs.promises,
-      access: jest.fn().mockResolvedValue(undefined),
-    },
   };
 });
-jest.mock('../src/compose-parser');
-jest.mock('../src/docker-command');
-jest.mock('../src/cache-manager');
-jest.mock('../src/skopeo-installer');
-jest.mock('../src/remote-registry');
 
-// Typed mocks
-const coreMock = core as jest.Mocked<typeof core>;
+jest.mock('../src/platform', () => ({
+  normalizePlatform: jest.fn((platform) => (platform ? platform.replace(/\//g, '_') : 'unknown_platform')),
+  getCurrentOciPlatform: jest.fn(() => 'linux/amd64'),
+}));
 
-const fsMock = fs as jest.Mocked<typeof fs>;
-
-const fsPromisesMock = fs.promises as jest.Mocked<typeof fs.promises>; // Keep if needed for promise mocks
-
-const ComposeParserMock = ComposeParser as jest.MockedClass<typeof ComposeParser>;
-const DockerCommandMock = DockerCommand as jest.MockedClass<typeof DockerCommand>;
-const CacheManagerMock = CacheManager as jest.MockedClass<typeof CacheManager>;
-const SkopeoInstallerMock = SkopeoInstaller as jest.MockedClass<typeof SkopeoInstaller>;
-const RemoteRegistryClientMock = RemoteRegistryClient as jest.MockedClass<typeof RemoteRegistryClient>;
-
-// Helper functions for platform normalization and assertions
-const getNormalizedPlatformForTest = (platform: string | undefined): string =>
-  platform ? platform.replace(/[/]/g, '_') : `${process.platform}_${process.arch}`;
-
-const expectCachePathContaining = (imageName: string, platform: string | undefined, remoteDigest: string): string => {
-  const safeImageName = imageName.replace(/[/:]/g, '_');
-  const safePlatform = getNormalizedPlatformForTest(platform);
-  return expect.stringContaining(
-    path.join('/tmp', `docker-image-${safeImageName}-plt_${safePlatform}-${remoteDigest}-`)
-  );
-};
-
-const expectCacheKeyContaining = (imageName: string, platform: string | undefined, remoteDigest: string): string => {
-  const safeImageName = imageName.replace(/[/:]/g, '_');
-  const safePlatform = getNormalizedPlatformForTest(platform);
-  return expect.stringContaining(`test-prefix-linux-${safeImageName}-plt_${safePlatform}-${remoteDigest}-`);
+// Type definition for private methods
+type PrivateMethods = {
+  determineComposeFiles: () => string[];
 };
 
 describe('ActionRunner', () => {
-  const mockImageInfoList: readonly ImageInfo[] = [
-    { imageName: 'image1:latest', platform: undefined },
-    { imageName: 'image2:v1.0', platform: 'linux/arm64' },
-  ];
-  const digest1 = 'sha256:digest1';
-  const digest2 = 'sha256:digest2';
+  // Mock implementations for dependencies
+  let mockDockerCommand: jest.Mocked<DockerCommand>;
+  let mockCacheManager: jest.Mocked<CacheManager>;
+  let mockDockerBuildxCommand: jest.Mocked<DockerBuildxCommand>;
+  let actionRunner: ActionRunner;
+
+  // Environment setup
+  const originalEnv = process.env;
 
   beforeEach(() => {
+    // Reset all mocks
     jest.clearAllMocks();
-    ComposeParserMock.prototype.getImageList = jest.fn().mockReturnValue(mockImageInfoList);
-    DockerCommandMock.prototype.pull = jest.fn().mockResolvedValue(undefined);
-    DockerCommandMock.prototype.load = jest.fn().mockResolvedValue(undefined);
-    DockerCommandMock.prototype.save = jest.fn().mockResolvedValue(undefined);
-    DockerCommandMock.prototype.getDigest = jest
-      .fn()
-      .mockImplementation(async (imageName: string) =>
-        imageName === 'image1:latest' ? digest1 : imageName === 'image2:v1.0' ? digest2 : null
-      ); // Default getDigest mock
-    CacheManagerMock.prototype.restore = jest.fn().mockResolvedValue(false);
-    CacheManagerMock.prototype.save = jest.fn().mockResolvedValue(undefined);
-    RemoteRegistryClientMock.prototype.getRemoteDigest = jest
-      .fn()
-      .mockImplementation(async (imageName: string, _platform?: string) =>
-        imageName === 'image1:latest' ? digest1 : imageName === 'image2:v1.0' ? digest2 : null
-      );
-    SkopeoInstallerMock.prototype.ensureInstalled = jest.fn().mockResolvedValue(undefined);
-    coreMock.getInput.mockImplementation((name: string): string => (name === 'cache-key-prefix' ? 'test-prefix' : ''));
-    coreMock.getMultilineInput.mockImplementation((name: string): string[] =>
-      name === 'compose-files' ? ['docker-compose.yml'] : name === 'exclude-images' ? [] : []
-    );
-    fsMock.existsSync.mockReturnValue(true);
-    fsMock.readFileSync.mockImplementation((filePath): string =>
-      typeof filePath === 'string' && filePath.includes('override') ? 'override content' : 'mock file content'
-    );
-    fsPromisesMock.access.mockResolvedValue(undefined);
-    process.env.RUNNER_OS = 'linux';
-    process.env.RUNNER_TEMP = '/tmp';
-    Object.defineProperty(process, 'platform', { value: 'linux', configurable: true });
-    Object.defineProperty(process, 'arch', { value: 'x64', configurable: true });
-  });
 
-  const createRunner = () => new ActionRunner();
+    // Setup environment variables
+    process.env = {
+      ...originalEnv,
+      RUNNER_OS: 'Linux',
+      RUNNER_TEMP: '/tmp',
+    };
 
-  test('should restore all images from cache successfully, respecting platform', async () => {
-    CacheManagerMock.prototype.restore.mockResolvedValue(true);
-    DockerCommandMock.prototype.load.mockResolvedValue(undefined);
-    const runner = createRunner();
-    await runner.run();
-    expect(CacheManagerMock.prototype.restore).toHaveBeenCalledTimes(2);
-    expect(CacheManagerMock.prototype.restore).toHaveBeenCalledWith(
-      expectCacheKeyContaining('image1:latest', undefined, digest1),
-      expectCachePathContaining('image1:latest', undefined, digest1)
-    );
-    expect(CacheManagerMock.prototype.restore).toHaveBeenCalledWith(
-      expectCacheKeyContaining('image2:v1.0', 'linux/arm64', digest2),
-      expectCachePathContaining('image2:v1.0', 'linux/arm64', digest2)
-    );
-    expect(DockerCommandMock.prototype.load).toHaveBeenCalledTimes(2);
-    expect(coreMock.setOutput).toHaveBeenCalledWith('cache-hit', 'true');
-    expect(DockerCommandMock.prototype.pull).not.toHaveBeenCalled();
-    expect(DockerCommandMock.prototype.save).not.toHaveBeenCalled();
-  });
-
-  test('should pull and save images on full cache miss, respecting platform', async () => {
-    DockerCommandMock.prototype.getDigest.mockImplementation(async (img) =>
-      img === 'image1:latest' ? digest1 : digest2
-    ); // Ensure correct digest after pull
-    const runner = createRunner();
-    await runner.run();
-    expect(coreMock.setOutput).toHaveBeenCalledWith('cache-hit', 'false');
-    expect(DockerCommandMock.prototype.pull).toHaveBeenCalledTimes(2);
-    expect(DockerCommandMock.prototype.save).toHaveBeenCalledTimes(2);
-    expect(CacheManagerMock.prototype.save).toHaveBeenCalledTimes(2);
-    expect(DockerCommandMock.prototype.save).toHaveBeenCalledWith(
-      expectCachePathContaining('image1:latest', undefined, digest1),
-      ['image1:latest']
-    );
-    expect(CacheManagerMock.prototype.save).toHaveBeenCalledWith(
-      expectCacheKeyContaining('image1:latest', undefined, digest1),
-      expectCachePathContaining('image1:latest', undefined, digest1)
-    );
-    expect(DockerCommandMock.prototype.save).toHaveBeenCalledWith(
-      expectCachePathContaining('image2:v1.0', 'linux/arm64', digest2),
-      ['image2:v1.0']
-    );
-    expect(CacheManagerMock.prototype.save).toHaveBeenCalledWith(
-      expectCacheKeyContaining('image2:v1.0', 'linux/arm64', digest2),
-      expectCachePathContaining('image2:v1.0', 'linux/arm64', digest2)
-    );
-  });
-
-  test('should handle partial cache hit (one hit, one miss)', async () => {
-    CacheManagerMock.prototype.restore.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
-    DockerCommandMock.prototype.load.mockResolvedValue(undefined);
-    DockerCommandMock.prototype.getDigest.mockResolvedValue(digest2); // image2 digest match after pull
-    const runner = createRunner();
-    await runner.run();
-    expect(coreMock.setOutput).toHaveBeenCalledWith('cache-hit', 'false');
-    expect(DockerCommandMock.prototype.load).toHaveBeenCalledTimes(1);
-    expect(DockerCommandMock.prototype.pull).toHaveBeenCalledTimes(1);
-    expect(DockerCommandMock.prototype.pull).toHaveBeenCalledWith('image2:v1.0');
-    expect(DockerCommandMock.prototype.getDigest).toHaveBeenCalledTimes(1); // Only image2 checked after pull
-    expect(DockerCommandMock.prototype.getDigest).toHaveBeenCalledWith('image2:v1.0');
-    expect(DockerCommandMock.prototype.save).toHaveBeenCalledTimes(1);
-    expect(CacheManagerMock.prototype.save).toHaveBeenCalledTimes(1);
-  });
-
-  test('should correctly pass platform to getRemoteDigest', async () => {
-    const runner = createRunner();
-    await runner.run();
-    expect(RemoteRegistryClientMock.prototype.getRemoteDigest).toHaveBeenCalledWith('image1:latest', undefined);
-    expect(RemoteRegistryClientMock.prototype.getRemoteDigest).toHaveBeenCalledWith('image2:v1.0', 'linux/arm64');
-  });
-
-  test('should handle exclusion based on image name only (ignoring platform)', async () => {
-    ComposeParserMock.prototype.getImageList.mockReturnValue([
-      { imageName: 'image1:latest', platform: undefined },
-      { imageName: 'image1:latest', platform: 'linux/arm64' },
-      { imageName: 'image2:v1.0', platform: undefined },
-    ]);
-    coreMock.getMultilineInput.mockImplementation((name: string): string[] =>
-      name === 'exclude-images' ? ['image1:latest'] : name === 'compose-files' ? ['compose.yml'] : []
-    );
-    RemoteRegistryClientMock.prototype.getRemoteDigest.mockResolvedValue(digest2);
-    DockerCommandMock.prototype.getDigest.mockResolvedValue(digest2);
-    CacheManagerMock.prototype.restore.mockResolvedValue(false);
-    const runner = createRunner();
-    await runner.run();
-    expect(coreMock.info).toHaveBeenCalledWith('Excluding images: image1:latest');
-    expect(coreMock.setOutput).toHaveBeenCalledWith('image-list', 'image2:v1.0');
-    expect(RemoteRegistryClientMock.prototype.getRemoteDigest).toHaveBeenCalledTimes(1);
-    expect(CacheManagerMock.prototype.restore).toHaveBeenCalledTimes(1);
-    expect(DockerCommandMock.prototype.pull).toHaveBeenCalledTimes(1);
-    expect(DockerCommandMock.prototype.save).toHaveBeenCalledTimes(1);
-    expect(CacheManagerMock.prototype.save).toHaveBeenCalledTimes(1);
-  });
-
-  test('should handle multiple compose files (check platform propagation)', async () => {
-    coreMock.getMultilineInput.mockImplementation((name: string): string[] =>
-      name === 'compose-files' ? ['docker-compose.yml', 'docker-compose.override.yml'] : []
-    );
-    fsMock.readFileSync.mockImplementation((filePath) =>
-      typeof filePath === 'string' && filePath.includes('override') ? 'override content' : 'mock file content'
-    );
-    const multiFileOutput: readonly ImageInfo[] = [
-      { imageName: 'image1:latest', platform: undefined },
-      { imageName: 'image2:v1.0', platform: 'linux/arm64' },
-      { imageName: 'image3:beta', platform: 'linux/amd64' },
-    ];
-    ComposeParserMock.prototype.getImageList.mockReturnValue(multiFileOutput);
-    const digest3 = 'sha256:digest3';
-    RemoteRegistryClientMock.prototype.getRemoteDigest.mockImplementation(async (img) =>
-      img === 'image1:latest' ? digest1 : img === 'image2:v1.0' ? digest2 : digest3
-    );
-    DockerCommandMock.prototype.getDigest.mockImplementation(async (img) =>
-      img === 'image1:latest' ? digest1 : img === 'image2:v1.0' ? digest2 : digest3
-    );
-    CacheManagerMock.prototype.restore.mockResolvedValue(false);
-    const runner = createRunner();
-    await runner.run();
-    expect(RemoteRegistryClientMock.prototype.getRemoteDigest).toHaveBeenCalledWith('image1:latest', undefined);
-    expect(RemoteRegistryClientMock.prototype.getRemoteDigest).toHaveBeenCalledWith('image2:v1.0', 'linux/arm64');
-    expect(RemoteRegistryClientMock.prototype.getRemoteDigest).toHaveBeenCalledWith('image3:beta', 'linux/amd64');
-    expect(CacheManagerMock.prototype.restore).toHaveBeenCalledWith(
-      expect.stringContaining('-image1_latest-plt_linux_x64-'),
-      expect.any(String)
-    );
-    expect(CacheManagerMock.prototype.restore).toHaveBeenCalledWith(
-      expect.stringContaining('-image2_v1.0-plt_linux_arm64-'),
-      expect.any(String)
-    );
-    expect(CacheManagerMock.prototype.restore).toHaveBeenCalledWith(
-      expect.stringContaining('-image3_beta-plt_linux_amd64-'),
-      expect.any(String)
-    );
-    expect(DockerCommandMock.prototype.pull).toHaveBeenCalledTimes(3);
-    expect(CacheManagerMock.prototype.save).toHaveBeenCalledTimes(3);
-  });
-
-  test('should find and use default compose file', async () => {
-    coreMock.getMultilineInput.mockImplementation((name: string): string[] => (name === 'compose-files' ? [] : []));
-    fsMock.existsSync.mockImplementation((p) => p === 'compose.yml');
-    CacheManagerMock.prototype.restore.mockResolvedValue(false);
-    DockerCommandMock.prototype.getDigest.mockResolvedValue(digest1);
-    ComposeParserMock.prototype.getImageList.mockReturnValue([{ imageName: 'image1:latest', platform: undefined }]); // Adjust mock return
-    const runner = createRunner();
-    await runner.run();
-    expect(coreMock.info).toHaveBeenCalledWith('Using automatically found compose file: compose.yml');
-    expect(ComposeParserMock).toHaveBeenCalledWith(['compose.yml']);
-    expect(RemoteRegistryClientMock.prototype.getRemoteDigest).toHaveBeenCalledTimes(1);
-  });
-
-  // Semi-Normal Cases
-  test('should warn and skip caching if remote digest fetch fails for an image', async () => {
-    const digestForImage1 = 'sha256:digest-for-image1';
-    RemoteRegistryClientMock.prototype.getRemoteDigest
-      .mockResolvedValueOnce(digestForImage1)
-      .mockRejectedValueOnce(new Error('Fetch failed'));
-    CacheManagerMock.prototype.restore.mockResolvedValue(false);
-    DockerCommandMock.prototype.getDigest.mockResolvedValue(digestForImage1);
-    const runner = createRunner();
-    await runner.run();
-    expect(coreMock.warning).toHaveBeenCalledWith('Fetch failed');
-    expect(CacheManagerMock.prototype.restore).toHaveBeenCalledTimes(1);
-    expect(DockerCommandMock.prototype.pull).toHaveBeenCalledTimes(1);
-    expect(DockerCommandMock.prototype.save).toHaveBeenCalledTimes(1);
-    expect(CacheManagerMock.prototype.save).toHaveBeenCalledTimes(1);
-    expect(coreMock.setOutput).toHaveBeenCalledWith('cache-hit', 'false');
-  });
-
-  // ********** Test Case Fix Start **********
-  test('should warn and pull if loading cached image fails', async () => {
-    // Arrange: Both hit cache, but load fails
-    CacheManagerMock.prototype.restore.mockResolvedValue(true);
-    DockerCommandMock.prototype.load.mockRejectedValue(new Error('Load failed'));
-    // IMPORTANT: Ensure digest check after pull succeeds by returning the correct digests
-    DockerCommandMock.prototype.getDigest.mockImplementation(async (imageName: string) => {
-      if (imageName === 'image1:latest') return digest1; // Matches remote digest1
-      if (imageName === 'image2:v1.0') return digest2; // Matches remote digest2
-      return null;
+    // Setup core input values
+    (core.getInput as jest.Mock).mockImplementation((name) => {
+      if (name === 'cache-key-prefix') return 'docker-compose-cache';
+      return '';
     });
 
-    const runner = createRunner();
-    await runner.run();
+    (core.getMultilineInput as jest.Mock).mockImplementation((name) => {
+      if (name === 'compose-files') return ['docker-compose.yml'];
+      if (name === 'exclude-images') return [];
+      return [];
+    });
 
-    // Assert
-    expect(coreMock.warning).toHaveBeenCalledWith(
-      expect.stringContaining('Failed to load image1:latest from cache: Load failed.')
-    );
-    expect(coreMock.warning).toHaveBeenCalledWith(
-      expect.stringContaining('Failed to load image2:v1.0 from cache: Load failed.')
-    );
-    expect(DockerCommandMock.prototype.pull).toHaveBeenCalledTimes(2); // Pull triggered
-    expect(DockerCommandMock.prototype.save).toHaveBeenCalledTimes(2); // Should be called now
-    expect(CacheManagerMock.prototype.save).toHaveBeenCalledTimes(2); // Should be called now
-    expect(coreMock.setOutput).toHaveBeenCalledWith('cache-hit', 'false');
-  });
-  // ********** Test Case Fix End **********
+    // Setup fs mock
+    (fs.existsSync as jest.Mock).mockReturnValue(true);
+    (fs.readFileSync as jest.Mock).mockReturnValue('mock-file-content');
 
-  test('should warn and skip saving if pull fails for an image', async () => {
-    CacheManagerMock.prototype.restore.mockResolvedValue(false);
-    DockerCommandMock.prototype.pull.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('Network Error'));
-    DockerCommandMock.prototype.getDigest.mockResolvedValue(digest1);
-    const runner = createRunner();
-    await runner.run();
-    expect(coreMock.error).toHaveBeenCalledWith('Failed to pull image image2:v1.0: Network Error');
-    expect(DockerCommandMock.prototype.save).toHaveBeenCalledTimes(1);
-    expect(CacheManagerMock.prototype.save).toHaveBeenCalledTimes(1);
-    expect(coreMock.info).toHaveBeenCalledWith('Saving 1 image(s) to cache...');
-    expect(coreMock.setOutput).toHaveBeenCalledWith('cache-hit', 'false');
-  });
+    // Mock path.join to return predictable paths
+    (path.join as jest.Mock).mockImplementation((...args) => args.join('/'));
 
-  test('should warn and skip saving if digest check fails after pull', async () => {
-    CacheManagerMock.prototype.restore.mockResolvedValue(false);
-    DockerCommandMock.prototype.pull.mockResolvedValue(undefined);
-    DockerCommandMock.prototype.getDigest.mockResolvedValue('sha256:different-after-pull');
-    const runner = createRunner();
-    await runner.run();
-    expect(DockerCommandMock.prototype.pull).toHaveBeenCalledTimes(2);
-    expect(DockerCommandMock.prototype.getDigest).toHaveBeenCalledTimes(2);
-    expect(coreMock.warning).toHaveBeenCalledWith(
-      expect.stringContaining(
-        `Digest check failed after pulling image1:latest (Local: sha256:different-after-pull, Expected: ${digest1}). Skipping cache save.`
-      )
-    );
-    expect(coreMock.warning).toHaveBeenCalledWith(
-      expect.stringContaining(
-        `Digest check failed after pulling image2:v1.0 (Local: sha256:different-after-pull, Expected: ${digest2}). Skipping cache save.`
-      )
-    );
-    expect(DockerCommandMock.prototype.save).not.toHaveBeenCalled();
-    expect(CacheManagerMock.prototype.save).not.toHaveBeenCalled();
-    expect(coreMock.setOutput).toHaveBeenCalledWith('cache-hit', 'false');
+    // Setup docker command mocks
+    mockDockerCommand = new DockerCommand() as jest.Mocked<DockerCommand>;
+    mockDockerCommand.pull.mockResolvedValue();
+    mockDockerCommand.load.mockResolvedValue();
+    mockDockerCommand.save.mockResolvedValue();
+    mockDockerCommand.getDigest.mockResolvedValue('sha256:1234567890abcdef');
+
+    // Setup cache manager mock
+    mockCacheManager = new CacheManager() as jest.Mocked<CacheManager>;
+    mockCacheManager.restore.mockResolvedValue(false);
+    mockCacheManager.save.mockResolvedValue();
+
+    // Setup docker buildx command mock
+    mockDockerBuildxCommand = new DockerBuildxCommand(new ImageManifestParser()) as jest.Mocked<DockerBuildxCommand>;
+    mockDockerBuildxCommand.getRemoteDigest.mockResolvedValue('sha256:1234567890abcdef');
+
+    // Create action runner instance with mocked dependencies
+    actionRunner = new ActionRunner(mockDockerCommand, mockCacheManager, mockDockerBuildxCommand);
+
+    // Mock private methods in ActionRunner
+    jest
+      .spyOn(actionRunner as unknown as PrivateMethods, 'determineComposeFiles')
+      .mockReturnValue(['docker-compose.yml']);
   });
 
-  test('should handle cache save errors gracefully', async () => {
-    CacheManagerMock.prototype.restore.mockResolvedValue(false);
-    DockerCommandMock.prototype.pull.mockResolvedValue(undefined);
-    DockerCommandMock.prototype.save.mockResolvedValue(undefined);
-    DockerCommandMock.prototype.getDigest.mockImplementation(async (img) =>
-      img === 'image1:latest' ? digest1 : digest2
-    );
-    CacheManagerMock.prototype.save.mockRejectedValue(new Error('Cache API limit reached'));
-    const runner = createRunner();
-    await runner.run();
-    expect(DockerCommandMock.prototype.save).toHaveBeenCalledTimes(2);
-    expect(CacheManagerMock.prototype.save).toHaveBeenCalledTimes(2);
-    expect(coreMock.warning).toHaveBeenCalledWith(
-      expect.stringContaining('Failed to save image image1:latest to cache: Cache API limit reached')
-    );
-    expect(coreMock.warning).toHaveBeenCalledWith(
-      expect.stringContaining('Failed to save image image2:v1.0 to cache: Cache API limit reached')
-    );
-    expect(coreMock.setOutput).toHaveBeenCalledWith('cache-hit', 'false');
+  afterEach(() => {
+    // Restore env
+    process.env = originalEnv;
   });
 
-  // Error Cases
-  test('should throw error if specified compose file does not exist in constructor', () => {
-    coreMock.getMultilineInput.mockImplementation((name: string): string[] =>
-      name === 'compose-files' ? ['non-existent-file.yml'] : []
-    );
-    fsMock.existsSync.mockReturnValue(false);
-    expect(() => new ActionRunner()).toThrow('Specified compose file not found: non-existent-file.yml');
+  describe('constructor', () => {
+    describe('normal cases', () => {
+      it('should create an instance with default values', () => {
+        // Act & Assert - using actionRunner instance created in beforeEach
+        expect(actionRunner).toBeInstanceOf(ActionRunner);
+        expect(core.getInput).toHaveBeenCalledWith('cache-key-prefix', expect.any(Object));
+        expect(core.getMultilineInput).toHaveBeenCalledWith('compose-files');
+        expect(core.getMultilineInput).toHaveBeenCalledWith('exclude-images');
+      });
+
+      it('should handle exclude-images input', () => {
+        // Arrange
+        (core.getMultilineInput as jest.Mock).mockImplementation((name) => {
+          if (name === 'compose-files') return ['docker-compose.yml'];
+          if (name === 'exclude-images') return ['redis:latest', 'postgres:13'];
+          return [];
+        });
+
+        // Act - create new instance to trigger constructor
+        new ActionRunner(mockDockerCommand, mockCacheManager, mockDockerBuildxCommand);
+
+        // Assert
+        expect(core.info).toHaveBeenCalledWith(expect.stringContaining('Excluding images: redis:latest, postgres:13'));
+      });
+    });
+
+    describe('edge cases', () => {
+      it('should find default compose file when none specified', () => {
+        // Arrange
+        (core.getMultilineInput as jest.Mock).mockImplementation((name) => {
+          if (name === 'compose-files') return [];
+          return [];
+        });
+
+        // Reset core.info mock to track calls specifically for this test
+        (core.info as jest.Mock).mockClear();
+
+        // Mock findDefaultComposeFile to return a file
+        (fs.existsSync as jest.Mock).mockImplementation((file) => file === 'docker-compose.yml');
+
+        // Create instance but we don't need to keep reference - we only care about side effects
+        new ActionRunner(mockDockerCommand, mockCacheManager, mockDockerBuildxCommand);
+
+        // Assert
+        expect(core.info).toHaveBeenCalledWith(expect.stringContaining('Using automatically found compose file'));
+      });
+
+      it('should handle custom compose file paths', () => {
+        // Arrange
+        (core.getMultilineInput as jest.Mock).mockImplementation((name) => {
+          if (name === 'compose-files') return ['custom/path/compose.yml', 'another/docker-compose.yaml'];
+          return [];
+        });
+
+        // Act - create new instance to trigger constructor
+        new ActionRunner(mockDockerCommand, mockCacheManager, mockDockerBuildxCommand);
+
+        // Assert
+        expect(core.info).toHaveBeenCalledWith(
+          expect.stringContaining('Using specified compose files: custom/path/compose.yml, another/docker-compose.yaml')
+        );
+      });
+    });
+
+    describe('error cases', () => {
+      it('should throw error when specified compose file does not exist', () => {
+        // Arrange
+        (core.getMultilineInput as jest.Mock).mockImplementation((name) => {
+          if (name === 'compose-files') return ['non-existent.yml'];
+          return [];
+        });
+        (fs.existsSync as jest.Mock).mockReturnValue(false);
+
+        // Act & Assert
+        expect(() => new ActionRunner(mockDockerCommand, mockCacheManager, mockDockerBuildxCommand)).toThrow(
+          'Specified compose file not found: non-existent.yml'
+        );
+      });
+
+      it('should throw error when no default compose files found', () => {
+        // Arrange - empty compose files input
+        (core.getMultilineInput as jest.Mock).mockImplementation((name) => {
+          if (name === 'compose-files') return [];
+          return [];
+        });
+
+        // Mock that no files exist
+        (fs.existsSync as jest.Mock).mockReturnValue(false);
+
+        // Ensure we don't use the mocked constructor from beforeEach
+        jest.spyOn(ActionRunner.prototype as unknown as PrivateMethods, 'determineComposeFiles').mockRestore();
+
+        // Act & Assert
+        expect(() => new ActionRunner(mockDockerCommand, mockCacheManager, mockDockerBuildxCommand)).toThrow(
+          'No default compose files found.'
+        );
+      });
+    });
   });
 
-  test('should throw error if default compose file search fails in constructor', () => {
-    coreMock.getMultilineInput.mockImplementation((name: string): string[] => (name === 'compose-files' ? [] : []));
-    fsMock.existsSync.mockReturnValue(false);
-    expect(() => new ActionRunner()).toThrow('No default compose files found.');
-  });
+  describe('run', () => {
+    describe('normal cases', () => {
+      it('should process all images and set output when all steps succeed', async () => {
+        // Arrange
+        mockDockerBuildxCommand.getRemoteDigest.mockResolvedValue('sha256:1234567890abcdef');
+        mockCacheManager.restore.mockResolvedValue(false); // Simulate cache miss
 
-  test('should reject run() if skopeo installation fails', async () => {
-    const installError = new Error('Skopeo installation failed.');
-    SkopeoInstallerMock.prototype.ensureInstalled.mockRejectedValue(installError);
-    const runner = createRunner();
-    await expect(runner.run()).rejects.toThrow(installError);
-    expect(SkopeoInstallerMock.prototype.ensureInstalled).toHaveBeenCalledTimes(1);
-  });
+        // Act
+        await actionRunner.run();
 
-  test('should handle failure to get digest for all images gracefully', async () => {
-    const apiError = new Error('API Error');
-    RemoteRegistryClientMock.prototype.getRemoteDigest.mockRejectedValue(apiError);
-    const runner = createRunner();
-    await runner.run();
-    expect(coreMock.warning).toHaveBeenCalledWith(apiError.message);
-    expect(coreMock.warning).toHaveBeenCalledWith('Could not retrieve digest for any image.');
-    expect(coreMock.setOutput).toHaveBeenCalledWith('cache-hit', 'false');
-    expect(DockerCommandMock.prototype.pull).not.toHaveBeenCalled();
+        // Assert
+        expect(core.setOutput).toHaveBeenCalledWith('cache-hit', 'false');
+        expect(core.setOutput).toHaveBeenCalledWith('image-list', expect.any(String));
+        expect(mockDockerCommand.pull).toHaveBeenCalled();
+        expect(mockDockerCommand.save).toHaveBeenCalled();
+        expect(mockCacheManager.save).toHaveBeenCalled();
+      });
+
+      it('should handle cache hit scenario', async () => {
+        // Arrange
+        mockDockerBuildxCommand.getRemoteDigest.mockResolvedValue('sha256:1234567890abcdef');
+        mockCacheManager.restore.mockResolvedValue(true); // Simulate cache hit
+
+        // Act
+        await actionRunner.run();
+
+        // Assert
+        expect(mockDockerCommand.load).toHaveBeenCalled();
+        expect(core.setOutput).toHaveBeenCalledWith('cache-hit', 'true');
+        expect(mockDockerCommand.pull).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('edge cases', () => {
+      it('should handle empty image list', async () => {
+        // Arrange - Mock getImageList to return empty array
+        mockGetImageList.mockReturnValueOnce([]);
+
+        // Act
+        await actionRunner.run();
+
+        // Assert
+        expect(core.info).toHaveBeenCalledWith(expect.stringContaining('No images to process'));
+        expect(core.setOutput).toHaveBeenCalledWith('cache-hit', 'false');
+        expect(core.setOutput).toHaveBeenCalledWith('image-list', '');
+      });
+
+      it('should handle excluded images', async () => {
+        // Setup excluded images
+        (core.getMultilineInput as jest.Mock).mockImplementation((name) => {
+          if (name === 'compose-files') return ['docker-compose.yml'];
+          if (name === 'exclude-images') return ['image1:latest'];
+          return [];
+        });
+
+        // Create new action runner with updated mock
+        actionRunner = new ActionRunner(mockDockerCommand, mockCacheManager, mockDockerBuildxCommand);
+
+        // Re-mock private methods
+        jest
+          .spyOn(actionRunner as unknown as PrivateMethods, 'determineComposeFiles')
+          .mockReturnValue(['docker-compose.yml']);
+
+        // Mock getRemoteDigest to track calls for different images
+        mockDockerBuildxCommand.getRemoteDigest.mockImplementation((_imageName, _platform) => {
+          return Promise.resolve('sha256:1234567890abcdef');
+        });
+
+        // Act
+        await actionRunner.run();
+
+        // Assert - should only process image2, not image1
+        expect(mockDockerBuildxCommand.getRemoteDigest).not.toHaveBeenCalledWith('image1:latest', expect.anything());
+        // platform is undefined for the second element, so adjust the expectation accordingly
+        expect(mockDockerBuildxCommand.getRemoteDigest).toHaveBeenCalledWith('image2:latest', undefined);
+      });
+    });
+
+    describe('error cases', () => {
+      it('should handle digest fetch failure', async () => {
+        // Arrange
+        mockDockerBuildxCommand.getRemoteDigest.mockResolvedValue(null); // Simulate failed digest fetch
+
+        // Act
+        await actionRunner.run();
+
+        // Assert
+        expect(core.warning).toHaveBeenCalledWith(expect.stringContaining('Could not retrieve digest for any image'));
+        expect(core.setOutput).toHaveBeenCalledWith('cache-hit', 'false');
+      });
+
+      it('should handle image load failure', async () => {
+        // Arrange
+        mockDockerBuildxCommand.getRemoteDigest.mockResolvedValue('sha256:1234567890abcdef');
+        mockCacheManager.restore.mockResolvedValue(true); // Cache hit
+        mockDockerCommand.load.mockRejectedValue(new Error('Load failed')); // Load fails
+
+        // Act
+        await actionRunner.run();
+
+        // Assert
+        expect(core.warning).toHaveBeenCalledWith(expect.stringContaining('Failed to load'));
+        expect(mockDockerCommand.pull).toHaveBeenCalled(); // Should fall back to pulling
+      });
+
+      it('should handle pull failure', async () => {
+        // Arrange
+        mockDockerBuildxCommand.getRemoteDigest.mockResolvedValue('sha256:1234567890abcdef');
+        mockCacheManager.restore.mockResolvedValue(false); // Cache miss
+        mockDockerCommand.pull.mockRejectedValue(new Error('Pull failed')); // Pull fails
+
+        // Act
+        await actionRunner.run();
+
+        // Assert
+        expect(core.error).toHaveBeenCalledWith(expect.stringContaining('Failed to pull image'));
+        expect(mockDockerCommand.save).not.toHaveBeenCalled(); // Shouldn't try to save
+      });
+
+      it('should use local digest for caching after pull', async () => {
+        // Arrange
+        mockDockerBuildxCommand.getRemoteDigest.mockResolvedValue('sha256:remoteDigest');
+        mockCacheManager.restore.mockResolvedValue(false); // Cache miss
+        mockDockerCommand.pull.mockResolvedValue();
+        mockDockerCommand.getDigest.mockResolvedValue('sha256:localDigest'); // Different local digest
+
+        // Act
+        await actionRunner.run();
+
+        // Assert
+        // Should save cache using local digest
+        expect(mockCacheManager.save).toHaveBeenCalledWith(
+          expect.stringContaining('sha256:localDigest'),
+          expect.any(String)
+        );
+      });
+    });
   });
 });

@@ -1,49 +1,64 @@
-import * as core from '@actions/core';
-import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
-import { ComposeParser, ImageInfo } from './compose-parser';
-import { DockerCommand } from './docker-command';
+import * as core from '@actions/core';
 import { CacheManager } from './cache-manager';
-import { SkopeoInstaller } from './skopeo-installer';
-import { RemoteRegistryClient } from './remote-registry';
-import { getErrorMessage } from './utils';
+import { DockerBuildxCommand } from './docker/docker-buildx-command';
+import { DockerCommand } from './docker/docker-command';
+import { DockerComposeFileParser, ImageInfo } from './docker/docker-compose-file-parser';
+import { getErrorMessage } from './errors';
+import { getCurrentOciPlatform, normalizePlatform } from './platform';
 
+/** Type alias for image name */
 type ImageName = string;
+/** Type alias for image digest */
 type Digest = string;
+/** Type alias for cache key */
 type CacheKey = string;
+/** Type alias for file path */
 type FilePath = string;
+/** Type alias for platform specification */
 type Platform = string | undefined;
 
+/** Core image metadata */
 type ImageMetadata = {
   readonly imageName: ImageName;
   readonly remoteDigest: Digest;
   readonly platform: Platform;
 };
 
+/** Extended image information with caching details */
 type ImageProcessingInfo = ImageMetadata & {
   readonly primaryKey: CacheKey;
   readonly cachePath: FilePath;
-  readonly needsPull: boolean; // True if cache miss or load failure
+  readonly needsPull: boolean;
 };
 
-const getNormalizedPlatform = (platform: Platform): string =>
-  platform ? platform.replace(/[/]/g, '_') : `${process.platform}_${process.arch}`;
-
+/**
+ * Main runner class for the Docker Compose Cache action.
+ * Coordinates the entire caching workflow:
+ * 1. Parses Docker Compose files to identify images
+ * 2. Fetches remote image digests to validate caches
+ * 3. Restores images from cache when valid
+ * 4. Pulls and caches images when needed
+ */
 export class ActionRunner {
   private readonly composeFiles: readonly FilePath[];
   private readonly excludeImages: ReadonlySet<ImageName>;
   private readonly cacheKeyPrefix: string;
   private readonly dockerCommand: DockerCommand;
   private readonly cacheManager: CacheManager;
-  private readonly remoteRegistry: RemoteRegistryClient;
-  private readonly skopeoInstaller: SkopeoInstaller;
+  private readonly dockerBuildxCommand: DockerBuildxCommand;
 
-  constructor() {
-    this.skopeoInstaller = new SkopeoInstaller();
-    this.dockerCommand = new DockerCommand();
-    this.cacheManager = new CacheManager();
-    this.remoteRegistry = new RemoteRegistryClient(this.skopeoInstaller);
+  /**
+   * Creates a new ActionRunner with the necessary dependencies
+   * @param dockerCommand Docker command executor
+   * @param cacheManager Cache manager for GitHub Actions cache
+   * @param dockerBuildxCommand Docker buildx command executor
+   */
+  constructor(dockerCommand: DockerCommand, cacheManager: CacheManager, dockerBuildxCommand: DockerBuildxCommand) {
+    this.dockerCommand = dockerCommand;
+    this.cacheManager = cacheManager;
+    this.dockerBuildxCommand = dockerBuildxCommand;
     this.cacheKeyPrefix = core.getInput('cache-key-prefix', { required: true });
     this.excludeImages = new Set(core.getMultilineInput('exclude-images'));
     this.composeFiles = this.determineComposeFiles(core.getMultilineInput('compose-files'));
@@ -51,16 +66,32 @@ export class ActionRunner {
     if (this.excludeImages.size > 0) {
       core.info(`Excluding images: ${[...this.excludeImages].join(', ')}`);
     }
+    if (!getCurrentOciPlatform()) {
+      core.warning(
+        `Could not determine OCI platform for the current runner environment (${process.platform}/${process.arch}). Default cache keys might be inconsistent.`
+      );
+    }
   }
 
+  /**
+   * Determines which compose files to use based on input or defaults
+   * @param input User-provided file paths from action input
+   * @returns Array of validated file paths
+   */
   private determineComposeFiles(input: readonly string[]): readonly FilePath[] {
     if (input.length > 0) {
       core.info(`Using specified compose files: ${input.join(', ')}`);
-      input.forEach((file) => {
-        if (!fs.existsSync(file)) throw new Error(`Specified compose file not found: ${file}`);
-      });
+
+      // Check each file exists using every() method
+      const allFilesExist = input.every((file) => fs.existsSync(file));
+      if (!allFilesExist) {
+        const missingFiles = input.filter((file) => !fs.existsSync(file));
+        throw new Error(`Specified compose file not found: ${missingFiles[0]}`);
+      }
+
       return input;
     }
+
     core.info('Compose files not specified, searching for default files...');
     const foundFile = this.findDefaultComposeFile();
     if (foundFile) {
@@ -70,6 +101,10 @@ export class ActionRunner {
     throw new Error('No default compose files found.');
   }
 
+  /**
+   * Tries to find a default compose file
+   * @returns Path to found file or undefined
+   */
   private findDefaultComposeFile(): FilePath | undefined {
     const defaultFiles: readonly FilePath[] = [
       'compose.yaml',
@@ -80,42 +115,40 @@ export class ActionRunner {
     return defaultFiles.find(fs.existsSync);
   }
 
-  private calculateFilesHash(): Digest {
-    const sortedFiles = [...this.composeFiles].sort();
-    const combinedContent = sortedFiles.reduce((content, file) => content + fs.readFileSync(file, 'utf8'), '');
-    return crypto.createHash('sha256').update(combinedContent).digest('hex');
+  /**
+   * Generates cache key for an image
+   * @param imageName Image name
+   * @param platform Target platform
+   * @param digest Image digest
+   * @returns Cache key string
+   */
+  private generateCacheKey(imageName: ImageName, platform: Platform, digest: Digest): CacheKey {
+    const safeImageName = imageName.replace(/[/:]/g, '_');
+    const safePlatform = normalizePlatform(platform);
+    return `${this.cacheKeyPrefix}-${process.env.RUNNER_OS}-${safeImageName}-${safePlatform}-${digest}`;
   }
 
-  private generateCacheKey(
-    imageName: ImageName,
-    platform: Platform,
-    remoteDigest: Digest,
-    filesHash: Digest
-  ): CacheKey {
+  /**
+   * Generates filesystem path for cached image
+   * @param imageName Image name
+   * @param platform Target platform
+   * @param digest Image digest
+   * @returns Path for tar file
+   */
+  private generateCachePath(imageName: ImageName, platform: Platform, digest: Digest): FilePath {
     const safeImageName = imageName.replace(/[/:]/g, '_');
-    const safePlatform = getNormalizedPlatform(platform);
-    return `${this.cacheKeyPrefix}-${process.env.RUNNER_OS}-${safeImageName}-plt_${safePlatform}-${remoteDigest}-${filesHash}`;
-  }
-
-  private generateCachePath(
-    imageName: ImageName,
-    platform: Platform,
-    remoteDigest: Digest,
-    filesHash: Digest
-  ): FilePath {
-    const safeImageName = imageName.replace(/[/:]/g, '_');
-    const safePlatform = getNormalizedPlatform(platform);
+    const safePlatform = normalizePlatform(platform);
     const tempDir = process.env.RUNNER_TEMP ?? '/tmp';
-    return path.join(tempDir, `docker-image-${safeImageName}-plt_${safePlatform}-${remoteDigest}-${filesHash}.tar`);
+    return path.join(tempDir, `docker-image-${safeImageName}-${safePlatform}-${digest}.tar`);
   }
 
+  /**
+   * Main execution method for the action
+   * @returns Promise that resolves when all operations are complete
+   */
   async run(): Promise<void> {
-    // Step 1: Ensure Skopeo is installed
-    await this.skopeoInstaller.ensureInstalled();
-
     core.info(`Processing compose file(s): ${this.composeFiles.join(', ')}`);
-    // Step 2: Parse Compose files and identify images to process
-    const parser = new ComposeParser(this.composeFiles);
+    const parser = new DockerComposeFileParser(this.composeFiles);
     const allImageInfos: readonly ImageInfo[] = parser.getImageList();
     const imageInfosToProcess = allImageInfos.filter((info) => !this.excludeImages.has(info.imageName));
 
@@ -127,12 +160,11 @@ export class ActionRunner {
     }
     core.setOutput('image-list', imageInfosToProcess.map((info) => info.imageName).join(' '));
     core.info(`Processing ${imageInfosToProcess.length} image(s)...`);
-    const filesHash = this.calculateFilesHash();
 
-    // Step 3: Fetch remote digests for target images
+    // Fetch remote digests for all images in parallel
     const metadataResults = await Promise.allSettled(
       imageInfosToProcess.map(async (imageInfo): Promise<ImageMetadata> => {
-        const remoteDigest = await this.remoteRegistry.getRemoteDigest(imageInfo.imageName, imageInfo.platform);
+        const remoteDigest = await this.dockerBuildxCommand.getRemoteDigest(imageInfo.imageName, imageInfo.platform);
         if (!remoteDigest)
           throw new Error(
             `Digest fetch failed for ${imageInfo.imageName} (platform: ${imageInfo.platform ?? 'default'})`
@@ -153,14 +185,15 @@ export class ActionRunner {
       return;
     }
 
-    // Step 4: Attempt to restore image caches based on remote digests
+    // Prepare processing information with cache keys and paths
     const initialProcessingInfos: readonly ImageProcessingInfo[] = validMetadata.map((meta) => ({
       ...meta,
-      primaryKey: this.generateCacheKey(meta.imageName, meta.platform, meta.remoteDigest, filesHash),
-      cachePath: this.generateCachePath(meta.imageName, meta.platform, meta.remoteDigest, filesHash),
-      needsPull: true, // Assume needs pull initially
+      primaryKey: this.generateCacheKey(meta.imageName, meta.platform, meta.remoteDigest),
+      cachePath: this.generateCachePath(meta.imageName, meta.platform, meta.remoteDigest),
+      needsPull: true,
     }));
 
+    // Try to restore each image from cache
     const restoredProcessingInfos: readonly ImageProcessingInfo[] = await Promise.all(
       initialProcessingInfos.map(async (info) => ({
         ...info,
@@ -168,25 +201,25 @@ export class ActionRunner {
       }))
     );
 
-    // Step 5: Attempt to load restored images from cache
+    // Try to load cached images into Docker
     const verifiedProcessingInfos: readonly ImageProcessingInfo[] = await Promise.all(
       restoredProcessingInfos.map(async (info): Promise<ImageProcessingInfo> => {
-        if (info.needsPull) return info; // Skip load if cache wasn't restored
+        if (info.needsPull) return info;
         try {
           core.info(
-            `Loading image ${info.imageName} (Platform: ${info.platform ?? getNormalizedPlatform(undefined)}) from cache: ${info.cachePath}`
+            `Loading image ${info.imageName} (Platform: ${normalizePlatform(info.platform)}) from cache: ${info.cachePath}`
           );
           await this.dockerCommand.load(info.cachePath);
           core.info(`Image ${info.imageName} loaded successfully from cache.`);
-          return { ...info, needsPull: false }; // Load successful
+          return { ...info, needsPull: false };
         } catch (loadError) {
           core.warning(`Failed to load ${info.imageName} from cache: ${getErrorMessage(loadError)}.`);
-          return { ...info, needsPull: true }; // Load failed, requires pull
+          return { ...info, needsPull: true };
         }
       })
     );
 
-    // Step 6: Determine final pull list and set overall cache-hit output
+    // Determine if we had a complete cache hit
     const imagesToPullInfo = verifiedProcessingInfos.filter((info) => info.needsPull);
     const allCacheHit = imagesToPullInfo.length === 0 && verifiedProcessingInfos.length === validMetadata.length;
     core.setOutput('cache-hit', allCacheHit.toString());
@@ -196,41 +229,46 @@ export class ActionRunner {
       return;
     }
 
-    // Step 7: Pull missing or outdated images
+    // Pull images that couldn't be restored from cache
     core.info(`Pulling ${imagesToPullInfo.length} image(s)...`);
-    const pullResults = await Promise.allSettled(
-      imagesToPullInfo.map((info) => this.dockerCommand.pull(info.imageName))
+
+    // Process each image with its own pull operation and track results
+    const pullResultsWithInfo = await Promise.all(
+      imagesToPullInfo.map(async (info) => {
+        try {
+          await this.dockerCommand.pull(info.imageName);
+          return { info, successful: true };
+        } catch (error) {
+          core.error(`Failed to pull image ${info.imageName}: ${getErrorMessage(error)}`);
+          return { info, successful: false };
+        }
+      })
     );
 
-    const successfullyPulledInfo = imagesToPullInfo.filter((info, index) => {
-      // eslint-disable-next-line security/detect-object-injection
-      const result = pullResults[index];
-      const wasFulfilled = result.status === 'fulfilled';
-      if (!wasFulfilled) {
-        core.error(`Failed to pull image ${info.imageName}: ${getErrorMessage(result.reason)}`);
-      }
-      return wasFulfilled;
-    });
+    // Extract only successfully pulled images
+    const successfullyPulledInfo = pullResultsWithInfo.filter(({ successful }) => successful).map(({ info }) => info);
 
     if (successfullyPulledInfo.length === 0) {
       core.warning('No images were successfully pulled, skipping cache save.');
       return;
     }
 
-    // Step 8: Save successfully pulled and verified images to cache
+    // Save successfully pulled images to cache
     core.info(`Saving ${successfullyPulledInfo.length} image(s) to cache...`);
     await Promise.allSettled(
       successfullyPulledInfo.map(async (info) => {
         try {
-          // Verify digest AFTER pull
           const pulledDigest = await this.dockerCommand.getDigest(info.imageName);
-          if (pulledDigest && pulledDigest === info.remoteDigest) {
-            await this.dockerCommand.save(info.cachePath, [info.imageName]);
-            await this.cacheManager.save(info.primaryKey, info.cachePath);
+          if (pulledDigest) {
+            // ローカルのダイジェスト値を使用して新しいキャッシュキーとパスを生成
+            const localCacheKey = this.generateCacheKey(info.imageName, info.platform, pulledDigest);
+            const localCachePath = this.generateCachePath(info.imageName, info.platform, pulledDigest);
+
+            await this.dockerCommand.save(localCachePath, [info.imageName]);
+            await this.cacheManager.save(localCacheKey, localCachePath);
+            core.info(`Image ${info.imageName} saved to cache with digest: ${pulledDigest}`);
           } else {
-            core.warning(
-              `Digest check failed after pulling ${info.imageName} (Local: ${pulledDigest ?? 'N/A'}, Expected: ${info.remoteDigest}). Skipping cache save.`
-            );
+            core.warning(`Could not retrieve digest for pulled image ${info.imageName}. Skipping cache save.`);
           }
         } catch (saveError) {
           core.warning(`Failed to save image ${info.imageName} to cache: ${getErrorMessage(saveError)}`);

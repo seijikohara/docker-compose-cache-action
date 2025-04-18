@@ -1,215 +1,248 @@
-import * as core from '@actions/core';
-import * as cache from '@actions/cache';
 import * as fs from 'fs';
-import { CacheManager } from '../src/cache-manager';
 
-// Mock dependent modules
-jest.mock('@actions/core');
+// Mock standard libraries
+jest.mock('fs');
+
+// Mock @actions/core with a direct mock to avoid fs.promises issues
+jest.mock('@actions/core', () => ({
+  info: jest.fn(),
+  debug: jest.fn(),
+  warning: jest.fn(),
+  error: jest.fn(),
+}));
+
+// Mock @actions/cache with a simplified direct mock
 jest.mock('@actions/cache', () => ({
-  // Mock functions used by CacheManager
   restoreCache: jest.fn(),
   saveCache: jest.fn(),
-  // Mock error classes for instanceof checks
+  // Add mock classes for instanceof checks
   ValidationError: class ValidationError extends Error {
-    constructor(message?: string) {
+    constructor(message = 'ValidationError') {
       super(message);
       this.name = 'ValidationError';
     }
   },
   ReserveCacheError: class ReserveCacheError extends Error {
-    constructor(message?: string) {
+    constructor(message = 'ReserveCacheError') {
       super(message);
       this.name = 'ReserveCacheError';
     }
   },
 }));
-// Mock fs using requireActual and overriding existsSync
-jest.mock('fs', () => {
-  const originalFs = jest.requireActual('fs');
-  return {
-    ...originalFs,
-    existsSync: jest.fn().mockReturnValue(true), // Default: file exists
-    // No need to mock readFileSync or promises for these tests
-  };
-});
 
-// Typed mocks
-const coreMock = core as jest.Mocked<typeof core>;
-const cacheMock = cache as jest.Mocked<typeof cache>;
-
-const fsMock = fs as jest.Mocked<typeof fs>;
+// Import after mock setup
+import * as core from '@actions/core';
+import * as cache from '@actions/cache';
+import { CacheManager } from '../src/cache-manager';
 
 describe('CacheManager', () => {
-  const TEST_KEY = 'test-primary-key';
-  const TEST_PATH = '/tmp/cache-file.tar';
-  const TEST_RESTORE_KEYS = ['restore-key-1', 'restore-key-2'];
   let cacheManager: CacheManager;
 
   beforeEach(() => {
+    // Create a new instance for each test
+    cacheManager = new CacheManager();
+
+    // Reset all mocks
     jest.clearAllMocks();
-    cacheManager = new CacheManager(); // Create a new instance for each test
   });
 
   describe('restore', () => {
-    test('should return true and log info when cache is restored and file exists', async () => {
-      // Arrange
-      const restoredKey = TEST_KEY;
-      cacheMock.restoreCache.mockResolvedValue(restoredKey);
-      fsMock.existsSync.mockReturnValue(true);
+    describe('normal cases', () => {
+      it('should successfully restore cache when it exists and file is found', async () => {
+        // Arrange
+        const key = 'cache-key';
+        const path = '/path/to/file.tar';
+        const restoreKeys = ['fallback-key-1', 'fallback-key-2'];
 
-      // Act
-      const result = await cacheManager.restore(TEST_KEY, TEST_PATH, TEST_RESTORE_KEYS);
+        // Mock successful cache restoration
+        (cache.restoreCache as jest.Mock).mockResolvedValue(key);
+        (fs.existsSync as jest.Mock).mockReturnValue(true);
 
-      // Assert
-      expect(result).toBe(true);
-      expect(cacheMock.restoreCache).toHaveBeenCalledTimes(1);
-      expect(cacheMock.restoreCache).toHaveBeenCalledWith([TEST_PATH], TEST_KEY, [...TEST_RESTORE_KEYS]); // Check mutable copy passed
-      expect(fsMock.existsSync).toHaveBeenCalledTimes(1);
-      expect(fsMock.existsSync).toHaveBeenCalledWith(TEST_PATH);
-      expect(coreMock.info).toHaveBeenCalledWith(`Cache restored for ${TEST_PATH} with key: ${restoredKey}`);
-      expect(coreMock.warning).not.toHaveBeenCalled();
+        // Act
+        const result = await cacheManager.restore(key, path, restoreKeys);
+
+        // Assert
+        expect(result).toBe(true);
+        expect(cache.restoreCache).toHaveBeenCalledWith([path], key, restoreKeys);
+        expect(core.info).toHaveBeenCalledWith(`Cache restored for ${path} with key: ${key}`);
+        expect(fs.existsSync).toHaveBeenCalledWith(path);
+      });
+
+      it('should handle restore with no fallback keys', async () => {
+        // Arrange
+        const key = 'cache-key';
+        const path = '/path/to/file.tar';
+
+        // Mock successful cache restoration
+        (cache.restoreCache as jest.Mock).mockResolvedValue(key);
+        (fs.existsSync as jest.Mock).mockReturnValue(true);
+
+        // Act
+        const result = await cacheManager.restore(key, path);
+
+        // Assert
+        expect(result).toBe(true);
+        expect(cache.restoreCache).toHaveBeenCalledWith([path], key, undefined);
+      });
     });
 
-    test('should return false when cache is not found', async () => {
-      // Arrange
-      cacheMock.restoreCache.mockResolvedValue(undefined); // Simulate cache miss
+    describe('edge cases', () => {
+      it('should return false when cache is found but file is missing', async () => {
+        // Arrange
+        const key = 'cache-key';
+        const path = '/path/to/missing-file.tar';
 
-      // Act
-      const result = await cacheManager.restore(TEST_KEY, TEST_PATH);
+        // Mock cache found but file missing
+        (cache.restoreCache as jest.Mock).mockResolvedValue(key);
+        (fs.existsSync as jest.Mock).mockReturnValue(false);
 
-      // Assert
-      expect(result).toBe(false);
-      expect(cacheMock.restoreCache).toHaveBeenCalledTimes(1);
-      expect(cacheMock.restoreCache).toHaveBeenCalledWith([TEST_PATH], TEST_KEY, undefined);
-      expect(fsMock.existsSync).not.toHaveBeenCalled(); // Shouldn't check if cacheKey is undefined
-      expect(coreMock.info).not.toHaveBeenCalled();
-      expect(coreMock.warning).not.toHaveBeenCalled();
+        // Act
+        const result = await cacheManager.restore(key, path);
+
+        // Assert
+        expect(result).toBe(false);
+        expect(core.warning).toHaveBeenCalledWith(
+          `Cache key '${key}' was found, but the file '${path}' is missing after restore.`
+        );
+      });
+
+      it('should return false when no cache is found', async () => {
+        // Arrange
+        const key = 'cache-key';
+        const path = '/path/to/file.tar';
+
+        // Mock no cache found
+        (cache.restoreCache as jest.Mock).mockResolvedValue(undefined);
+
+        // Act
+        const result = await cacheManager.restore(key, path);
+
+        // Assert
+        expect(result).toBe(false);
+        expect(core.info).toHaveBeenCalledWith(`Cache not found for key: ${key}`);
+      });
     });
 
-    test('should return false and log info when cache key hit but file does not exist', async () => {
-      // Arrange
-      const restoredKey = TEST_KEY;
-      cacheMock.restoreCache.mockResolvedValue(restoredKey);
-      fsMock.existsSync.mockReturnValue(false); // Simulate file missing
+    describe('error cases', () => {
+      it('should handle errors during cache restoration', async () => {
+        // Arrange
+        const key = 'cache-key';
+        const path = '/path/to/file.tar';
+        const errorMessage = 'Cache restoration failed';
 
-      // Act
-      const result = await cacheManager.restore(TEST_KEY, TEST_PATH);
+        // Mock error during cache restoration
+        (cache.restoreCache as jest.Mock).mockRejectedValue(new Error(errorMessage));
 
-      // Assert
-      expect(result).toBe(false);
-      expect(cacheMock.restoreCache).toHaveBeenCalledTimes(1);
-      expect(fsMock.existsSync).toHaveBeenCalledTimes(1);
-      expect(fsMock.existsSync).toHaveBeenCalledWith(TEST_PATH);
-      expect(coreMock.info).toHaveBeenCalledWith(`Cache restored for ${TEST_PATH} with key: ${restoredKey}`); // Still logs restore
-      expect(coreMock.warning).not.toHaveBeenCalled(); // No warning in this specific scenario in current code
-    });
+        // Act
+        const result = await cacheManager.restore(key, path);
 
-    test('should return false and log warning when restoreCache throws an error', async () => {
-      // Arrange
-      const errorMessage = 'Cache service unavailable';
-      cacheMock.restoreCache.mockRejectedValue(new Error(errorMessage));
-
-      // Act
-      const result = await cacheManager.restore(TEST_KEY, TEST_PATH);
-
-      // Assert
-      expect(result).toBe(false);
-      expect(cacheMock.restoreCache).toHaveBeenCalledTimes(1);
-      expect(fsMock.existsSync).not.toHaveBeenCalled();
-      expect(coreMock.info).not.toHaveBeenCalled();
-      expect(coreMock.warning).toHaveBeenCalledTimes(1);
-      expect(coreMock.warning).toHaveBeenCalledWith(`Failed to restore cache for key ${TEST_KEY}: ${errorMessage}`);
+        // Assert
+        expect(result).toBe(false);
+        expect(core.warning).toHaveBeenCalledWith(`Failed to restore cache for key ${key}: ${errorMessage}`);
+      });
     });
   });
 
   describe('save', () => {
-    test('should call saveCache and log info when file exists', async () => {
-      // Arrange
-      fsMock.existsSync.mockReturnValue(true);
-      cacheMock.saveCache.mockResolvedValue(123); // Simulate successful save return value (cacheId)
+    describe('normal cases', () => {
+      it('should successfully save cache when file exists', async () => {
+        // Arrange
+        const key = 'cache-key';
+        const path = '/path/to/file.tar';
 
-      // Act
-      await cacheManager.save(TEST_KEY, TEST_PATH);
+        // Mock file exists
+        (fs.existsSync as jest.Mock).mockReturnValue(true);
+        (cache.saveCache as jest.Mock).mockResolvedValue(undefined);
 
-      // Assert
-      expect(fsMock.existsSync).toHaveBeenCalledTimes(1);
-      expect(fsMock.existsSync).toHaveBeenCalledWith(TEST_PATH);
-      expect(cacheMock.saveCache).toHaveBeenCalledTimes(1);
-      expect(cacheMock.saveCache).toHaveBeenCalledWith([TEST_PATH], TEST_KEY);
-      expect(coreMock.info).toHaveBeenCalledWith(`Saving cache for ${TEST_PATH} with key: ${TEST_KEY}`);
-      expect(coreMock.info).toHaveBeenCalledWith(`Cache saved successfully for key: ${TEST_KEY}`);
-      expect(coreMock.warning).not.toHaveBeenCalled();
+        // Act
+        await cacheManager.save(key, path);
+
+        // Assert
+        expect(fs.existsSync).toHaveBeenCalledWith(path);
+        expect(cache.saveCache).toHaveBeenCalledWith([path], key);
+        expect(core.info).toHaveBeenCalledWith(`Attempting to save cache for path ${path} with key: ${key}`);
+        expect(core.info).toHaveBeenCalledWith(`Cache saved successfully for key: ${key}`);
+      });
     });
 
-    test('should not call saveCache and log warning when file does not exist', async () => {
-      // Arrange
-      fsMock.existsSync.mockReturnValue(false);
+    describe('edge cases', () => {
+      it('should not attempt to save cache when file does not exist', async () => {
+        // Arrange
+        const key = 'cache-key';
+        const path = '/path/to/nonexistent-file.tar';
 
-      // Act
-      await cacheManager.save(TEST_KEY, TEST_PATH);
+        // Mock file does not exist
+        (fs.existsSync as jest.Mock).mockReturnValue(false);
 
-      // Assert
-      expect(fsMock.existsSync).toHaveBeenCalledTimes(1);
-      expect(fsMock.existsSync).toHaveBeenCalledWith(TEST_PATH);
-      expect(cacheMock.saveCache).not.toHaveBeenCalled();
-      expect(coreMock.info).not.toHaveBeenCalledWith(expect.stringContaining('Saving cache')); // No save attempt logged
-      expect(coreMock.warning).toHaveBeenCalledTimes(1);
-      expect(coreMock.warning).toHaveBeenCalledWith(
-        `Cache file '${TEST_PATH}' does not exist. Cannot save cache with key ${TEST_KEY}.`
-      );
+        // Act
+        await cacheManager.save(key, path);
+
+        // Assert
+        expect(fs.existsSync).toHaveBeenCalledWith(path);
+        expect(cache.saveCache).not.toHaveBeenCalled();
+        expect(core.warning).toHaveBeenCalledWith(
+          `Cache file or directory '${path}' does not exist. Cannot save cache with key ${key}.`
+        );
+      });
+
+      it('should handle ValidationError during cache save', async () => {
+        // Arrange
+        const key = 'cache-key';
+        const path = '/path/to/file.tar';
+        const errorMessage = 'Validation failed';
+
+        // Mock file exists but validation error occurs
+        (fs.existsSync as jest.Mock).mockReturnValue(true);
+
+        // Create ValidationError
+        const validationError = new cache.ValidationError(errorMessage);
+        (cache.saveCache as jest.Mock).mockRejectedValue(validationError);
+
+        // Act
+        await cacheManager.save(key, path);
+
+        // Assert
+        expect(core.warning).toHaveBeenCalledWith(`Cache save warning for key ${key}: ${errorMessage}`);
+      });
+
+      it('should handle ReserveCacheError during cache save', async () => {
+        // Arrange
+        const key = 'cache-key';
+        const path = '/path/to/file.tar';
+        const errorMessage = 'Reserve cache failed';
+
+        // Mock file exists but reserve cache error occurs
+        (fs.existsSync as jest.Mock).mockReturnValue(true);
+
+        // Create ReserveCacheError
+        const reserveError = new cache.ReserveCacheError(errorMessage);
+        (cache.saveCache as jest.Mock).mockRejectedValue(reserveError);
+
+        // Act
+        await cacheManager.save(key, path);
+
+        // Assert
+        expect(core.warning).toHaveBeenCalledWith(`Cache save warning for key ${key}: ${errorMessage}`);
+      });
     });
 
-    test('should log general warning when saveCache throws a generic error', async () => {
-      // Arrange
-      const errorMessage = 'Network error during save';
-      fsMock.existsSync.mockReturnValue(true);
-      cacheMock.saveCache.mockRejectedValue(new Error(errorMessage));
+    describe('error cases', () => {
+      it('should handle generic errors during cache save', async () => {
+        // Arrange
+        const key = 'cache-key';
+        const path = '/path/to/file.tar';
+        const errorMessage = 'Unknown error occurred';
 
-      // Act
-      await cacheManager.save(TEST_KEY, TEST_PATH);
+        // Mock file exists but generic error occurs
+        (fs.existsSync as jest.Mock).mockReturnValue(true);
+        (cache.saveCache as jest.Mock).mockRejectedValue(new Error(errorMessage));
 
-      // Assert
-      expect(cacheMock.saveCache).toHaveBeenCalledTimes(1);
-      expect(coreMock.info).toHaveBeenCalledWith(`Saving cache for ${TEST_PATH} with key: ${TEST_KEY}`);
-      expect(coreMock.info).not.toHaveBeenCalledWith(expect.stringContaining('saved successfully'));
-      expect(coreMock.warning).toHaveBeenCalledTimes(1);
-      expect(coreMock.warning).toHaveBeenCalledWith(`Failed to save cache for key ${TEST_KEY}: ${errorMessage}`);
-    });
+        // Act
+        await cacheManager.save(key, path);
 
-    test('should log specific warning when saveCache throws ValidationError', async () => {
-      // Arrange
-      const errorMessage = 'Invalid cache key format';
-      fsMock.existsSync.mockReturnValue(true);
-      // Use the mocked error class constructor
-      cacheMock.saveCache.mockRejectedValue(new cache.ValidationError(errorMessage));
-
-      // Act
-      await cacheManager.save(TEST_KEY, TEST_PATH);
-
-      // Assert
-      expect(cacheMock.saveCache).toHaveBeenCalledTimes(1);
-      expect(coreMock.info).toHaveBeenCalledWith(`Saving cache for ${TEST_PATH} with key: ${TEST_KEY}`);
-      expect(coreMock.info).not.toHaveBeenCalledWith(expect.stringContaining('saved successfully'));
-      expect(coreMock.warning).toHaveBeenCalledTimes(1);
-      expect(coreMock.warning).toHaveBeenCalledWith(`Cache save warning for key ${TEST_KEY}: ${errorMessage}`);
-    });
-
-    test('should log specific warning when saveCache throws ReserveCacheError', async () => {
-      // Arrange
-      const errorMessage = 'Cache already exists or reservation conflict';
-      fsMock.existsSync.mockReturnValue(true);
-      // Use the mocked error class constructor
-      cacheMock.saveCache.mockRejectedValue(new cache.ReserveCacheError(errorMessage));
-
-      // Act
-      await cacheManager.save(TEST_KEY, TEST_PATH);
-
-      // Assert
-      expect(cacheMock.saveCache).toHaveBeenCalledTimes(1);
-      expect(coreMock.info).toHaveBeenCalledWith(`Saving cache for ${TEST_PATH} with key: ${TEST_KEY}`);
-      expect(coreMock.info).not.toHaveBeenCalledWith(expect.stringContaining('saved successfully'));
-      expect(coreMock.warning).toHaveBeenCalledTimes(1);
-      expect(coreMock.warning).toHaveBeenCalledWith(`Cache save warning for key ${TEST_KEY}: ${errorMessage}`);
+        // Assert
+        expect(core.warning).toHaveBeenCalledWith(`Failed to save cache for key ${key}: ${errorMessage}`);
+      });
     });
   });
 });
