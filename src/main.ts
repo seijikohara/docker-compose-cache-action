@@ -1,8 +1,9 @@
 import * as path from 'path';
-import { actionCore, actionCache } from './actions-wrapper';
-import { getCurrentPlatformInfo, sanitizePlatformComponent, parsePlatformString } from './platform';
-import { getComposeServicesFromFiles, ComposeService } from './docker-compose-file';
-import { getImageDigest, saveImageToTar, loadImageFromTar, pullImage } from './docker-command';
+
+import { actionCache, actionCore } from './actions-wrapper';
+import { getImageDigest, loadImageFromTar, pullImage, saveImageToTar } from './docker-command';
+import { ComposeService, getComposeServicesFromFiles } from './docker-compose-file';
+import { getCurrentPlatformInfo, parsePlatformString, sanitizePlatformComponent } from './platform';
 
 /**
  * Result of processing a single Docker service

@@ -1,5 +1,6 @@
-import { actionCore } from '../src/actions-wrapper';
 import * as fs from 'fs';
+
+import { actionCore } from '../src/actions-wrapper';
 import { getComposeServicesFromFiles } from '../src/docker-compose-file';
 
 // Setup mocks

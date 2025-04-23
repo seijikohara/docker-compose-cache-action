@@ -1,7 +1,7 @@
-import { actionCore, actionCache } from '../src/actions-wrapper';
-import * as platform from '../src/platform';
+import { actionCache, actionCore } from '../src/actions-wrapper';
 import * as dockerCommand from '../src/docker-command';
 import * as dockerComposeFile from '../src/docker-compose-file';
+import * as platform from '../src/platform';
 
 // Mock the main module to prevent automatic execution
 jest.mock('../src/main', () => {
