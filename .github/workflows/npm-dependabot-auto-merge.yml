@@ -12,7 +12,7 @@ jobs:
   auto-process-npm-dependencies:
     name: Process and Merge NPM Dependency Updates
     runs-on: ubuntu-latest
-    if: github.actor == 'dependabot[bot]' && startsWith(github.event.pull_request.title, 'npm') && github.event.pull_request.draft == false
+    if: github.actor == 'dependabot[bot]' && (startsWith(github.event.pull_request.title, 'npm') || startsWith(github.event.pull_request.title, 'github-actions')) && github.event.pull_request.draft == false
     permissions:
       contents: write
       pull-requests: write
