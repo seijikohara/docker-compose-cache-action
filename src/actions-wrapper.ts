@@ -2,8 +2,8 @@
  * Wrapper module for GitHub Actions libraries.
  * Makes it easier to mock these dependencies in tests.
  */
-import * as core from '@actions/core';
 import * as cache from '@actions/cache';
+import * as core from '@actions/core';
 import * as exec from '@actions/exec';
 
 /**

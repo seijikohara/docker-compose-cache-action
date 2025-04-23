@@ -1,5 +1,5 @@
 import { actionCore, actionExec } from '../src/actions-wrapper';
-import { getImageDigest, saveImageToTar, loadImageFromTar, pullImage } from '../src/docker-command';
+import { getImageDigest, loadImageFromTar, pullImage, saveImageToTar } from '../src/docker-command';
 
 // Setup mocks
 jest.mock('../src/actions-wrapper', () => ({

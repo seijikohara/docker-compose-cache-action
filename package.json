@@ -1,6 +1,6 @@
 {
   "name": "docker-compose-cache-action",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Dynamically caches Docker images defined in a docker-compose.yml file using TypeScript.",
   "keywords": [
     "github",
@@ -51,6 +51,7 @@
     "eslint-config-prettier": "^10.1.2",
     "eslint-plugin-prettier": "^5.2.6",
     "eslint-plugin-security": "^3.0.1",
+    "eslint-plugin-simple-import-sort": "^12.1.1",
     "globals": "^16.0.0",
     "jest": "^29.7.0",
     "prettier": "^3.5.3",
