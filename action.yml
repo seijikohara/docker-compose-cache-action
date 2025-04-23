@@ -6,15 +6,21 @@ branding:
   color: 'blue'
 inputs:
   compose-files:
-    description: |
+    description: >
       Path(s) to the Docker Compose file(s).
-      Specify multiple files using YAML list format.
+      Specify multiple files using multiline string with pipe (|):
+        compose-files: |
+          docker-compose.yml
+          docker-compose.prod.yml
       If omitted, defaults to searching for default compose files.
     required: false
   exclude-images:
-    description: |
+    description: >
       Images to exclude from caching.
-      Specify multiple images using YAML list format.
+      Specify multiple images using multiline string with pipe (|):
+        exclude-images: |
+          mysql:8.0
+          redis:alpine
     required: false
   cache-key-prefix:
     description: 'Prefix for the generated cache key.'

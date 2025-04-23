@@ -57,7 +57,7 @@ export default [
 
   // 4. Overrides specifically for test files
   {
-    files: ['__tests__/**/*.ts'],
+    files: ['tests/**/*.ts'],
     rules: {
       // Disable rules problematic in tests
       '@typescript-eslint/no-unsafe-assignment': 'off',

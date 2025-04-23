@@ -10,7 +10,7 @@ This action addresses these challenges by:
 
 - **Parsing Compose File(s):** Automatically detects the images your services depend on by reading your `compose.yaml` or `docker-compose.yml` files.
 - **Individual Image Caching:** Caches each required Docker image as a separate tarball using `actions/cache`. This improves cache granularity compared to saving multiple images in one large archive.
-- **Digest Verification:** Before using a cached image, it checks the image's manifest digest against the current digest in the remote registry using `skopeo`. This ensures you always use the correct image version, even if tags like `latest` have been updated, preventing unexpected behavior from stale caches.
+- **Digest Verification:** Before using a cached image, it checks the image's manifest digest against the current digest in the remote registry using `docker buildx imagetools inspect`. This ensures you always use the correct image version, even if tags like `latest` have been updated, preventing unexpected behavior from stale caches.
 - **Efficiency:** Only pulls images that are not found in the cache or whose digests have changed. Only saves images to the cache if they were freshly pulled and their digests match the remote source.
 - **Flexibility:** Supports specifying multiple Compose files and allows you to exclude specific images from the caching process.
 
@@ -84,11 +84,11 @@ jobs:
 
 ## Inputs
 
-| Input              | Description                                                                                                                                                               | Required | Default                                                                             |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------- |
-| `compose-files`    | Path(s) to the Docker Compose file(s). Provide multiple files using YAML list format (each file on a new line starting with `-`). If omitted, searches for default files. | `false`  | Searches `compose.yaml`, `compose.yml`, `docker-compose.yaml`, `docker-compose.yml` |
-| `exclude-images`   | Images to exclude from caching. Provide multiple images using YAML list format (each image on a new line starting with `-`). Exact image name with tag is required.       | `false`  | (empty list)                                                                        |
-| `cache-key-prefix` | Prefix for the generated cache key for each image. Change this if you need to invalidate all existing caches for this action.                                             | `false`  | `docker-compose-image`                                                              |
+| Input              | Description                                                                                                                                              | Required | Default                                                                             |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------- |
+| `compose-files`    | Path(s) to the Docker Compose file(s). Provide multiple files using multiline string with pipe (`\|`) character. If omitted, searches for default files. | `false`  | Searches `compose.yaml`, `compose.yml`, `docker-compose.yaml`, `docker-compose.yml` |
+| `exclude-images`   | Images to exclude from caching. Provide multiple images using multiline string with pipe (`\|`) character. Exact image name with tag is required.        | `false`  | (empty list)                                                                        |
+| `cache-key-prefix` | Prefix for the generated cache key for each image. Change this if you need to invalidate all existing caches for this action.                            | `false`  | `docker-compose-image`                                                              |
 
 ## Outputs
 
@@ -99,11 +99,11 @@ jobs:
 
 ## Authentication for Private Registries
 
-This action currently works best with **public Docker images**. Accessing private registries (like Docker Hub private repositories, GitHub Container Registry (GHCR) private packages, AWS ECR, etc.) requires authentication for both `skopeo inspect` (to get the digest) and `docker pull`.
+This action currently works best with **public Docker images**. Accessing private registries (like Docker Hub private repositories, GitHub Container Registry (GHCR) private packages, AWS ECR, etc.) requires authentication for both `docker buildx imagetools inspect` (to get the digest) and `docker pull`.
 
 While this action doesn't handle authentication directly, you can usually achieve this by:
 
-1. **Using `docker/login-action`:** Add steps _before_ this action to log in to the required registries. `skopeo` and `docker` often automatically pick up credentials stored in the standard Docker config file (`~/.docker/config.json`).
+1. **Using `docker/login-action`:** Add steps _before_ this action to log in to the required registries. `docker` automatically picks up credentials stored in the standard Docker config file (`~/.docker/config.json`).
 
    ```yaml
    steps:

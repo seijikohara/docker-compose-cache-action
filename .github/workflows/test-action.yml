@@ -12,110 +12,582 @@ on:
   workflow_dispatch:
 
 jobs:
-  test-caching:
-    name: Run with Docker Compose Cache Action (${{ matrix.scenario.name }})
+  # Generate a unique run ID to ensure clean cache state for each test run
+  setup:
+    name: Setup Test Environment
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        scenario:
-          # --- Define Test Scenarios using directories ---
-          - name: Simple Compose
-            dir: examples/simple
-            exclude_images: ''
-            run_compose_up: true
-          - name: Override Compose
-            dir: examples/override # Uses the combined override compose file
-            exclude_images: ''
-            run_compose_up: true
-          - name: Platform Specific
-            dir: examples/platform
-            exclude_images: ''
-            run_compose_up: true
-          - name: Image Exclusion
-            dir: examples/exclude
-            exclude_images: | # Exclude redis defined in examples/exclude/compose.yaml
-              redis:7-alpine
-            run_compose_up: true
-          - name: No Images Defined
-            dir: examples/no-images
-            exclude_images: ''
-            run_compose_up: false
-          - name: Empty Compose File
-            dir: examples/empty
-            exclude_images: ''
-            run_compose_up: false # Cannot 'up' an empty file logically
+    outputs:
+      run_id: ${{ steps.set-run-id.outputs.run_id }}
+    steps:
+      - name: Generate unique run ID
+        id: set-run-id
+        run: |
+          # Generate a unique ID using timestamp and random string
+          UNIQUE_ID="test-$(date +%Y%m%d%H%M%S)-$RANDOM"
+          echo "Generated unique run ID: $UNIQUE_ID"
+          echo "run_id=$UNIQUE_ID" >> "$GITHUB_OUTPUT"
 
+          echo "This unique ID will be used as cache key prefix to ensure a clean cache state for the test run"
+
+  # First run jobs (No Cache expected)
+  first-run-simple:
+    name: First Run - Simple Compose (No Cache)
+    runs-on: ubuntu-latest
+    needs: setup
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Cache Docker Compose Images (${{ matrix.scenario.name }})
+      - name: Cache Docker Compose Images [First Run]
         id: cache-docker
         uses: ./
         with:
-          # Point to the standard compose file within the scenario directory
           compose-files: |
-            ${{ matrix.scenario.dir }}/compose.yaml
-          exclude-images: ${{ matrix.scenario.exclude_images }}
+            examples/simple/compose.yaml
+          cache-key-prefix: ${{ needs.setup.outputs.run_id }}
 
-      - name: Display Cache Information
+      - name: Verify No Cache Hit
         run: |
-          echo "Scenario: ${{ matrix.scenario.name }}"
-          echo "Action Outputs:"
-          echo "  Cache Hit (All Images): ${{ steps.cache-docker.outputs.cache-hit }}"
-          echo "  Image List Processed: ${{ steps.cache-docker.outputs.image-list }}"
-          echo "-------------------------------------"
-          echo "Current Docker Images Before Up:"
-          docker images
+          echo "🧪 First Run - Simple Compose (expecting no cache)"
+          echo "📊 Action Outputs:"
+          echo "  ${{ steps.cache-docker.outputs.cache-hit == 'true' && '❌' || '✅' }} Cache Miss: ${{ steps.cache-docker.outputs.cache-hit == 'false' }}"
+          echo "  🔍 Images Processed: ${{ steps.cache-docker.outputs.image-list }}"
 
-      - name: Start Services (${{ matrix.scenario.name }})
-        if: matrix.scenario.run_compose_up == true
-        # Set working directory to the scenario directory
-        working-directory: ${{ matrix.scenario.dir }}
+          # Assert no cache hit on first run
+          if [ "${{ steps.cache-docker.outputs.cache-hit }}" == "true" ]; then
+            echo "❌ ERROR: Cache hit reported on first run! Expected cache miss."
+            exit 1
+          else
+            echo "✅ Confirmed: No cache hit on first run as expected"
+          fi
+
+      - name: Start Services
+        working-directory: examples/simple
         run: |
-          echo "Starting Docker Compose services in $(pwd)..."
-          # No -f needed, docker compose automatically finds compose.yaml/docker-compose.yml
+          echo "▶️ Starting Docker Compose services..."
           docker compose up -d
-          echo "Services started."
+          echo "✅ Services started successfully"
 
-      - name: Check Running Containers (${{ matrix.scenario.name }})
-        if: matrix.scenario.run_compose_up == true
+      - name: Check Running Containers
         run: |
-          echo "-------------------------------------"
-          echo "Running Docker Containers (docker ps -a):"
+          echo "🔎 Running Docker Containers:"
           docker ps -a
-          echo "-------------------------------------"
 
-      - name: Stop Services (${{ matrix.scenario.name }})
-        if: always() && matrix.scenario.run_compose_up == true
-        # Set working directory to the scenario directory
-        working-directory: ${{ matrix.scenario.dir }}
+  first-run-override:
+    name: First Run - Override Compose (No Cache)
+    runs-on: ubuntu-latest
+    needs: setup
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Docker Compose Images [First Run]
+        id: cache-docker
+        uses: ./
+        with:
+          compose-files: |
+            examples/override/compose.yaml
+          cache-key-prefix: ${{ needs.setup.outputs.run_id }}
+
+      - name: Verify No Cache Hit
         run: |
-          echo "Stopping Docker Compose services in $(pwd)..."
-          # No -f needed
-          docker compose down --volumes
-          echo "Services stopped."
+          echo "🧪 First Run - Override Compose (expecting no cache)"
+          echo "📊 Action Outputs:"
+          echo "  ${{ steps.cache-docker.outputs.cache-hit == 'true' && '❌' || '✅' }} Cache Miss: ${{ steps.cache-docker.outputs.cache-hit == 'false' }}"
+          echo "  🔍 Images Processed: ${{ steps.cache-docker.outputs.image-list }}"
 
-      - name: Show Docker Images After Run
-        if: always()
+          # Assert no cache hit on first run
+          if [ "${{ steps.cache-docker.outputs.cache-hit }}" == "true" ]; then
+            echo "❌ ERROR: Cache hit reported on first run! Expected cache miss."
+            exit 1
+          else
+            echo "✅ Confirmed: No cache hit on first run as expected"
+          fi
+
+      - name: Start Services
+        working-directory: examples/override
         run: |
-          echo "------ Docker Images After Run ------"
-          docker images
+          echo "▶️ Starting Docker Compose services..."
+          docker compose up -d
+          echo "✅ Services started successfully"
 
-  test-caching-summary:
+      - name: Check Running Containers
+        run: |
+          echo "🔎 Running Docker Containers:"
+          docker ps -a
+
+  first-run-platform:
+    name: First Run - Platform Specific (No Cache)
+    runs-on: ubuntu-latest
+    needs: setup
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Docker Compose Images [First Run]
+        id: cache-docker
+        uses: ./
+        with:
+          compose-files: |
+            examples/platform/compose.yaml
+          cache-key-prefix: ${{ needs.setup.outputs.run_id }}
+
+      - name: Verify No Cache Hit
+        run: |
+          echo "🧪 First Run - Platform Specific (expecting no cache)"
+          echo "📊 Action Outputs:"
+          echo "  ${{ steps.cache-docker.outputs.cache-hit == 'true' && '❌' || '✅' }} Cache Miss: ${{ steps.cache-docker.outputs.cache-hit == 'false' }}"
+          echo "  🔍 Images Processed: ${{ steps.cache-docker.outputs.image-list }}"
+
+          # Assert no cache hit on first run
+          if [ "${{ steps.cache-docker.outputs.cache-hit }}" == "true" ]; then
+            echo "❌ ERROR: Cache hit reported on first run! Expected cache miss."
+            exit 1
+          else
+            echo "✅ Confirmed: No cache hit on first run as expected"
+          fi
+
+      - name: Start Services
+        working-directory: examples/platform
+        run: |
+          echo "▶️ Starting Docker Compose services..."
+          docker compose up -d
+          echo "✅ Services started successfully"
+
+      - name: Check Running Containers
+        run: |
+          echo "🔎 Running Docker Containers:"
+          docker ps -a
+
+  first-run-multi-file:
+    name: First Run - Multi-File Compose (No Cache)
+    runs-on: ubuntu-latest
+    needs: setup
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Docker Compose Images [First Run]
+        id: cache-docker
+        uses: ./
+        with:
+          compose-files: |
+            examples/multi-file/compose.yaml
+            examples/multi-file/compose.override.yaml
+          cache-key-prefix: ${{ needs.setup.outputs.run_id }}
+
+      - name: Verify No Cache Hit
+        run: |
+          echo "🧪 First Run - Multi-File Compose (expecting no cache)"
+          echo "📊 Action Outputs:"
+          echo "  ${{ steps.cache-docker.outputs.cache-hit == 'true' && '❌' || '✅' }} Cache Miss: ${{ steps.cache-docker.outputs.cache-hit == 'false' }}"
+          echo "  🔍 Images Processed: ${{ steps.cache-docker.outputs.image-list }}"
+
+          # Assert no cache hit on first run
+          if [ "${{ steps.cache-docker.outputs.cache-hit }}" == "true" ]; then
+            echo "❌ ERROR: Cache hit reported on first run! Expected cache miss."
+            exit 1
+          else
+            echo "✅ Confirmed: No cache hit on first run as expected"
+          fi
+
+      - name: Start Services
+        working-directory: examples/multi-file
+        run: |
+          echo "▶️ Starting Docker Compose services..."
+          docker compose -f compose.yaml -f compose.override.yaml up -d
+          echo "✅ Services started successfully"
+
+      - name: Check Running Containers
+        run: |
+          echo "🔎 Running Docker Containers:"
+          docker ps -a
+
+  first-run-exclude:
+    name: First Run - Image Exclusion (No Cache)
+    runs-on: ubuntu-latest
+    needs: setup
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Docker Compose Images [First Run]
+        id: cache-docker
+        uses: ./
+        with:
+          compose-files: |
+            examples/exclude/compose.yaml
+          exclude-images: |
+            redis:7-alpine
+          cache-key-prefix: ${{ needs.setup.outputs.run_id }}
+
+      - name: Verify No Cache Hit
+        run: |
+          echo "🧪 First Run - Image Exclusion (expecting no cache)"
+          echo "📊 Action Outputs:"
+          echo "  ${{ steps.cache-docker.outputs.cache-hit == 'true' && '❌' || '✅' }} Cache Miss: ${{ steps.cache-docker.outputs.cache-hit == 'false' }}"
+          echo "  🔍 Images Processed: ${{ steps.cache-docker.outputs.image-list }}"
+
+          # Assert no cache hit on first run
+          if [ "${{ steps.cache-docker.outputs.cache-hit }}" == "true" ]; then
+            echo "❌ ERROR: Cache hit reported on first run! Expected cache miss."
+            exit 1
+          else
+            echo "✅ Confirmed: No cache hit on first run as expected"
+          fi
+
+      - name: Start Services
+        working-directory: examples/exclude
+        run: |
+          echo "▶️ Starting Docker Compose services..."
+          docker compose up -d
+          echo "✅ Services started successfully"
+
+      - name: Check Running Containers
+        run: |
+          echo "🔎 Running Docker Containers:"
+          docker ps -a
+
+  first-run-no-images:
+    name: First Run - No Images Defined (No Cache)
+    runs-on: ubuntu-latest
+    needs: setup
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Docker Compose Images [First Run]
+        id: cache-docker
+        uses: ./
+        with:
+          compose-files: |
+            examples/no-images/compose.yaml
+          cache-key-prefix: ${{ needs.setup.outputs.run_id }}
+
+      - name: Verify No Cache Hit
+        run: |
+          echo "🧪 First Run - No Images Defined (expecting no cache)"
+          echo "📊 Action Outputs:"
+          echo "  ${{ steps.cache-docker.outputs.cache-hit == 'true' && '❌' || '✅' }} Cache Miss: ${{ steps.cache-docker.outputs.cache-hit == 'false' }}"
+          echo "  🔍 Images Processed: ${{ steps.cache-docker.outputs.image-list }}"
+
+          # Assert no cache hit on first run
+          if [ "${{ steps.cache-docker.outputs.cache-hit }}" == "true" ]; then
+            echo "❌ ERROR: Cache hit reported on first run! Expected cache miss."
+            exit 1
+          else
+            echo "✅ Confirmed: No cache hit on first run as expected"
+          fi
+
+  first-run-empty:
+    name: First Run - Empty Compose File (No Cache)
+    runs-on: ubuntu-latest
+    needs: setup
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Docker Compose Images [First Run]
+        id: cache-docker
+        uses: ./
+        with:
+          compose-files: |
+            examples/empty/compose.yaml
+          cache-key-prefix: ${{ needs.setup.outputs.run_id }}
+
+      - name: Verify No Cache Hit
+        run: |
+          echo "🧪 First Run - Empty Compose File (expecting no cache)"
+          echo "📊 Action Outputs:"
+          echo "  ${{ steps.cache-docker.outputs.cache-hit == 'true' && '❌' || '✅' }} Cache Miss: ${{ steps.cache-docker.outputs.cache-hit == 'false' }}"
+          echo "  🔍 Images Processed: ${{ steps.cache-docker.outputs.image-list }}"
+
+          # Assert no cache hit on first run
+          if [ "${{ steps.cache-docker.outputs.cache-hit }}" == "true" ];then
+            echo "❌ ERROR: Cache hit reported on first run! Expected cache miss."
+            exit 1
+          else
+            echo "✅ Confirmed: No cache hit on first run as expected"
+          fi
+
+  # Second run jobs (Cache Hit expected)
+  second-run-simple:
+    name: Second Run - Simple Compose (With Cache)
+    runs-on: ubuntu-latest
+    needs: [setup, first-run-simple]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Docker Compose Images [Second Run]
+        id: cache-docker
+        uses: ./
+        with:
+          compose-files: |
+            examples/simple/compose.yaml
+          cache-key-prefix: ${{ needs.setup.outputs.run_id }}
+
+      - name: Verify Cache Hit
+        run: |
+          echo "🧪 Second Run - Simple Compose (expecting cache hit)"
+          echo "📊 Action Outputs:"
+          echo "  ${{ steps.cache-docker.outputs.cache-hit == 'true' && '✅' || '❌' }} Cache Hit: ${{ steps.cache-docker.outputs.cache-hit }}"
+          echo "  🔍 Images Processed: ${{ steps.cache-docker.outputs.image-list }}"
+
+          # Assert cache hit on second run for scenarios with images
+          if [ "${{ steps.cache-docker.outputs.cache-hit }}" != "true" ]; then
+            echo "❌ ERROR: Cache miss reported on second run! Expected cache hit."
+            exit 1
+          else
+            echo "✅ Confirmed: Cache hit on second run as expected"
+          fi
+
+      - name: Start Services
+        working-directory: examples/simple
+        run: |
+          echo "▶️ Starting Docker Compose services..."
+          docker compose up -d
+          echo "✅ Services started successfully"
+
+  second-run-override:
+    name: Second Run - Override Compose (With Cache)
+    runs-on: ubuntu-latest
+    needs: [setup, first-run-override]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Docker Compose Images [Second Run]
+        id: cache-docker
+        uses: ./
+        with:
+          compose-files: |
+            examples/override/compose.yaml
+          cache-key-prefix: ${{ needs.setup.outputs.run_id }}
+
+      - name: Verify Cache Hit
+        run: |
+          echo "🧪 Second Run - Override Compose (expecting cache hit)"
+          echo "📊 Action Outputs:"
+          echo "  ${{ steps.cache-docker.outputs.cache-hit == 'true' && '✅' || '❌' }} Cache Hit: ${{ steps.cache-docker.outputs.cache-hit }}"
+          echo "  🔍 Images Processed: ${{ steps.cache-docker.outputs.image-list }}"
+
+          # Assert cache hit on second run for scenarios with images
+          if [ "${{ steps.cache-docker.outputs.cache-hit }}" != "true" ]; then
+            echo "❌ ERROR: Cache miss reported on second run! Expected cache hit."
+            exit 1
+          else
+            echo "✅ Confirmed: Cache hit on second run as expected"
+          fi
+
+      - name: Start Services
+        working-directory: examples/override
+        run: |
+          echo "▶️ Starting Docker Compose services..."
+          docker compose up -d
+          echo "✅ Services started successfully"
+
+  second-run-platform:
+    name: Second Run - Platform Specific (With Cache)
+    runs-on: ubuntu-latest
+    needs: [setup, first-run-platform]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Docker Compose Images [Second Run]
+        id: cache-docker
+        uses: ./
+        with:
+          compose-files: |
+            examples/platform/compose.yaml
+          cache-key-prefix: ${{ needs.setup.outputs.run_id }}
+
+      - name: Verify Cache Hit
+        run: |
+          echo "🧪 Second Run - Platform Specific (expecting cache hit)"
+          echo "📊 Action Outputs:"
+          echo "  ${{ steps.cache-docker.outputs.cache-hit == 'true' && '✅' || '❌' }} Cache Hit: ${{ steps.cache-docker.outputs.cache-hit }}"
+          echo "  🔍 Images Processed: ${{ steps.cache-docker.outputs.image-list }}"
+
+          # Assert cache hit on second run for scenarios with images
+          if [ "${{ steps.cache-docker.outputs.cache-hit }}" != "true" ]; then
+            echo "❌ ERROR: Cache miss reported on second run! Expected cache hit."
+            exit 1
+          else
+            echo "✅ Confirmed: Cache hit on second run as expected"
+          fi
+
+      - name: Start Services
+        working-directory: examples/platform
+        run: |
+          echo "▶️ Starting Docker Compose services..."
+          docker compose up -d
+          echo "✅ Services started successfully"
+
+  second-run-multi-file:
+    name: Second Run - Multi-File Compose (With Cache)
+    runs-on: ubuntu-latest
+    needs: [setup, first-run-multi-file]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Docker Compose Images [Second Run]
+        id: cache-docker
+        uses: ./
+        with:
+          compose-files: |
+            examples/multi-file/compose.yaml
+            examples/multi-file/compose.override.yaml
+          cache-key-prefix: ${{ needs.setup.outputs.run_id }}
+
+      - name: Verify Cache Hit
+        run: |
+          echo "🧪 Second Run - Multi-File Compose (expecting cache hit)"
+          echo "📊 Action Outputs:"
+          echo "  ${{ steps.cache-docker.outputs.cache-hit == 'true' && '✅' || '❌' }} Cache Hit: ${{ steps.cache-docker.outputs.cache-hit }}"
+          echo "  🔍 Images Processed: ${{ steps.cache-docker.outputs.image-list }}"
+
+          # Assert cache hit on second run for scenarios with images
+          if [ "${{ steps.cache-docker.outputs.cache-hit }}" != "true" ]; then
+            echo "❌ ERROR: Cache miss reported on second run! Expected cache hit."
+            exit 1
+          else
+            echo "✅ Confirmed: Cache hit on second run as expected"
+          fi
+
+      - name: Start Services
+        working-directory: examples/multi-file
+        run: |
+          echo "▶️ Starting Docker Compose services..."
+          docker compose -f compose.yaml -f compose.override.yaml up -d
+          echo "✅ Services started successfully"
+
+  second-run-exclude:
+    name: Second Run - Image Exclusion (With Cache)
+    runs-on: ubuntu-latest
+    needs: [setup, first-run-exclude]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Docker Compose Images [Second Run]
+        id: cache-docker
+        uses: ./
+        with:
+          compose-files: |
+            examples/exclude/compose.yaml
+          exclude-images: |
+            redis:7-alpine
+          cache-key-prefix: ${{ needs.setup.outputs.run_id }}
+
+      - name: Verify Cache Hit
+        run: |
+          echo "🧪 Second Run - Image Exclusion (expecting cache hit)"
+          echo "📊 Action Outputs:"
+          echo "  ${{ steps.cache-docker.outputs.cache-hit == 'true' && '✅' || '❌' }} Cache Hit: ${{ steps.cache-docker.outputs.cache-hit }}"
+          echo "  🔍 Images Processed: ${{ steps.cache-docker.outputs.image-list }}"
+
+          # Assert cache hit on second run for scenarios with images
+          if [ "${{ steps.cache-docker.outputs.cache-hit }}" != "true" ]; then
+            echo "❌ ERROR: Cache miss reported on second run! Expected cache hit."
+            exit 1
+          else
+            echo "✅ Confirmed: Cache hit on second run as expected"
+          fi
+
+      - name: Start Services
+        working-directory: examples/exclude
+        run: |
+          echo "▶️ Starting Docker Compose services..."
+          docker compose up -d
+          echo "✅ Services started successfully"
+
+  second-run-no-images:
+    name: Second Run - No Images Defined (With Cache)
+    runs-on: ubuntu-latest
+    needs: [setup, first-run-no-images]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Docker Compose Images [Second Run]
+        id: cache-docker
+        uses: ./
+        with:
+          compose-files: |
+            examples/no-images/compose.yaml
+          cache-key-prefix: ${{ needs.setup.outputs.run_id }}
+
+      - name: Display Cache Information (No Image Scenarios)
+        run: |
+          echo "🧪 Second Run - No Images Defined (no image scenario)"
+          echo "📊 Action Outputs:"
+          echo "  ℹ️ Cache Hit Check Skipped: No images in this scenario"
+          echo "  🔍 Images Processed: ${{ steps.cache-docker.outputs.image-list }}"
+
+  second-run-empty:
+    name: Second Run - Empty Compose File (With Cache)
+    runs-on: ubuntu-latest
+    needs: [setup, first-run-empty]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Docker Compose Images [Second Run]
+        id: cache-docker
+        uses: ./
+        with:
+          compose-files: |
+            examples/empty/compose.yaml
+          cache-key-prefix: ${{ needs.setup.outputs.run_id }}
+
+      - name: Display Cache Information (No Image Scenarios)
+        run: |
+          echo "🧪 Second Run - Empty Compose File (no image scenario)"
+          echo "📊 Action Outputs:"
+          echo "  ℹ️ Cache Hit Check Skipped: No images in this scenario"
+          echo "  🔍 Images Processed: ${{ steps.cache-docker.outputs.image-list }}"
+
+  test-summary:
     name: Test Scenarios Summary
     runs-on: ubuntu-latest
-    needs: test-caching
+    needs:
+      [
+        second-run-simple,
+        second-run-override,
+        second-run-platform,
+        second-run-multi-file,
+        second-run-exclude,
+        second-run-no-images,
+        second-run-empty,
+      ]
     if: always()
     steps:
       - name: Report overall status
         run: |
-          echo "All test scenarios completed."
-          echo "Overall matrix job status: ${{ needs.test-caching.result }}"
-          if [ "${{ needs.test-caching.result }}" != "success" ]; then
-            echo "::error::One or more test scenarios failed!"
+          echo "📋 All test scenarios completed"
+
+          FAILED_FIRST_RUN_SIMPLE="${{ needs.second-run-simple.result != 'success' }}"
+          FAILED_FIRST_RUN_OVERRIDE="${{ needs.second-run-override.result != 'success' }}"
+          FAILED_FIRST_RUN_PLATFORM="${{ needs.second-run-platform.result != 'success' }}"
+          FAILED_FIRST_RUN_MULTI_FILE="${{ needs.second-run-multi-file.result != 'success' }}"
+          FAILED_FIRST_RUN_EXCLUDE="${{ needs.second-run-exclude.result != 'success' }}"
+          FAILED_FIRST_RUN_NO_IMAGES="${{ needs.second-run-no-images.result != 'success' }}"
+          FAILED_FIRST_RUN_EMPTY="${{ needs.second-run-empty.result != 'success' }}"
+
+          FAILED_TESTS=false
+
+          for RESULT in "$FAILED_FIRST_RUN_SIMPLE" "$FAILED_FIRST_RUN_OVERRIDE" "$FAILED_FIRST_RUN_PLATFORM" "$FAILED_FIRST_RUN_MULTI_FILE" "$FAILED_FIRST_RUN_EXCLUDE" "$FAILED_FIRST_RUN_NO_IMAGES" "$FAILED_FIRST_RUN_EMPTY"; do
+            if [ "$RESULT" == "true" ]; then
+              FAILED_TESTS=true
+            fi
+          done
+
+          if [ "$FAILED_TESTS" == "true" ]; then
+            echo "❌ Some tests failed!"
             exit 1
           else
-            echo "All scenarios passed successfully."
+            echo "🎉 All tests passed successfully!"
           fi
