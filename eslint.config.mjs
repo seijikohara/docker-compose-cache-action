@@ -3,6 +3,7 @@ import tseslint from '@typescript-eslint/eslint-plugin';
 import tsParser from '@typescript-eslint/parser';
 import securityPlugin from 'eslint-plugin-security';
 import prettierPlugin from 'eslint-plugin-prettier';
+import simpleImportSort from 'eslint-plugin-simple-import-sort';
 import eslintConfigPrettier from 'eslint-config-prettier/flat';
 import globals from 'globals';
 
@@ -29,11 +30,16 @@ export default [
       '@typescript-eslint': tseslint,
       security: securityPlugin,
       prettier: prettierPlugin,
+      'simple-import-sort': simpleImportSort,
     },
     rules: {
       // Apply base + recommended rules first
       ...tseslint.configs.recommended.rules,
       ...securityPlugin.configs.recommended.rules,
+
+      // Import sorting rules
+      'simple-import-sort/imports': 'error',
+      'simple-import-sort/exports': 'error',
 
       // Common overrides
       'no-unused-vars': 'off',
