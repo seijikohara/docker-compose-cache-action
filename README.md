@@ -88,18 +88,18 @@ jobs:
 
 ### Inputs
 
-| Input              | Description                                                                                                             | Required | Default                                                                             |
-|--------------------|------------------------------------------------------------------------------------------------------------------------|----------|------------------------------------------------------------------------------------|
-| `compose-files`    | Path(s) to Docker Compose file(s). Provide multiple files as multiline string with pipe character.                      | `false`  | Searches `compose.yaml`, `compose.yml`, `docker-compose.yaml`, `docker-compose.yml` |
-| `exclude-images`   | Images to exclude from caching. Provide multiple images as multiline string with pipe character.                        | `false`  | (empty list)                                                                        |
-| `cache-key-prefix` | Prefix for the generated cache key for each image. Change to invalidate existing caches.                               | `false`  | `docker-compose-image`                                                              |
+| Input              | Description                                                                                        | Required | Default                                                                             |
+| ------------------ | -------------------------------------------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------- |
+| `compose-files`    | Path(s) to Docker Compose file(s). Provide multiple files as multiline string with pipe character. | `false`  | Searches `compose.yaml`, `compose.yml`, `docker-compose.yaml`, `docker-compose.yml` |
+| `exclude-images`   | Images to exclude from caching. Provide multiple images as multiline string with pipe character.   | `false`  | (empty list)                                                                        |
+| `cache-key-prefix` | Prefix for the generated cache key for each image. Change to invalidate existing caches.           | `false`  | `docker-compose-image`                                                              |
 
 ### Outputs
 
-| Output       | Description                                                                           | Example Value                           |
-|--------------|---------------------------------------------------------------------------------------|----------------------------------------|
-| `cache-hit`  | Boolean value (`'true'` or `'false'`) indicating if all images were restored from cache. | `'true'`                               |
-| `image-list` | Space-separated string of unique image names targeted for caching.                    | `'mysql:8.0 redis:alpine myapp:latest'` |
+| Output       | Description                                                                              | Example Value                           |
+| ------------ | ---------------------------------------------------------------------------------------- | --------------------------------------- |
+| `cache-hit`  | Boolean value (`'true'` or `'false'`) indicating if all images were restored from cache. | `'true'`                                |
+| `image-list` | Space-separated string of unique image names targeted for caching.                       | `'mysql:8.0 redis:alpine myapp:latest'` |
 
 ## Private Registry Authentication
 

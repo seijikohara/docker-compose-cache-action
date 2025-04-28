@@ -3,6 +3,7 @@ import * as path from 'path';
 import { actionCache, actionCore } from './actions-wrapper';
 import { getImageDigest, loadImageFromTar, pullImage, saveImageToTar } from './docker-command';
 import { ComposeService, getComposeServicesFromFiles } from './docker-compose-file';
+import { sanitizePathComponent } from './path-utils';
 import { getCurrentPlatformInfo, parsePlatformString, sanitizePlatformComponent } from './platform';
 
 /**
@@ -38,7 +39,10 @@ function generateCacheKey(cacheKeyPrefix: string, servicePlatform: string | unde
  * @returns Path to store the tar file
  */
 function generateTarPath(imageName: string, imageTag: string): string {
-  return path.join(process.env.RUNNER_TEMP || '/tmp', `${imageName}-${imageTag}.tar`);
+  // Sanitize both image name and tag to avoid invalid directory paths
+  const sanitizedImageName = sanitizePathComponent(imageName);
+  const sanitizedImageTag = sanitizePathComponent(imageTag);
+  return path.join(process.env.RUNNER_TEMP || '/tmp', `${sanitizedImageName}-${sanitizedImageTag}.tar`);
 }
 
 /**
