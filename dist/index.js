@@ -69781,6 +69781,7 @@ const path = __importStar(__nccwpck_require__(6928));
 const actions_wrapper_1 = __nccwpck_require__(2518);
 const docker_command_1 = __nccwpck_require__(4919);
 const docker_compose_file_1 = __nccwpck_require__(4329);
+const path_utils_1 = __nccwpck_require__(6696);
 const platform_1 = __nccwpck_require__(3728);
 /**
  * Generates a cache key for the Docker image
@@ -69804,7 +69805,10 @@ function generateCacheKey(cacheKeyPrefix, servicePlatform, digest) {
  * @returns Path to store the tar file
  */
 function generateTarPath(imageName, imageTag) {
-    return path.join(process.env.RUNNER_TEMP || '/tmp', `${imageName}-${imageTag}.tar`);
+    // Sanitize both image name and tag to avoid invalid directory paths
+    const sanitizedImageName = (0, path_utils_1.sanitizePathComponent)(imageName);
+    const sanitizedImageTag = (0, path_utils_1.sanitizePathComponent)(imageTag);
+    return path.join(process.env.RUNNER_TEMP || '/tmp', `${sanitizedImageName}-${sanitizedImageTag}.tar`);
 }
 /**
  * Processes a single Docker service
@@ -69936,6 +69940,27 @@ async function run() {
 }
 // Execute the action
 run();
+
+
+/***/ }),
+
+/***/ 6696:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.sanitizePathComponent = sanitizePathComponent;
+/**
+ * Sanitizes a string to make it safe for use in file paths
+ * @param value - The string to sanitize
+ * @returns A sanitized string safe for use in file paths
+ */
+function sanitizePathComponent(value) {
+    // Replace all characters that are not safe for filenames across platforms
+    // This includes: / \ : * ? " < > |
+    return value.replace(/[/\\:*?"<>|]/g, '-');
+}
 
 
 /***/ }),

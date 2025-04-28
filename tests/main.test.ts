@@ -76,8 +76,8 @@ describe('Main Module', () => {
     (dockerComposeFile.getComposeServicesFromFiles as jest.Mock).mockReturnValue(mockServices);
 
     // Setup default inputs
-    mockGetInput.mockImplementation((name) => {
-      switch (name) {
+    mockGetInput.mockImplementation((_name) => {
+      switch (_name) {
         case 'cache-key-prefix':
           return 'test-cache';
         default:
@@ -86,8 +86,8 @@ describe('Main Module', () => {
     });
 
     // Setup multiline inputs
-    mockGetMultilineInput.mockImplementation((name) => {
-      switch (name) {
+    mockGetMultilineInput.mockImplementation((_name) => {
+      switch (_name) {
         case 'compose-files':
           return ['docker-compose.yml'];
         case 'exclude-images':
@@ -208,5 +208,155 @@ describe('Main Module', () => {
     // Verify platform handling
     expect(mockInfo).toHaveBeenCalledWith('Using platform linux/arm64 for nginx:alpine');
     expect(dockerCommand.pullImage).toHaveBeenCalledWith('nginx:alpine', 'linux/arm64');
+  });
+
+  /**
+   * Tests default cache key prefix when not specified
+   */
+  it('should use default cache key prefix when not specified', async () => {
+    // Override the getInput mock to return empty string for cache-key-prefix
+    mockGetInput.mockImplementation((_name) => {
+      return ''; // Return empty string for all inputs
+    });
+
+    // Set up for cache miss
+    mockRestoreCache.mockResolvedValue(null);
+
+    // Run the function
+    await run();
+
+    // Verify default cache key prefix ('docker-compose-image') is used
+    expect(mockInfo).toHaveBeenCalledWith(expect.stringMatching(/Cache key for .* docker-compose-image-/));
+  });
+
+  /**
+   * Tests image exclusion functionality
+   */
+  it('should exclude specified images from processing', async () => {
+    // Setup exclude input to exclude nginx:latest
+    mockGetMultilineInput.mockImplementation((_name) => {
+      switch (_name) {
+        case 'compose-files':
+          return ['docker-compose.yml'];
+        case 'exclude-images':
+          return ['nginx:latest'];
+        default:
+          return [];
+      }
+    });
+
+    // Run the function
+    await run();
+
+    // Verify the exclude parameter is passed correctly
+    expect(dockerComposeFile.getComposeServicesFromFiles).toHaveBeenCalledWith(
+      ['docker-compose.yml'],
+      ['nginx:latest']
+    );
+  });
+
+  /**
+   * Tests error handling when saving cache (already exists error)
+   */
+  it('should handle "already exists" error when saving cache', async () => {
+    // Set up cache miss
+    mockRestoreCache.mockResolvedValue(null);
+
+    // Mock saveCache to throw "already exists" error
+    mockSaveCache.mockImplementation(() => {
+      throw new Error('Unable to reserve cache with key, key already exists');
+    });
+
+    // Run the function
+    await run();
+
+    // Verify error is handled gracefully and process continues
+    expect(mockSetFailed).not.toHaveBeenCalled();
+    expect(actionCore.debug).toHaveBeenCalledWith(expect.stringContaining('Cache already exists'));
+  });
+
+  /**
+   * Tests error handling when saving cache (unable to upload error)
+   */
+  it('should handle "unable to upload" error when saving cache', async () => {
+    // Set up cache miss
+    mockRestoreCache.mockResolvedValue(null);
+
+    // Mock saveCache to throw "unable to upload" error
+    mockSaveCache.mockImplementation(() => {
+      throw new Error('unable to upload cache');
+    });
+
+    // Run the function
+    await run();
+
+    // Verify error is handled gracefully and process continues
+    expect(mockSetFailed).not.toHaveBeenCalled();
+    expect(actionCore.debug).toHaveBeenCalledWith(expect.stringContaining('Unable to upload cache'));
+  });
+
+  /**
+   * Tests digest mismatch handling after pull
+   */
+  it('should handle digest mismatch after pull', async () => {
+    // Set up cache miss
+    mockRestoreCache.mockResolvedValue(null);
+
+    // 単一サービスの場合のテストに変更して、他のサービスの影響を排除
+    const singleService = { image: 'nginx:latest' };
+    (dockerComposeFile.getComposeServicesFromFiles as jest.Mock).mockReturnValue([singleService]);
+
+    // Mock initial digest check and then a different digest after pull
+    const mockGetImageDigest = dockerCommand.getImageDigest as jest.Mock;
+    mockGetImageDigest
+      .mockResolvedValueOnce('sha256:original') // First call returns initial digest
+      .mockResolvedValueOnce('sha256:different'); // Second call returns different digest after pull
+
+    // Run the function
+    await run();
+
+    // Verify warning is shown for digest mismatch
+    expect(mockWarning).toHaveBeenCalledWith(expect.stringContaining('Digest mismatch'));
+    // Verify image not saved due to mismatch
+    expect(dockerCommand.saveImageToTar).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Tests partial cache hits with multiple services
+   */
+  it('should handle partial cache hits with multiple services', async () => {
+    // Mock cache hit for first service and miss for others
+    mockRestoreCache
+      .mockResolvedValueOnce('cache-key') // Cache hit for nginx
+      .mockResolvedValueOnce(null) // Cache miss for redis
+      .mockResolvedValueOnce(null); // Cache miss for node
+
+    // Run the function
+    await run();
+
+    // Verify some images were loaded from cache and some were pulled
+    expect(dockerCommand.loadImageFromTar).toHaveBeenCalled();
+    expect(dockerCommand.pullImage).toHaveBeenCalled();
+
+    // Verify cache-hit is false because not all services were cached
+    expect(mockSetOutput).toHaveBeenCalledWith('cache-hit', 'false');
+
+    // Verify summary shows partial restoration
+    expect(mockInfo).toHaveBeenCalledWith(expect.stringMatching(/\d+ of 3 services restored from cache/));
+  });
+
+  /**
+   * Tests behavior when all services have cache hits
+   */
+  it('should set cache-hit to true when all services are cached', async () => {
+    // Mock cache hit for all services
+    mockRestoreCache.mockResolvedValue('cache-key');
+
+    // Run the function
+    await run();
+
+    // Verify cache-hit is true when all services are cached
+    expect(mockSetOutput).toHaveBeenCalledWith('cache-hit', 'true');
+    expect(mockInfo).toHaveBeenCalledWith('3 of 3 services restored from cache');
   });
 });
