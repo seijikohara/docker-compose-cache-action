@@ -83,6 +83,7 @@ const VALID_OCI_VARIANTS: ReadonlySet<string> = new Set(NODE_TO_OCI_VARIANT_MAP.
 
 /**
  * Internal helper to resolve an OCI architecture identifier.
+ *
  * @param arch - The architecture string to map (Node.js or OCI).
  * @returns The canonical OCI architecture string or `undefined`.
  */
@@ -93,6 +94,7 @@ function resolveOciArch(arch: string | undefined): string | undefined {
 
 /**
  * Internal helper to resolve an OCI OS identifier.
+ *
  * @param os - The OS string to map (Node.js or OCI).
  * @returns The canonical OCI OS string or `undefined`.
  */
@@ -103,6 +105,7 @@ function resolveOciOs(os: string | undefined): string | undefined {
 
 /**
  * Internal helper to resolve an OCI variant identifier.
+ *
  * @param variant - The variant string to map (Node.js arm_version or OCI).
  * @returns The canonical OCI variant string or `undefined`.
  */
@@ -113,6 +116,7 @@ function resolveOciVariant(variant: string | undefined): string | undefined {
 
 /**
  * Determines the OCI platform string (os/arch[/variant]) for the current Node.js runtime.
+ *
  * @returns The OCI platform string (e.g., "linux/amd64", "linux/arm/v7"), or `null` if resolution fails.
  */
 export function getCurrentOciPlatformString(): string | null {
@@ -137,6 +141,7 @@ export function getCurrentOciPlatformString(): string | null {
 
 /**
  * Parses an OCI platform string into its components (OS, architecture, variant).
+ *
  * @param platformString - The platform string to parse (e.g., "linux/amd64", "windows/amd64/v8").
  * @returns A `PlatformInfo` object, or `null` if the string is invalid.
  */
@@ -169,22 +174,10 @@ export function parsePlatformString(platformString: string | null | undefined): 
 
 /**
  * Retrieves the OCI platform information (`PlatformInfo`) for the current Node.js runtime.
+ *
  * @returns A `PlatformInfo` object for the current environment, or `null` if resolution fails.
  */
 export function getCurrentPlatformInfo(): PlatformInfo | null {
   const platformString = getCurrentOciPlatformString();
   return parsePlatformString(platformString);
-}
-
-/**
- * Sanitizes a platform component string (OS, arch, or variant) for safe use (e.g., in file names).
- * Replaces non-alphanumeric characters (excluding '.', '_', '-') with underscores.
- * @param component - The platform component string to sanitize.
- * @returns A sanitized string. Returns 'none' if the input is null or undefined.
- */
-export function sanitizePlatformComponent(component: string | null | undefined): string {
-  if (!component) {
-    return 'none';
-  }
-  return component.replace(/[^a-zA-Z0-9._-]/g, '_');
 }

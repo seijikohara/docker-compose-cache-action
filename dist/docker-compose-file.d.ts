@@ -6,9 +6,11 @@ export type ComposeService = {
     readonly platform?: string;
 };
 /**
- * Gets Docker Compose services from compose files, filtering out excluded images
- * @param composeFilePaths - Array of compose file paths
- * @param excludeImageNames - Array of image names to exclude
- * @returns Array of ComposeService objects with image definitions
+ * Extracts Docker Compose services from specified files and filters them
+ * based on exclusion list
+ *
+ * @param composeFilePaths - Array of paths to Docker Compose files to parse
+ * @param excludeImageNames - Array of image names to exclude from results
+ * @returns Array of ComposeService objects from all valid files
  */
 export declare function getComposeServicesFromFiles(composeFilePaths: ReadonlyArray<string>, excludeImageNames: ReadonlyArray<string>): ReadonlyArray<ComposeService>;

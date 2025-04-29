@@ -1,3 +1,5 @@
 services:
   nginx:
     image: nginx:alpine
+  grafana:
+    image: grafana/grafana:latest

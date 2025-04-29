@@ -1,4 +1,4 @@
-import { getCurrentPlatformInfo, sanitizePlatformComponent } from '../src/platform';
+import { getCurrentPlatformInfo } from '../src/platform';
 
 describe('Platform Module', () => {
   describe('getCurrentPlatformInfo', () => {
@@ -69,19 +69,6 @@ describe('Platform Module', () => {
       expect(result?.os).toBe('linux');
       expect(result?.arch).toBe('arm');
       expect(result?.variant).toBe('v7');
-    });
-  });
-
-  describe('sanitizePlatformComponent', () => {
-    it('should sanitize platform components correctly', () => {
-      expect(sanitizePlatformComponent('linux')).toBe('linux');
-      expect(sanitizePlatformComponent('amd64')).toBe('amd64');
-      expect(sanitizePlatformComponent('v8')).toBe('v8');
-      expect(sanitizePlatformComponent('linux/amd64')).toBe('linux_amd64');
-      expect(sanitizePlatformComponent('special.name-here')).toBe('special.name-here');
-      expect(sanitizePlatformComponent('invalid*chars?')).toBe('invalid_chars_');
-      expect(sanitizePlatformComponent('')).toBe('none');
-      expect(sanitizePlatformComponent(undefined)).toBe('none');
     });
   });
 });
