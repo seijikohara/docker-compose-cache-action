@@ -57,6 +57,19 @@ describe('Platform Module', () => {
       result = getCurrentPlatformInfo();
       expect(result).toBeNull();
     });
+
+    it('should return platform info for Linux arm v7', () => {
+      mockPlatformAndArch('linux', 'arm');
+      Object.defineProperty(process, 'config', {
+        value: { variables: { arm_version: '7' } },
+      });
+      const result = getCurrentPlatformInfo();
+
+      expect(result).not.toBeNull();
+      expect(result?.os).toBe('linux');
+      expect(result?.arch).toBe('arm');
+      expect(result?.variant).toBe('v7');
+    });
   });
 
   describe('sanitizePlatformComponent', () => {
