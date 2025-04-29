@@ -1,10 +1,11 @@
 import * as path from 'path';
 
-import { actionCache, actionCore } from './actions-wrapper';
+import * as cacheWrapper from './actions/cache-wrapper';
+import * as coreWrapper from './actions/core-wrapper';
 import { getImageDigest, loadImageFromTar, pullImage, saveImageToTar } from './docker-command';
 import { ComposeService, getComposeServicesFromFiles } from './docker-compose-file';
 import { sanitizePathComponent } from './path-utils';
-import { getCurrentPlatformInfo, parsePlatformString, sanitizePlatformComponent } from './platform';
+import { getCurrentPlatformInfo, parsePlatformString } from './platform';
 
 /**
  * Result of processing a single Docker service
@@ -12,175 +13,299 @@ import { getCurrentPlatformInfo, parsePlatformString, sanitizePlatformComponent 
 type ServiceProcessingResult = {
   readonly success: boolean;
   readonly restoredFromCache: boolean;
+  readonly imageName: string;
+  readonly cacheKey: string;
+  readonly digest: string | undefined;
+  readonly platform: string | undefined;
+  readonly error?: string;
 };
 
 /**
- * Generates a cache key for the Docker image
- * @param cacheKeyPrefix - Prefix for the cache key
- * @param servicePlatform - Optional platform specified in the Docker Compose service
- * @param digest - Docker image digest
- * @returns Generated cache key
+ * Generates a unique cache key for a Docker image
+ *
+ * @param cacheKeyPrefix - Prefix to use for the cache key
+ * @param imageName - Docker image name (without tag)
+ * @param imageTag - Docker image tag
+ * @param servicePlatform - Platform string (e.g. 'linux/amd64') or undefined
+ * @param digest - Image digest
+ * @returns A unique cache key string
  */
-function generateCacheKey(cacheKeyPrefix: string, servicePlatform: string | undefined, digest: string): string {
-  // If service has a platform specified, use it; otherwise use the current environment's platform
-  const platform = servicePlatform ? parsePlatformString(servicePlatform) : getCurrentPlatformInfo();
-
-  const os = sanitizePlatformComponent(platform?.os);
-  const arch = sanitizePlatformComponent(platform?.arch);
-  const variant = sanitizePlatformComponent(platform?.variant);
-
-  return `${cacheKeyPrefix}-${os}-${arch}-${variant}-${digest}`;
-}
-
-/**
- * Generates a path for tar file to store the Docker image
- * @param imageName - Name portion of the Docker image
- * @param imageTag - Tag portion of the Docker image
- * @returns Path to store the tar file
- */
-function generateTarPath(imageName: string, imageTag: string): string {
-  // Sanitize both image name and tag to avoid invalid directory paths
+function generateCacheKey(
+  cacheKeyPrefix: string,
+  imageName: string,
+  imageTag: string,
+  servicePlatform: string | undefined,
+  digest: string
+): string {
+  // Sanitize components to ensure valid cache key
   const sanitizedImageName = sanitizePathComponent(imageName);
   const sanitizedImageTag = sanitizePathComponent(imageTag);
-  return path.join(process.env.RUNNER_TEMP || '/tmp', `${sanitizedImageName}-${sanitizedImageTag}.tar`);
+  const sanitizedDigest = sanitizePathComponent(digest);
+
+  // Use provided platform or get current platform
+  const platform = servicePlatform ? parsePlatformString(servicePlatform) : getCurrentPlatformInfo();
+  const sanitizedOs = sanitizePathComponent(platform?.os || 'none');
+  const sanitizedArch = sanitizePathComponent(platform?.arch || 'none');
+  const sanitizedVariant = sanitizePathComponent(platform?.variant || 'none');
+
+  return `${cacheKeyPrefix}-${sanitizedImageName}-${sanitizedImageTag}-${sanitizedOs}-${sanitizedArch}-${sanitizedVariant}-${sanitizedDigest}`;
 }
 
 /**
- * Processes a single Docker service
- * @param service - Docker Compose service to process
- * @param cacheKeyPrefix - Prefix for cache key generation
- * @returns Result of processing the service
+ * Generates filesystem path for storing Docker image tar file
+ *
+ * @param imageName - Docker image name (without tag)
+ * @param imageTag - Docker image tag
+ * @param servicePlatform - Platform string (e.g. 'linux/amd64') or undefined
+ * @param digest - Image digest
+ * @returns Absolute path to the tar file
+ */
+function generateTarPath(
+  imageName: string,
+  imageTag: string,
+  servicePlatform: string | undefined,
+  digest: string
+): string {
+  const tarFileName = generateCacheKey('', imageName, imageTag, servicePlatform, digest);
+  return path.join(process.env.RUNNER_TEMP || '/tmp', `${tarFileName}.tar`);
+}
+
+/**
+ * Processes a single Docker Compose service:
+ * - Tries to restore from cache
+ * - If cache miss, pulls and caches the image
+ * - Handles various error conditions
+ *
+ * @param service - The Docker Compose service to process
+ * @param cacheKeyPrefix - Prefix to use for the cache key
+ * @returns Result object with status and metadata
  */
 async function processService(service: ComposeService, cacheKeyPrefix: string): Promise<ServiceProcessingResult> {
   const fullImageName = service.image;
   const [imageName, imageTag = 'latest'] = fullImageName.split(':');
 
-  // Get image digest
+  // Get image digest for cache key generation
   const digest = await getImageDigest(fullImageName);
   if (!digest) {
-    actionCore.warning(`Could not get digest for ${fullImageName}, skipping cache`);
-    return { success: false, restoredFromCache: false };
+    coreWrapper.warning(`Could not get digest for ${fullImageName}, skipping cache`);
+    return {
+      success: false,
+      restoredFromCache: false,
+      imageName: fullImageName,
+      cacheKey: '',
+      digest: undefined,
+      platform: service.platform,
+    };
   }
 
-  const cacheKey = generateCacheKey(cacheKeyPrefix, service.platform, digest);
-  const cachePath = generateTarPath(imageName, imageTag);
+  const cacheKey = generateCacheKey(cacheKeyPrefix, imageName, imageTag, service.platform, digest);
+  const cachePath = generateTarPath(imageName, imageTag, service.platform, digest);
 
   if (service.platform) {
-    actionCore.info(`Using platform ${service.platform} for ${fullImageName}`);
+    coreWrapper.info(`Using platform ${service.platform} for ${fullImageName}`);
   }
-  actionCore.info(`Cache key for ${fullImageName}: ${cacheKey}`);
-  actionCore.debug(`Cache path: ${cachePath}`);
+  coreWrapper.info(`Cache key for ${fullImageName}: ${cacheKey}`);
+  coreWrapper.debug(`Cache path: ${cachePath}`);
 
-  // Try to restore from cache
-  const cacheHit = await actionCache.restoreCache([cachePath], cacheKey);
+  // Try to restore from cache first
+  const cacheHit = await cacheWrapper.restoreCache([cachePath], cacheKey);
 
   if (cacheHit) {
-    actionCore.info(`Cache hit for ${fullImageName}, loading from cache`);
+    coreWrapper.info(`Cache hit for ${fullImageName}, loading from cache`);
     const loadSuccess = await loadImageFromTar(cachePath);
-    return { success: loadSuccess, restoredFromCache: loadSuccess };
+    return {
+      success: loadSuccess,
+      restoredFromCache: loadSuccess,
+      imageName: fullImageName,
+      cacheKey,
+      digest,
+      platform: service.platform,
+    };
   }
 
-  // Handle cache miss - Pull the image
-  actionCore.info(`Cache miss for ${fullImageName}, pulling and saving`);
+  // Handle cache miss - pull the image
+  coreWrapper.info(`Cache miss for ${fullImageName}, pulling and saving`);
   const pullSuccess = await pullImage(fullImageName, service.platform);
   if (!pullSuccess) {
-    actionCore.warning(`Failed to pull ${fullImageName}`);
-    return { success: false, restoredFromCache: false };
+    coreWrapper.warning(`Failed to pull ${fullImageName}`);
+    return {
+      success: false,
+      restoredFromCache: false,
+      imageName: fullImageName,
+      cacheKey,
+      digest,
+      platform: service.platform,
+    };
   }
 
-  // Verify the digest matches what we expect
+  // Verify the digest matches after pull
   const newDigest = await getImageDigest(fullImageName);
   if (newDigest !== digest) {
-    actionCore.warning(`Digest mismatch for ${fullImageName}: expected ${digest}, got ${newDigest}`);
-    return { success: false, restoredFromCache: false };
+    coreWrapper.warning(`Digest mismatch for ${fullImageName}: expected ${digest}, got ${newDigest}`);
+    return {
+      success: false,
+      restoredFromCache: false,
+      imageName: fullImageName,
+      cacheKey,
+      digest,
+      platform: service.platform,
+    };
   }
 
-  // Save to tar
+  // Save the image to tar file
   const saveSuccess = await saveImageToTar(fullImageName, cachePath);
   if (!saveSuccess) {
-    actionCore.warning(`Failed to save image to tar: ${fullImageName}`);
-    return { success: false, restoredFromCache: false };
+    coreWrapper.warning(`Failed to save image to tar: ${fullImageName}`);
+    return {
+      success: false,
+      restoredFromCache: false,
+      imageName: fullImageName,
+      cacheKey,
+      digest,
+      platform: service.platform,
+    };
   }
 
   // Save to cache
   try {
-    const cacheResult = await actionCache.saveCache([cachePath], cacheKey);
+    const cacheResult = await cacheWrapper.saveCache([cachePath], cacheKey);
     const cacheSuccess = cacheResult !== -1;
 
     if (cacheSuccess) {
-      actionCore.info(`Cached ${fullImageName} with key ${cacheKey}`);
+      coreWrapper.info(`Cached ${fullImageName} with key ${cacheKey}`);
     } else {
-      actionCore.debug(`Cache was not saved for ${fullImageName} (cache ID: ${cacheResult})`);
+      coreWrapper.debug(`Cache was not saved for ${fullImageName} (cache ID: ${cacheResult})`);
     }
 
-    // Even if the cache save fails, the overall operation is successful
-    return { success: true, restoredFromCache: false };
+    return {
+      success: true,
+      restoredFromCache: false,
+      imageName: fullImageName,
+      cacheKey,
+      digest,
+      platform: service.platform,
+    };
   } catch (error) {
-    // Handle known cache saving errors without failing the operation
+    // Handle known cache saving errors gracefully without failing the operation
     if (error instanceof Error) {
       if (error.message.includes('already exists')) {
-        actionCore.debug(`Cache already exists for ${fullImageName}: ${error.message}`);
+        coreWrapper.debug(`Cache already exists for ${fullImageName}: ${error.message}`);
       } else if (error.message.includes('unable to upload')) {
-        actionCore.debug(`Unable to upload cache for ${fullImageName}: ${error.message}`);
+        coreWrapper.debug(`Unable to upload cache for ${fullImageName}: ${error.message}`);
       } else {
-        actionCore.debug(`Error saving cache for ${fullImageName}: ${error.message}`);
+        coreWrapper.debug(`Error saving cache for ${fullImageName}: ${error.message}`);
       }
     } else {
-      actionCore.debug(`Unknown error saving cache for ${fullImageName}: ${String(error)}`);
+      coreWrapper.debug(`Unknown error saving cache for ${fullImageName}: ${String(error)}`);
     }
-    // Image was successfully processed despite cache issues
-    return { success: true, restoredFromCache: false };
+    return {
+      success: true,
+      restoredFromCache: false,
+      imageName: fullImageName,
+      cacheKey,
+      digest,
+      platform: service.platform,
+    };
   }
 }
 
 /**
  * Main function that runs the GitHub Action
+ *
+ * @returns Promise that resolves when the action completes
  */
 export async function run(): Promise<void> {
   try {
-    // Get inputs from action.yml
-    const composeFilePaths: ReadonlyArray<string> = actionCore.getMultilineInput('compose-files');
-    const excludeImageNames: ReadonlyArray<string> = actionCore.getMultilineInput('exclude-images');
-    const cacheKeyPrefix = actionCore.getInput('cache-key-prefix') || 'docker-compose-image';
+    // Get action inputs from GitHub Actions environment
+    const composeFilePaths: ReadonlyArray<string> = coreWrapper.getMultilineInput('compose-files');
+    const excludeImageNames: ReadonlyArray<string> = coreWrapper.getMultilineInput('exclude-images');
+    const cacheKeyPrefix = coreWrapper.getInput('cache-key-prefix') || 'docker-compose-image';
 
-    // Get Docker Compose services
-    const services = getComposeServicesFromFiles(composeFilePaths, excludeImageNames);
+    const services = getComposeServicesFromFiles(composeFilePaths, excludeImageNames)
+      // Complete undefined platforms with getCurrentPlatformInfo()
+      .map((service) => {
+        if (service.platform !== undefined) {
+          return service;
+        }
+
+        const platformInfo = getCurrentPlatformInfo();
+        if (!platformInfo) {
+          return service;
+        }
+
+        // Create platform string from platform info components
+        const platformStr = `${platformInfo.os}/${platformInfo.arch}${
+          platformInfo.variant ? `/${platformInfo.variant}` : ''
+        }`;
+
+        return {
+          ...service,
+          platform: platformStr,
+        };
+      })
+      // Filter out duplicates by keeping only the first occurrence of each image+platform combination
+      .filter((service, index, array) => {
+        const key = `${service.image}|${service.platform || 'default'}`;
+        return array.findIndex((s) => `${s.image}|${s.platform || 'default'}` === key) === index;
+      });
 
     if (services.length === 0) {
-      actionCore.info('No Docker services found in compose files or all services were excluded');
-      actionCore.setOutput('cache-hit', 'false');
-      actionCore.setOutput('image-list', '');
+      coreWrapper.info('No Docker services found in compose files or all services were excluded');
+      coreWrapper.setOutput('cache-hit', 'false');
+      coreWrapper.setOutput('image-list', '');
       return;
     }
 
-    // Output info about found services
-    actionCore.info(`Found ${services.length} services to cache`);
-    actionCore.setOutput('image-list', services.map((service) => service.image).join(' '));
+    coreWrapper.info(`Found ${services.length} services to cache`);
+    coreWrapper.setOutput('image-list', services.map((service) => service.image).join(' '));
 
-    // Process services concurrently and track results
+    // Process all services concurrently for efficiency
     const results = await Promise.all(services.map((service) => processService(service, cacheKeyPrefix)));
 
-    // Aggregate results
+    // Aggregate results for outputs and reporting
     const totalServices = services.length;
     const servicesRestoredFromCache = results.filter((result) => result.restoredFromCache).length;
     const allServicesSuccessful = results.every((result) => result.success);
     const allServicesFromCache = servicesRestoredFromCache === totalServices && totalServices > 0;
 
-    // Report cache status
-    actionCore.info(`${servicesRestoredFromCache} of ${totalServices} services restored from cache`);
-    actionCore.setOutput('cache-hit', allServicesFromCache.toString());
+    coreWrapper.info(`${servicesRestoredFromCache} of ${totalServices} services restored from cache`);
+    coreWrapper.setOutput('cache-hit', allServicesFromCache.toString());
 
-    // Report overall status
+    // Create summary table for better visibility in the GitHub Actions UI
+    const summary = coreWrapper.summary.addHeading('Docker Compose Cache Results').addTable([
+      [
+        { data: 'Image Name', header: true },
+        { data: 'Platform', header: true },
+        { data: 'Cache Hit', header: true },
+        { data: 'Status', header: true },
+        { data: 'Cache Key', header: true },
+        { data: 'Digest', header: true },
+      ],
+      ...results.map((result) => [
+        result.imageName,
+        result.platform || 'default',
+        result.restoredFromCache ? '✅' : '❌',
+        result.success ? 'Success' : 'Failed',
+        result.cacheKey || 'N/A',
+        result.digest?.substring(0, 16) || 'unknown',
+      ]),
+    ]);
+
+    summary
+      .addRaw(`Total Services: ${totalServices}`, true)
+      .addRaw(`Restored from Cache: ${servicesRestoredFromCache}/${totalServices}`, true)
+      .write();
+
     if (allServicesSuccessful) {
-      actionCore.info('Docker Compose Cache action completed successfully');
+      coreWrapper.info('Docker Compose Cache action completed successfully');
     } else {
-      actionCore.info('Docker Compose Cache action completed with some services not fully processed');
+      coreWrapper.info('Docker Compose Cache action completed with some services not fully processed');
     }
   } catch (error) {
     if (error instanceof Error) {
-      actionCore.setFailed(error.message);
+      coreWrapper.setFailed(error.message);
     } else {
-      actionCore.setFailed('Unknown error occurred');
+      coreWrapper.setFailed('Unknown error occurred');
     }
   }
 }

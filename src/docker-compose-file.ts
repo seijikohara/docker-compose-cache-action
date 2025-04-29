@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';
 
-import { actionCore } from './actions-wrapper';
+import * as coreWrapper from './actions/core-wrapper';
 
 /**
  * Represents a Docker Compose service definition with an image reference
@@ -29,52 +29,52 @@ const DEFAULT_COMPOSE_FILE_NAMES: ReadonlyArray<string> = [
 ];
 
 /**
- * Gets Docker Compose services from compose files, filtering out excluded images
- * @param composeFilePaths - Array of compose file paths
- * @param excludeImageNames - Array of image names to exclude
- * @returns Array of ComposeService objects with image definitions
+ * Extracts Docker Compose services from specified files and filters them
+ * based on exclusion list
+ *
+ * @param composeFilePaths - Array of paths to Docker Compose files to parse
+ * @param excludeImageNames - Array of image names to exclude from results
+ * @returns Array of ComposeService objects from all valid files
  */
 export function getComposeServicesFromFiles(
   composeFilePaths: ReadonlyArray<string>,
   excludeImageNames: ReadonlyArray<string>
 ): ReadonlyArray<ComposeService> {
-  // Convert excludeImageNames to a set for O(1) lookups
+  // Convert exclude list to a Set for O(1) lookups
   const excludedImages: ReadonlySet<string> = new Set(excludeImageNames);
 
-  // Use default files if none provided
+  // Use provided paths or default filenames if none provided
   const filesToProcess: ReadonlyArray<string> =
     composeFilePaths.length > 0
       ? composeFilePaths.filter((file) => fs.existsSync(file))
       : DEFAULT_COMPOSE_FILE_NAMES.filter((file) => fs.existsSync(file));
 
-  // Extract and filter services from all files
-  return filesToProcess
-    .flatMap((file) => {
-      try {
-        const content = fs.readFileSync(file, 'utf8');
-        const parsed = yaml.load(content) as ComposeFile | null;
+  return (
+    filesToProcess
+      .flatMap((file) => {
+        try {
+          const content = fs.readFileSync(file, 'utf8');
+          // Parse YAML content into a ComposeFile structure
+          const parsed = yaml.load(content) as ComposeFile | null;
 
-        // Early return for empty or invalid YAML files
-        if (!parsed) {
-          actionCore.debug(`Empty or invalid YAML file: ${file}`);
+          if (!parsed) {
+            coreWrapper.debug(`Empty or invalid YAML file: ${file}`);
+            return [];
+          }
+
+          if (!parsed.services) {
+            coreWrapper.debug(`No services section found in ${file}`);
+            return [];
+          }
+
+          // Return just the service definitions, discarding service names
+          return Object.values(parsed.services);
+        } catch (error) {
+          coreWrapper.warning(`Failed to parse ${file}: ${error}`);
           return [];
         }
-
-        // Early return if services section doesn't exist
-        if (!parsed.services) {
-          actionCore.debug(`No services section found in ${file}`);
-          return [];
-        }
-
-        return Object.values(parsed.services);
-      } catch (error) {
-        actionCore.warning(`Failed to parse ${file}: ${error}`);
-        return [];
-      }
-    })
-    .filter(
-      (service) =>
-        // Keep only services with defined images that aren't excluded
-        service.image !== undefined && !excludedImages.has(service.image)
-    );
+      })
+      // Filter out services with no image property or excluded images
+      .filter((service) => service.image !== undefined && !excludedImages.has(service.image))
+  );
 }
