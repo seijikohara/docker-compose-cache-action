@@ -38,10 +38,12 @@
     "@actions/cache": "^4.0.3",
     "@actions/core": "^1.11.1",
     "@actions/exec": "^1.1.1",
+    "cpu-features": "^0.0.10",
     "js-yaml": "^4.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.24.0",
+    "@types/cpu-features": "^0.0.3",
     "@types/jest": "^29.5.14",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.14.1",

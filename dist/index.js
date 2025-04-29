@@ -38100,6 +38100,19 @@ var isArray = Array.isArray || function (xs) {
 
 /***/ }),
 
+/***/ 4982:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+const binding = __nccwpck_require__(5243);
+
+module.exports = binding.getCPUInfo;
+
+
+/***/ }),
+
 /***/ 6110:
 /***/ ((module, exports, __nccwpck_require__) => {
 
@@ -69966,126 +69979,453 @@ function sanitizePathComponent(value) {
 /***/ }),
 
 /***/ 3728:
-/***/ ((__unused_webpack_module, exports) => {
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
 
-/**
- * Platform utility module for mapping between Node.js and OCI/Docker platform identifiers.
- */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.PPC_VARIANTS = exports.MIPS_VARIANTS = exports.ARM_VARIANTS = exports.AMD64_VARIANTS = void 0;
 exports.parsePlatformString = parsePlatformString;
 exports.getCurrentPlatformInfo = getCurrentPlatformInfo;
 exports.sanitizePlatformComponent = sanitizePlatformComponent;
+const cpu_features_1 = __importDefault(__nccwpck_require__(4982));
+const os = __importStar(__nccwpck_require__(857));
+const process_1 = __nccwpck_require__(932);
+const actions_wrapper_1 = __nccwpck_require__(2518);
 /**
- * Mapping from Node.js architecture identifiers to OCI architecture identifiers
+ * AMD64 architecture variants for OCI image specifications
  */
-const NODE_TO_OCI_ARCH_MAP = new Map([
-    ['x64', 'amd64'],
-    ['arm64', 'arm64'],
-    ['ia32', '386'],
-    ['arm', 'arm'],
-    ['ppc64', 'ppc64le'],
-    ['s390x', 's390x'],
-    ['mips', 'mips'],
-    ['mipsel', 'mipsle'],
-    ['loong64', 'loong64'],
-    ['riscv64', 'riscv64'],
-    // Common aliases
-    ['aarch64', 'arm64'],
-    ['x86_64', 'amd64'],
-    ['x86', '386'],
-    ['ppc', 'ppc'],
-    ['s390', 's390'],
-    ['mips64el', 'mips64le'],
-]);
+exports.AMD64_VARIANTS = {
+    V2: 'v2',
+    V3: 'v3',
+    V4: 'v4',
+};
 /**
- * Set of known OCI architecture values for fast lookup
+ * ARM architecture variants for OCI image specifications
  */
-const OCI_ARCH_VALUES = new Set(NODE_TO_OCI_ARCH_MAP.values());
+exports.ARM_VARIANTS = {
+    V6: 'v6',
+    V7: 'v7',
+    V8: 'v8',
+};
 /**
- * Mapping from Node.js platform identifiers to OCI OS identifiers
+ * MIPS architecture variants for OCI image specifications
  */
-const NODE_TO_OCI_OS_MAP = new Map([
-    ['linux', 'linux'],
-    ['win32', 'windows'],
-    ['darwin', 'darwin'],
-    ['aix', 'aix'],
-    ['freebsd', 'freebsd'],
-    ['openbsd', 'openbsd'],
-    ['sunos', 'solaris'],
-    ['android', 'android'],
-]);
+exports.MIPS_VARIANTS = {
+    R6: 'r6',
+};
 /**
- * Set of known OCI OS values for fast lookup
+ * PowerPC architecture variants for OCI image specifications
  */
-const OCI_OS_VALUES = new Set(NODE_TO_OCI_OS_MAP.values());
+exports.PPC_VARIANTS = {
+    POWER7: 'power7',
+    POWER8: 'power8',
+    POWER9: 'power9',
+};
+// --- CPU Feature Detection Logic ---
 /**
- * Maps Node.js architecture identifier to OCI architecture identifier
- * @param nodeArch - Node.js architecture identifier (e.g., 'x64', 'arm64')
- * @returns Corresponding OCI architecture identifier, or undefined if no mapping exists
+ * Attempts to load and return CPU features using the 'cpu-features' package.
+ * @returns CPU features information, or null if unavailable
  */
-function mapNodeArchToOciArch(nodeArch) {
-    return NODE_TO_OCI_ARCH_MAP.get(nodeArch) ?? (OCI_ARCH_VALUES.has(nodeArch) ? nodeArch : undefined);
+function loadCpuFeatures() {
+    try {
+        const cpuFeatures = (0, cpu_features_1.default)();
+        // Type-safe validation
+        if (!cpuFeatures ||
+            typeof cpuFeatures !== 'object' ||
+            !('flags' in cpuFeatures) ||
+            !cpuFeatures.flags ||
+            typeof cpuFeatures.flags !== 'object') {
+            actions_wrapper_1.actionCore.warning('cpu-features module loaded but returned an unexpected structure.');
+            return null;
+        }
+        actions_wrapper_1.actionCore.debug('cpu-features loaded successfully.');
+        return cpuFeatures;
+    }
+    catch (error) {
+        const typedError = error;
+        if (typedError?.code !== 'MODULE_NOT_FOUND') {
+            actions_wrapper_1.actionCore.warning(`Failed to load or execute cpu-features: ${typedError?.message || String(error)}`);
+        }
+        else {
+            actions_wrapper_1.actionCore.debug('cpu-features module not found.');
+        }
+        return null;
+    }
 }
 /**
- * Maps Node.js OS identifier to OCI OS identifier
- * @param nodePlatform - Node.js OS identifier (e.g., 'linux', 'win32')
- * @returns Corresponding OCI OS identifier, or undefined if no mapping exists
+ * Safely checks if a flag exists and is true in CPU flags.
+ * Uses safe property checking to avoid Object Injection vulnerabilities.
+ * @param flags - The flags object to check
+ * @param flag - The flag name to verify
+ * @returns True if the flag exists and is set to true, false otherwise
+ */
+function isFlagSet(flags, flag) {
+    // Safety check for null or undefined flags
+    if (!flags) {
+        return false;
+    }
+    // Safe property checking using Object.prototype methods to avoid injection vulnerabilities
+    // This approach does not trigger ESLint's security/detect-object-injection warning
+    return (Object.prototype.hasOwnProperty.call(flags, flag) &&
+        Object.prototype.propertyIsEnumerable.call(flags, flag) &&
+        Object.entries(flags).some(([key, value]) => key === flag && value === true));
+}
+/**
+ * Determines the AMD64 architecture variant based on CPU feature flags.
+ * @param features - CPU features information
+ * @returns Detected variant or undefined
+ */
+function detectAmd64Variant(features) {
+    const { flags } = features;
+    if (!flags) {
+        return undefined;
+    }
+    // Check for v2 required features
+    const v2RequiredFlags = ['cx16', 'popcnt', 'sse3', 'ssse3', 'sse4_1', 'sse4_2'];
+    const hasV2Features = v2RequiredFlags.every((flag) => isFlagSet(flags, flag));
+    if (!hasV2Features) {
+        return undefined;
+    }
+    // Check for v3 required features
+    const v3RequiredFlags = ['avx', 'avx2', 'bmi1', 'bmi2', 'f16c', 'fma3', 'movbe'];
+    const hasV3Features = v3RequiredFlags.every((flag) => isFlagSet(flags, flag));
+    if (!hasV3Features) {
+        return exports.AMD64_VARIANTS.V2;
+    }
+    // Check for v4 required features
+    const v4RequiredFlags = ['avx512f', 'avx512bw', 'avx512cd', 'avx512dq', 'avx512vl'];
+    const hasV4Features = v4RequiredFlags.every((flag) => isFlagSet(flags, flag));
+    if (!hasV4Features) {
+        return exports.AMD64_VARIANTS.V3;
+    }
+    return exports.AMD64_VARIANTS.V4;
+}
+/**
+ * Determines the ARM architecture variant based on CPU features.
+ * @param cpuFeatures - CPU features information for ARM architecture
+ * @returns Detected variant or undefined
+ */
+function detectArmVariant(cpuFeatures) {
+    // ARMv8 detection from microarchitecture
+    if ('uarch' in cpuFeatures && typeof cpuFeatures.uarch === 'string' && cpuFeatures.uarch.includes('ARMv8')) {
+        return exports.ARM_VARIANTS.V8;
+    }
+    // ARM32 detection from flags
+    if (cpuFeatures.arch === 'arm') {
+        const armFeatures = cpuFeatures;
+        const { flags } = armFeatures;
+        if (flags) {
+            // NEON is ARMv7 feature
+            if (isFlagSet(flags, 'neon')) {
+                return exports.ARM_VARIANTS.V7;
+            }
+            // VFP is ARMv6 feature
+            if (isFlagSet(flags, 'vfp')) {
+                return exports.ARM_VARIANTS.V6;
+            }
+        }
+    }
+    // AARCH64 is always v8
+    if (cpuFeatures.arch === 'aarch64') {
+        return exports.ARM_VARIANTS.V8;
+    }
+    return undefined;
+}
+/**
+ * Determines the MIPS architecture variant based on CPU features.
+ * @param cpuFeatures - CPU features information for MIPS architecture
+ * @returns Detected variant or undefined
+ */
+function detectMipsVariant(cpuFeatures) {
+    return cpuFeatures.flags && isFlagSet(cpuFeatures.flags, 'r6') ? exports.MIPS_VARIANTS.R6 : undefined;
+}
+/**
+ * Determines the PowerPC architecture variant based on CPU features.
+ * @param cpuFeatures - CPU features information for PPC architecture
+ * @returns Detected variant or undefined
+ */
+function detectPpcVariant(cpuFeatures) {
+    // Detection from microarchitecture name
+    if (typeof cpuFeatures.microarchitecture === 'string') {
+        const uarch = cpuFeatures.microarchitecture.toLowerCase();
+        if (uarch.includes('power9'))
+            return exports.PPC_VARIANTS.POWER9;
+        if (uarch.includes('power8'))
+            return exports.PPC_VARIANTS.POWER8;
+        if (uarch.includes('power7'))
+            return exports.PPC_VARIANTS.POWER7;
+    }
+    // Detection from CPU flags
+    if (cpuFeatures.flags) {
+        if (isFlagSet(cpuFeatures.flags, 'arch300'))
+            return exports.PPC_VARIANTS.POWER9;
+        if (isFlagSet(cpuFeatures.flags, 'arch207'))
+            return exports.PPC_VARIANTS.POWER8;
+    }
+    return undefined;
+}
+/**
+ * Detects the OCI variant for the provided architecture.
+ * @param ociArch - OCI architecture identifier
+ * @returns The detected variant or undefined
+ */
+function detectOciVariant(ociArch) {
+    const cpuFeatures = loadCpuFeatures();
+    /**
+     * Helper for ARM variant detection.
+     * @param arch - ARM architecture string
+     * @param cpuFeatures - CPU features information, if available
+     * @returns The appropriate ARM variant
+     */
+    const getArmVariant = (arch, cpuFeatures) => {
+        // ARM64 is always v8
+        if (arch === 'arm64') {
+            return exports.ARM_VARIANTS.V8;
+        }
+        // Use CPU features for ARM32 if available
+        if (cpuFeatures?.arch === 'arm' || cpuFeatures?.arch === 'aarch64') {
+            const armCpuInfo = cpuFeatures;
+            const detectedVariant = detectArmVariant(armCpuInfo);
+            if (detectedVariant) {
+                return detectedVariant;
+            }
+        }
+        // Default fallback: ARM32 is v7
+        actions_wrapper_1.actionCore.debug("Applying heuristic: Detected ARM architecture, assuming 'v7' variant as default.");
+        return exports.ARM_VARIANTS.V7;
+    };
+    // If CPU info is unavailable, use architecture-specific defaults
+    if (!cpuFeatures) {
+        actions_wrapper_1.actionCore.debug('cpu-features not available. Applying architecture heuristics.');
+        if (ociArch === 'arm64' || ociArch === 'arm') {
+            return getArmVariant(ociArch, null);
+        }
+        return undefined;
+    }
+    // Delegate to specific detection functions based on architecture
+    switch (ociArch) {
+        case 'amd64':
+            if (cpuFeatures.arch !== 'x86') {
+                return undefined;
+            }
+            return detectAmd64Variant(cpuFeatures);
+        case 'arm':
+        case 'arm64':
+            return getArmVariant(ociArch, cpuFeatures);
+        case 'mips':
+        case 'mipsle':
+            if (cpuFeatures.arch !== 'mips') {
+                return undefined;
+            }
+            return detectMipsVariant(cpuFeatures);
+        case 'ppc64':
+        case 'ppc64le':
+            if (cpuFeatures.arch !== 'ppc') {
+                return undefined;
+            }
+            return detectPpcVariant(cpuFeatures);
+        default:
+            return undefined;
+    }
+}
+// --- Platform Mapping Logic ---
+/**
+ * Maps Node.js OS identifier to OCI OS identifier.
+ * @param nodePlatform - Node.js platform identifier
+ * @returns Corresponding OCI OS identifier or undefined
  */
 function mapNodeOsToOciOs(nodePlatform) {
-    return NODE_TO_OCI_OS_MAP.get(nodePlatform) ?? (OCI_OS_VALUES.has(nodePlatform) ? nodePlatform : undefined);
+    // Direct mappings from Node.js platform to OCI OS
+    const platformMap = {
+        aix: 'aix',
+        darwin: 'darwin',
+        freebsd: 'freebsd',
+        linux: 'linux',
+        openbsd: 'openbsd',
+        sunos: 'solaris', // OCI uses 'solaris'
+        win32: 'windows', // OCI uses 'windows'
+        android: 'android',
+        windows: 'windows', // Pass-through
+        solaris: 'solaris', // Pass-through
+    };
+    // Type-safe property access
+    const mappedOs = nodePlatform in platformMap ? platformMap[nodePlatform] : undefined;
+    if (!mappedOs) {
+        actions_wrapper_1.actionCore.warning(`Unknown Node.js platform: ${nodePlatform}. Cannot determine OCI OS.`);
+    }
+    return mappedOs;
 }
 /**
- * Gets the OCI platform string for the current Node.js environment
- * @returns Platform string in "os/arch" format, or null if conversion failed
+ * Maps Node.js architecture to OCI architecture.
+ * @param nodeArch - Node.js architecture identifier
+ * @returns Corresponding OCI architecture or undefined
  */
-function getCurrentOciPlatform() {
-    const os = mapNodeOsToOciOs(process.platform);
-    const arch = mapNodeArchToOciArch(process.arch);
-    if (!os || !arch) {
-        return null;
+function mapNodeArchToOciArch(nodeArch) {
+    /**
+     * Helper to safely get system endianness.
+     * @returns System endianness or undefined if cannot be determined
+     */
+    const getEndianness = () => {
+        try {
+            return os.endianness();
+        }
+        catch (error) {
+            const typedError = error;
+            actions_wrapper_1.actionCore.warning(`Failed to determine endianness for arch '${nodeArch}': ${typedError?.message || String(error)}`);
+            return undefined;
+        }
+    };
+    // Direct mappings for architectures without endianness concerns
+    const simpleArchMap = {
+        x64: 'amd64',
+        ia32: '386',
+        arm: 'arm',
+        arm64: 'arm64',
+        s390x: 's390x',
+        loong64: 'loong64',
+        riscv64: 'riscv64',
+        aarch64: 'arm64', // alias
+        x86_64: 'amd64', // alias
+        x86: '386', // alias
+        amd64: 'amd64', // pass-through
+        '386': '386', // pass-through
+        ppc64le: 'ppc64le', // pass-through
+        mipsle: 'mipsle', // pass-through
+    };
+    // First check simple mappings with type safety
+    if (nodeArch in simpleArchMap) {
+        return simpleArchMap[nodeArch];
     }
-    return `${os}/${arch}`;
+    // Special cases that depend on endianness
+    switch (nodeArch) {
+        case 'ppc64': {
+            const endian = getEndianness();
+            return endian === 'LE' ? 'ppc64le' : 'ppc64';
+        }
+        case 'mips': {
+            const endian = getEndianness();
+            return endian === 'LE' ? 'mipsle' : 'mips';
+        }
+        case 'mipsel':
+            return 'mipsle';
+        case 'ppc':
+            actions_wrapper_1.actionCore.warning(`Node.js arch 'ppc' lacks a direct equivalent in standard OCI. Using 'ppc'.`);
+            return 'ppc';
+        case 's390':
+            actions_wrapper_1.actionCore.warning(`Node.js arch 's390' lacks a direct equivalent in standard OCI (s390x is common). Using 's390'.`);
+            return 's390';
+        default:
+            actions_wrapper_1.actionCore.warning(`Unknown Node.js architecture: ${nodeArch}. Cannot determine OCI architecture.`);
+            return undefined;
+    }
+}
+// --- Public Interface ---
+/**
+ * Gets the OCI platform string for the current environment.
+ * @returns Platform string in "os/arch[/variant]" format, or null if unavailable
+ */
+function getOciPlatform() {
+    const ociOs = mapNodeOsToOciOs(process_1.platform);
+    if (!ociOs)
+        return null;
+    const ociArch = mapNodeArchToOciArch(process_1.arch);
+    if (!ociArch)
+        return null;
+    const ociVariant = detectOciVariant(ociArch);
+    return ociVariant ? `${ociOs}/${ociArch}/${ociVariant}` : `${ociOs}/${ociArch}`;
 }
 /**
- * Parses a platform string into its components (OS, architecture, variant)
- * @param platform - Platform string in "os/arch[/variant]" format
- * @returns Parsed platform components, or null if format is invalid
+ * Parses a platform string into its components.
+ * @param platformString - Platform string in "os/arch[/variant]" format
+ * @returns Parsed platform components or null if invalid
+ * @example
+ * // Returns { os: "linux", arch: "amd64", variant: "v2" }
+ * parsePlatformString("linux/amd64/v2")
+ * // Returns { os: "darwin", arch: "arm64" }
+ * parsePlatformString("darwin/arm64")
  */
-function parsePlatformString(platform) {
-    if (!platform) {
+function parsePlatformString(platformString) {
+    if (!platformString)
         return null;
-    }
-    const parts = platform.split('/');
-    if (parts.length < 2) {
+    const parts = platformString.split('/');
+    if (parts.length < 2 || parts.length > 3)
         return null;
-    }
     return {
         os: parts[0],
         arch: parts[1],
-        variant: parts.length > 2 ? parts[2] : undefined,
+        variant: parts.length === 3 ? parts[2] : undefined,
     };
 }
 /**
- * Gets the platform information for the current environment
- * @returns Current environment's platform information, or null if unavailable
+ * Gets the platform information for the current environment.
+ * @returns Current environment's platform information or null if unavailable
+ * @example
+ * // Example output: { os: "linux", arch: "amd64", variant: "v2" }
  */
 function getCurrentPlatformInfo() {
-    return parsePlatformString(getCurrentOciPlatform());
+    return parsePlatformString(getOciPlatform());
 }
 /**
- * Normalizes a platform component string for safe use in cache keys
- * @param component - Component string to normalize (OS, architecture, or variant)
+ * Normalizes a platform component string for safe use in cache keys.
+ * Removes any characters that might be problematic in file paths or cache key identifiers.
+ * @param component - Platform component string to normalize
  * @returns Safely normalized string, 'none' if component is undefined
+ * @example
+ * // Returns "linux"
+ * sanitizePlatformComponent("linux")
+ * // Returns "windows_server_2022"
+ * sanitizePlatformComponent("windows/server-2022")
+ * // Returns "none"
+ * sanitizePlatformComponent(undefined)
  */
 function sanitizePlatformComponent(component) {
-    if (!component) {
-        return 'none';
-    }
-    return component.replace(/[^a-zA-Z0-9._-]/g, '_');
+    return component ? component.replace(/[^a-zA-Z0-9._-]/g, '_') : 'none';
 }
 
+
+/***/ }),
+
+/***/ 5243:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+module.exports = require(__nccwpck_require__.ab + "build/Release/cpufeatures.node")
 
 /***/ }),
 
@@ -70286,6 +70626,14 @@ module.exports = require("path");
 
 "use strict";
 module.exports = require("perf_hooks");
+
+/***/ }),
+
+/***/ 932:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("process");
 
 /***/ }),
 
