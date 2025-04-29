@@ -69361,7 +69361,7 @@ module.exports = {
 
 /***/ }),
 
-/***/ 2518:
+/***/ 3879:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -69400,140 +69400,284 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.actionExec = exports.actionCache = exports.actionCore = void 0;
+exports.restoreCache = restoreCache;
+exports.saveCache = saveCache;
 /**
- * Wrapper module for GitHub Actions libraries.
- * Makes it easier to mock these dependencies in tests.
+ * Wrapper module for GitHub Actions cache library.
+ * Provides simplified access to GitHub Actions cache functionality.
  */
 const cache = __importStar(__nccwpck_require__(5116));
+/**
+ * Restores cache from the provided paths
+ *
+ * @param paths - An array of file paths to restore from cache
+ * @param primaryKey - Primary cache key to restore
+ * @param restoreKeys - Optional fallback cache keys if primary key is not found
+ * @returns The cache key that was restored, or undefined if cache miss
+ */
+async function restoreCache(paths, primaryKey, restoreKeys) {
+    return cache.restoreCache(paths, primaryKey, restoreKeys);
+}
+/**
+ * Saves cache from the provided paths
+ *
+ * @param paths - An array of file paths to cache
+ * @param key - Cache key to save the paths with
+ * @returns Cache id if successfully saved, -1 otherwise
+ */
+async function saveCache(paths, key) {
+    return cache.saveCache(paths, key);
+}
+
+
+/***/ }),
+
+/***/ 8490:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.summary = void 0;
+exports.getInput = getInput;
+exports.getMultilineInput = getMultilineInput;
+exports.getBooleanInput = getBooleanInput;
+exports.setOutput = setOutput;
+exports.info = info;
+exports.warning = warning;
+exports.debug = debug;
+exports.setFailed = setFailed;
+/**
+ * Wrapper module for GitHub Actions core library.
+ * Provides simplified access to GitHub Actions core functionality for logging, inputs and outputs.
+ */
 const core = __importStar(__nccwpck_require__(7484));
+/**
+ * Gets the input value for the given input name
+ *
+ * @param name - Name of the input to get
+ * @param options - Optional input options
+ * @returns String value of the input
+ */
+function getInput(name, options) {
+    return core.getInput(name, options);
+}
+/**
+ * Gets the multiline input value for the given input name
+ *
+ * @param name - Name of the multiline input to get
+ * @param options - Optional input options
+ * @returns Array of strings, one for each line of the input
+ */
+function getMultilineInput(name, options) {
+    return core.getMultilineInput(name, options);
+}
+/**
+ * Gets the input value for the given input name as a boolean
+ *
+ * @param name - Name of the boolean input to get
+ * @param options - Optional input options
+ * @returns Boolean value of the input
+ */
+function getBooleanInput(name, options) {
+    return core.getBooleanInput(name, options);
+}
+/**
+ * Sets a value for the outputs of the action
+ *
+ * @param name - Name of the output to set
+ * @param value - Value to set for the output
+ */
+function setOutput(name, value) {
+    core.setOutput(name, value);
+}
+/**
+ * Logs an info message to the action output
+ *
+ * @param message - Message to log at info level
+ */
+function info(message) {
+    core.info(message);
+}
+/**
+ * Logs a warning message to the action output
+ *
+ * @param message - Message to log at warning level
+ */
+function warning(message) {
+    core.warning(message);
+}
+/**
+ * Logs a debug message to the action output
+ * Requires the workflow to have debug logging enabled
+ *
+ * @param message - Message to log at debug level
+ */
+function debug(message) {
+    core.debug(message);
+}
+/**
+ * Sets the action as failed with the given message
+ *
+ * @param message - Error message or Error object
+ */
+function setFailed(message) {
+    core.setFailed(message);
+}
+/**
+ * Gets access to the workflow summary functionality
+ * Used to create a Markdown summary for the workflow
+ */
+exports.summary = core.summary;
+
+
+/***/ }),
+
+/***/ 7112:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.execCommand = execCommand;
+/**
+ * Wrapper module for GitHub Actions exec library.
+ * Provides simplified access to command execution functionality.
+ */
 const exec = __importStar(__nccwpck_require__(5236));
 /**
- * Wrapper for @actions/core functionality
+ * Executes a command in a shell
+ *
+ * @param commandLine - The command to execute
+ * @param args - Optional arguments for the command
+ * @param options - Optional execution options
+ * @returns Promise that resolves to the exit code
  */
-exports.actionCore = {
-    /**
-     * Gets the input value for the given input name
-     * @param name - Input name to get
-     * @param options - Additional options
-     * @returns Input value
-     */
-    getInput: (name, options) => {
-        return core.getInput(name, options);
-    },
-    /**
-     * Gets the multiline input value for the given input name
-     * @param name - Input name to get
-     * @param options - Additional options
-     * @returns Array of input values, one per line
-     */
-    getMultilineInput: (name, options) => {
-        return core.getMultilineInput(name, options);
-    },
-    /**
-     * Gets the input value for the given input name as a boolean
-     * @param name - Input name to get
-     * @param options - Additional options
-     * @returns Boolean input value
-     */
-    getBooleanInput: (name, options) => {
-        return core.getBooleanInput(name, options);
-    },
-    /**
-     * Sets a value for the outputs of the action
-     * @param name - Output name
-     * @param value - Output value
-     */
-    setOutput: (name, value) => {
-        core.setOutput(name, value);
-    },
-    /**
-     * Logs an info message to the action output
-     * @param message - Info message
-     */
-    info: (message) => {
-        core.info(message);
-    },
-    /**
-     * Logs a warning message to the action output
-     * @param message - Warning message
-     */
-    warning: (message) => {
-        core.warning(message);
-    },
-    /**
-     * Logs a debug message to the action output
-     * @param message - Debug message
-     */
-    debug: (message) => {
-        core.debug(message);
-    },
-    /**
-     * Sets the action as failed with the given message
-     * @param message - Error message
-     */
-    setFailed: (message) => {
-        core.setFailed(message);
-    },
-};
-/**
- * Wrapper for @actions/cache functionality
- */
-exports.actionCache = {
-    /**
-     * Restores cache from the provided paths
-     * @param paths - Paths to restore cache
-     * @param primaryKey - Primary cache key
-     * @param restoreKeys - Additional restore keys
-     * @returns Cache hit key if found, undefined otherwise
-     */
-    restoreCache: async (paths, primaryKey, restoreKeys) => {
-        return cache.restoreCache(paths, primaryKey, restoreKeys);
-    },
-    /**
-     * Saves cache from the provided paths
-     * @param paths - Paths to save cache
-     * @param key - Cache key
-     * @returns Cache ID, -1 if cache was already up-to-date
-     */
-    saveCache: async (paths, key) => {
-        return cache.saveCache(paths, key);
-    },
-};
-/**
- * Wrapper for @actions/exec functionality
- */
-exports.actionExec = {
-    /**
-     * Executes a command in a shell
-     * @param commandLine - Command to execute
-     * @param args - Arguments to pass to the command
-     * @param options - Options for executing the command
-     * @returns Exit code
-     */
-    exec: async (commandLine, args, options) => {
-        return exec.exec(commandLine, args, options);
-    },
-};
+async function execCommand(commandLine, args, options) {
+    return exec.exec(commandLine, args, options);
+}
 
 
 /***/ }),
 
 /***/ 4919:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.getImageDigest = getImageDigest;
 exports.saveImageToTar = saveImageToTar;
 exports.loadImageFromTar = loadImageFromTar;
 exports.pullImage = pullImage;
-const actions_wrapper_1 = __nccwpck_require__(2518);
+const coreWrapper = __importStar(__nccwpck_require__(8490));
+const exec_wrapper_1 = __nccwpck_require__(7112);
 /**
  * Gets the image digest from Docker registry
- * @param imageName - Docker image name to check
- * @returns Image digest string or null if not found
+ *
+ * Uses 'docker buildx imagetools inspect' to retrieve the manifest digest
+ *
+ * @param imageName - Docker image name with optional tag
+ * @returns Promise resolving to digest string or null on failure
  */
 async function getImageDigest(imageName) {
     try {
@@ -69551,89 +69695,97 @@ async function getImageDigest(imageName) {
             },
             ignoreReturnCode: true,
         };
-        const exitCode = await actions_wrapper_1.actionExec.exec('docker', ['buildx', 'imagetools', 'inspect', '--format', '{{json .Manifest}}', imageName], options);
+        // Execute docker buildx command to inspect the image manifest
+        const exitCode = await (0, exec_wrapper_1.execCommand)('docker', ['buildx', 'imagetools', 'inspect', '--format', '{{json .Manifest}}', imageName], options);
         if (exitCode !== 0) {
-            actions_wrapper_1.actionCore.warning(`Failed to get digest for ${imageName}: ${stderrData}`);
+            coreWrapper.warning(`Failed to get digest for ${imageName}: ${stderrData}`);
             return null;
         }
         try {
+            // Parse the JSON output to extract the digest
             const manifest = JSON.parse(stdoutData.trim());
             return manifest.digest || null;
         }
         catch (parseError) {
-            actions_wrapper_1.actionCore.warning(`Failed to parse manifest JSON for ${imageName}: ${parseError}`);
+            coreWrapper.warning(`Failed to parse manifest JSON for ${imageName}: ${parseError}`);
             return null;
         }
     }
     catch (error) {
-        actions_wrapper_1.actionCore.warning(`Error getting digest for ${imageName}: ${error}`);
+        coreWrapper.warning(`Error getting digest for ${imageName}: ${error}`);
         return null;
     }
 }
 /**
  * Saves Docker image to a tar file
+ *
  * @param imageName - Docker image name to save
- * @param outputPath - Path to save the tar file
- * @returns True if successful, false otherwise
+ * @param outputPath - File path where the tar file should be created
+ * @returns Promise resolving to boolean indicating success or failure
  */
 async function saveImageToTar(imageName, outputPath) {
     try {
         const options = { ignoreReturnCode: true };
-        const exitCode = await actions_wrapper_1.actionExec.exec('docker', ['save', '-o', outputPath, imageName], options);
+        // Execute docker save command to create a tar archive of the image
+        const exitCode = await (0, exec_wrapper_1.execCommand)('docker', ['save', '-o', outputPath, imageName], options);
         if (exitCode !== 0) {
-            actions_wrapper_1.actionCore.warning(`Failed to save image ${imageName} to ${outputPath}`);
+            coreWrapper.warning(`Failed to save image ${imageName} to ${outputPath}`);
             return false;
         }
         return true;
     }
     catch (error) {
-        actions_wrapper_1.actionCore.warning(`Failed to save image ${imageName}: ${error}`);
+        coreWrapper.warning(`Failed to save image ${imageName}: ${error}`);
         return false;
     }
 }
 /**
  * Loads Docker image from a tar file
- * @param tarPath - Path to the tar file containing the image
- * @returns True if successful, false otherwise
+ *
+ * @param tarPath - Path to the tar file containing the Docker image
+ * @returns Promise resolving to boolean indicating success or failure
  */
 async function loadImageFromTar(tarPath) {
     try {
         const options = { ignoreReturnCode: true };
-        const exitCode = await actions_wrapper_1.actionExec.exec('docker', ['load', '-i', tarPath], options);
+        // Execute docker load command to restore image from tar archive
+        const exitCode = await (0, exec_wrapper_1.execCommand)('docker', ['load', '-i', tarPath], options);
         if (exitCode !== 0) {
-            actions_wrapper_1.actionCore.warning(`Failed to load image from ${tarPath}`);
+            coreWrapper.warning(`Failed to load image from ${tarPath}`);
             return false;
         }
         return true;
     }
     catch (error) {
-        actions_wrapper_1.actionCore.warning(`Failed to load image from ${tarPath}: ${error}`);
+        coreWrapper.warning(`Failed to load image from ${tarPath}: ${error}`);
         return false;
     }
 }
 /**
- * Pulls a Docker image
+ * Pulls a Docker image, optionally for a specific platform
+ *
  * @param imageName - Docker image name to pull
- * @param platform - Optional platform to pull for (e.g. 'linux/amd64', 'linux/arm64')
- * @returns True if successful, false otherwise
+ * @param platform - Optional platform string (e.g., 'linux/amd64')
+ * @returns Promise resolving to boolean indicating success or failure
  */
 async function pullImage(imageName, platform) {
     try {
         const options = { ignoreReturnCode: true };
-        // Construct args array immutably
+        // Construct args array conditionally including platform flag if specified
         const args = platform ? ['pull', '--platform', platform, imageName] : ['pull', imageName];
         if (platform) {
-            actions_wrapper_1.actionCore.info(`Pulling image ${imageName} for platform ${platform}`);
+            coreWrapper.info(`Pulling image ${imageName} for platform ${platform}`);
         }
-        const exitCode = await actions_wrapper_1.actionExec.exec('docker', args, options);
+        // Execute docker pull command
+        const exitCode = await (0, exec_wrapper_1.execCommand)('docker', args, options);
         if (exitCode !== 0) {
-            actions_wrapper_1.actionCore.warning(`Failed to pull image ${imageName}${platform ? ` for platform ${platform}` : ''}`);
+            coreWrapper.warning(`Failed to pull image ${imageName}${platform ? ` for platform ${platform}` : ''}`);
             return false;
         }
         return true;
     }
     catch (error) {
-        actions_wrapper_1.actionCore.warning(`Failed to pull image ${imageName}${platform ? ` for platform ${platform}` : ''}: ${error}`);
+        coreWrapper.warning(`Failed to pull image ${imageName}${platform ? ` for platform ${platform}` : ''}: ${error}`);
         return false;
     }
 }
@@ -69683,7 +69835,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.getComposeServicesFromFiles = getComposeServicesFromFiles;
 const fs = __importStar(__nccwpck_require__(9896));
 const yaml = __importStar(__nccwpck_require__(4281));
-const actions_wrapper_1 = __nccwpck_require__(2518);
+const coreWrapper = __importStar(__nccwpck_require__(8490));
 /**
  * Default Docker Compose filenames to look for if none are specified
  */
@@ -69694,44 +69846,44 @@ const DEFAULT_COMPOSE_FILE_NAMES = [
     'docker-compose.yml',
 ];
 /**
- * Gets Docker Compose services from compose files, filtering out excluded images
- * @param composeFilePaths - Array of compose file paths
- * @param excludeImageNames - Array of image names to exclude
- * @returns Array of ComposeService objects with image definitions
+ * Extracts Docker Compose services from specified files and filters them
+ * based on exclusion list
+ *
+ * @param composeFilePaths - Array of paths to Docker Compose files to parse
+ * @param excludeImageNames - Array of image names to exclude from results
+ * @returns Array of ComposeService objects from all valid files
  */
 function getComposeServicesFromFiles(composeFilePaths, excludeImageNames) {
-    // Convert excludeImageNames to a set for O(1) lookups
+    // Convert exclude list to a Set for O(1) lookups
     const excludedImages = new Set(excludeImageNames);
-    // Use default files if none provided
+    // Use provided paths or default filenames if none provided
     const filesToProcess = composeFilePaths.length > 0
         ? composeFilePaths.filter((file) => fs.existsSync(file))
         : DEFAULT_COMPOSE_FILE_NAMES.filter((file) => fs.existsSync(file));
-    // Extract and filter services from all files
-    return filesToProcess
+    return (filesToProcess
         .flatMap((file) => {
         try {
             const content = fs.readFileSync(file, 'utf8');
+            // Parse YAML content into a ComposeFile structure
             const parsed = yaml.load(content);
-            // Early return for empty or invalid YAML files
             if (!parsed) {
-                actions_wrapper_1.actionCore.debug(`Empty or invalid YAML file: ${file}`);
+                coreWrapper.debug(`Empty or invalid YAML file: ${file}`);
                 return [];
             }
-            // Early return if services section doesn't exist
             if (!parsed.services) {
-                actions_wrapper_1.actionCore.debug(`No services section found in ${file}`);
+                coreWrapper.debug(`No services section found in ${file}`);
                 return [];
             }
+            // Return just the service definitions, discarding service names
             return Object.values(parsed.services);
         }
         catch (error) {
-            actions_wrapper_1.actionCore.warning(`Failed to parse ${file}: ${error}`);
+            coreWrapper.warning(`Failed to parse ${file}: ${error}`);
             return [];
         }
     })
-        .filter((service) => 
-    // Keep only services with defined images that aren't excluded
-    service.image !== undefined && !excludedImages.has(service.image));
+        // Filter out services with no image property or excluded images
+        .filter((service) => service.image !== undefined && !excludedImages.has(service.image)));
 }
 
 
@@ -69778,163 +69930,265 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = run;
 const path = __importStar(__nccwpck_require__(6928));
-const actions_wrapper_1 = __nccwpck_require__(2518);
+const cacheWrapper = __importStar(__nccwpck_require__(3879));
+const coreWrapper = __importStar(__nccwpck_require__(8490));
 const docker_command_1 = __nccwpck_require__(4919);
 const docker_compose_file_1 = __nccwpck_require__(4329);
 const path_utils_1 = __nccwpck_require__(6696);
 const platform_1 = __nccwpck_require__(3728);
 /**
- * Generates a cache key for the Docker image
- * @param cacheKeyPrefix - Prefix for the cache key
- * @param servicePlatform - Optional platform specified in the Docker Compose service
- * @param digest - Docker image digest
- * @returns Generated cache key
+ * Generates a unique cache key for a Docker image
+ *
+ * @param cacheKeyPrefix - Prefix to use for the cache key
+ * @param imageName - Docker image name (without tag)
+ * @param imageTag - Docker image tag
+ * @param servicePlatform - Platform string (e.g. 'linux/amd64') or undefined
+ * @param digest - Image digest
+ * @returns A unique cache key string
  */
-function generateCacheKey(cacheKeyPrefix, servicePlatform, digest) {
-    // If service has a platform specified, use it; otherwise use the current environment's platform
-    const platform = servicePlatform ? (0, platform_1.parsePlatformString)(servicePlatform) : (0, platform_1.getCurrentPlatformInfo)();
-    const os = (0, platform_1.sanitizePlatformComponent)(platform?.os);
-    const arch = (0, platform_1.sanitizePlatformComponent)(platform?.arch);
-    const variant = (0, platform_1.sanitizePlatformComponent)(platform?.variant);
-    return `${cacheKeyPrefix}-${os}-${arch}-${variant}-${digest}`;
-}
-/**
- * Generates a path for tar file to store the Docker image
- * @param imageName - Name portion of the Docker image
- * @param imageTag - Tag portion of the Docker image
- * @returns Path to store the tar file
- */
-function generateTarPath(imageName, imageTag) {
-    // Sanitize both image name and tag to avoid invalid directory paths
+function generateCacheKey(cacheKeyPrefix, imageName, imageTag, servicePlatform, digest) {
+    // Sanitize components to ensure valid cache key
     const sanitizedImageName = (0, path_utils_1.sanitizePathComponent)(imageName);
     const sanitizedImageTag = (0, path_utils_1.sanitizePathComponent)(imageTag);
-    return path.join(process.env.RUNNER_TEMP || '/tmp', `${sanitizedImageName}-${sanitizedImageTag}.tar`);
+    const sanitizedDigest = (0, path_utils_1.sanitizePathComponent)(digest);
+    // Use provided platform or get current platform
+    const platform = servicePlatform ? (0, platform_1.parsePlatformString)(servicePlatform) : (0, platform_1.getCurrentPlatformInfo)();
+    const sanitizedOs = (0, path_utils_1.sanitizePathComponent)(platform?.os || 'none');
+    const sanitizedArch = (0, path_utils_1.sanitizePathComponent)(platform?.arch || 'none');
+    const sanitizedVariant = (0, path_utils_1.sanitizePathComponent)(platform?.variant || 'none');
+    return `${cacheKeyPrefix}-${sanitizedImageName}-${sanitizedImageTag}-${sanitizedOs}-${sanitizedArch}-${sanitizedVariant}-${sanitizedDigest}`;
 }
 /**
- * Processes a single Docker service
- * @param service - Docker Compose service to process
- * @param cacheKeyPrefix - Prefix for cache key generation
- * @returns Result of processing the service
+ * Generates filesystem path for storing Docker image tar file
+ *
+ * @param imageName - Docker image name (without tag)
+ * @param imageTag - Docker image tag
+ * @param servicePlatform - Platform string (e.g. 'linux/amd64') or undefined
+ * @param digest - Image digest
+ * @returns Absolute path to the tar file
+ */
+function generateTarPath(imageName, imageTag, servicePlatform, digest) {
+    const tarFileName = generateCacheKey('', imageName, imageTag, servicePlatform, digest);
+    return path.join(process.env.RUNNER_TEMP || '/tmp', `${tarFileName}.tar`);
+}
+/**
+ * Processes a single Docker Compose service:
+ * - Tries to restore from cache
+ * - If cache miss, pulls and caches the image
+ * - Handles various error conditions
+ *
+ * @param service - The Docker Compose service to process
+ * @param cacheKeyPrefix - Prefix to use for the cache key
+ * @returns Result object with status and metadata
  */
 async function processService(service, cacheKeyPrefix) {
     const fullImageName = service.image;
     const [imageName, imageTag = 'latest'] = fullImageName.split(':');
-    // Get image digest
+    // Get image digest for cache key generation
     const digest = await (0, docker_command_1.getImageDigest)(fullImageName);
     if (!digest) {
-        actions_wrapper_1.actionCore.warning(`Could not get digest for ${fullImageName}, skipping cache`);
-        return { success: false, restoredFromCache: false };
+        coreWrapper.warning(`Could not get digest for ${fullImageName}, skipping cache`);
+        return {
+            success: false,
+            restoredFromCache: false,
+            imageName: fullImageName,
+            cacheKey: '',
+            digest: undefined,
+            platform: service.platform,
+        };
     }
-    const cacheKey = generateCacheKey(cacheKeyPrefix, service.platform, digest);
-    const cachePath = generateTarPath(imageName, imageTag);
+    const cacheKey = generateCacheKey(cacheKeyPrefix, imageName, imageTag, service.platform, digest);
+    const cachePath = generateTarPath(imageName, imageTag, service.platform, digest);
     if (service.platform) {
-        actions_wrapper_1.actionCore.info(`Using platform ${service.platform} for ${fullImageName}`);
+        coreWrapper.info(`Using platform ${service.platform} for ${fullImageName}`);
     }
-    actions_wrapper_1.actionCore.info(`Cache key for ${fullImageName}: ${cacheKey}`);
-    actions_wrapper_1.actionCore.debug(`Cache path: ${cachePath}`);
-    // Try to restore from cache
-    const cacheHit = await actions_wrapper_1.actionCache.restoreCache([cachePath], cacheKey);
+    coreWrapper.info(`Cache key for ${fullImageName}: ${cacheKey}`);
+    coreWrapper.debug(`Cache path: ${cachePath}`);
+    // Try to restore from cache first
+    const cacheHit = await cacheWrapper.restoreCache([cachePath], cacheKey);
     if (cacheHit) {
-        actions_wrapper_1.actionCore.info(`Cache hit for ${fullImageName}, loading from cache`);
+        coreWrapper.info(`Cache hit for ${fullImageName}, loading from cache`);
         const loadSuccess = await (0, docker_command_1.loadImageFromTar)(cachePath);
-        return { success: loadSuccess, restoredFromCache: loadSuccess };
+        return {
+            success: loadSuccess,
+            restoredFromCache: loadSuccess,
+            imageName: fullImageName,
+            cacheKey,
+            digest,
+            platform: service.platform,
+        };
     }
-    // Handle cache miss - Pull the image
-    actions_wrapper_1.actionCore.info(`Cache miss for ${fullImageName}, pulling and saving`);
+    // Handle cache miss - pull the image
+    coreWrapper.info(`Cache miss for ${fullImageName}, pulling and saving`);
     const pullSuccess = await (0, docker_command_1.pullImage)(fullImageName, service.platform);
     if (!pullSuccess) {
-        actions_wrapper_1.actionCore.warning(`Failed to pull ${fullImageName}`);
-        return { success: false, restoredFromCache: false };
+        coreWrapper.warning(`Failed to pull ${fullImageName}`);
+        return {
+            success: false,
+            restoredFromCache: false,
+            imageName: fullImageName,
+            cacheKey,
+            digest,
+            platform: service.platform,
+        };
     }
-    // Verify the digest matches what we expect
+    // Verify the digest matches after pull
     const newDigest = await (0, docker_command_1.getImageDigest)(fullImageName);
     if (newDigest !== digest) {
-        actions_wrapper_1.actionCore.warning(`Digest mismatch for ${fullImageName}: expected ${digest}, got ${newDigest}`);
-        return { success: false, restoredFromCache: false };
+        coreWrapper.warning(`Digest mismatch for ${fullImageName}: expected ${digest}, got ${newDigest}`);
+        return {
+            success: false,
+            restoredFromCache: false,
+            imageName: fullImageName,
+            cacheKey,
+            digest,
+            platform: service.platform,
+        };
     }
-    // Save to tar
+    // Save the image to tar file
     const saveSuccess = await (0, docker_command_1.saveImageToTar)(fullImageName, cachePath);
     if (!saveSuccess) {
-        actions_wrapper_1.actionCore.warning(`Failed to save image to tar: ${fullImageName}`);
-        return { success: false, restoredFromCache: false };
+        coreWrapper.warning(`Failed to save image to tar: ${fullImageName}`);
+        return {
+            success: false,
+            restoredFromCache: false,
+            imageName: fullImageName,
+            cacheKey,
+            digest,
+            platform: service.platform,
+        };
     }
     // Save to cache
     try {
-        const cacheResult = await actions_wrapper_1.actionCache.saveCache([cachePath], cacheKey);
+        const cacheResult = await cacheWrapper.saveCache([cachePath], cacheKey);
         const cacheSuccess = cacheResult !== -1;
         if (cacheSuccess) {
-            actions_wrapper_1.actionCore.info(`Cached ${fullImageName} with key ${cacheKey}`);
+            coreWrapper.info(`Cached ${fullImageName} with key ${cacheKey}`);
         }
         else {
-            actions_wrapper_1.actionCore.debug(`Cache was not saved for ${fullImageName} (cache ID: ${cacheResult})`);
+            coreWrapper.debug(`Cache was not saved for ${fullImageName} (cache ID: ${cacheResult})`);
         }
-        // Even if the cache save fails, the overall operation is successful
-        return { success: true, restoredFromCache: false };
+        return {
+            success: true,
+            restoredFromCache: false,
+            imageName: fullImageName,
+            cacheKey,
+            digest,
+            platform: service.platform,
+        };
     }
     catch (error) {
-        // Handle known cache saving errors without failing the operation
+        // Handle known cache saving errors gracefully without failing the operation
         if (error instanceof Error) {
             if (error.message.includes('already exists')) {
-                actions_wrapper_1.actionCore.debug(`Cache already exists for ${fullImageName}: ${error.message}`);
+                coreWrapper.debug(`Cache already exists for ${fullImageName}: ${error.message}`);
             }
             else if (error.message.includes('unable to upload')) {
-                actions_wrapper_1.actionCore.debug(`Unable to upload cache for ${fullImageName}: ${error.message}`);
+                coreWrapper.debug(`Unable to upload cache for ${fullImageName}: ${error.message}`);
             }
             else {
-                actions_wrapper_1.actionCore.debug(`Error saving cache for ${fullImageName}: ${error.message}`);
+                coreWrapper.debug(`Error saving cache for ${fullImageName}: ${error.message}`);
             }
         }
         else {
-            actions_wrapper_1.actionCore.debug(`Unknown error saving cache for ${fullImageName}: ${String(error)}`);
+            coreWrapper.debug(`Unknown error saving cache for ${fullImageName}: ${String(error)}`);
         }
-        // Image was successfully processed despite cache issues
-        return { success: true, restoredFromCache: false };
+        return {
+            success: true,
+            restoredFromCache: false,
+            imageName: fullImageName,
+            cacheKey,
+            digest,
+            platform: service.platform,
+        };
     }
 }
 /**
  * Main function that runs the GitHub Action
+ *
+ * @returns Promise that resolves when the action completes
  */
 async function run() {
     try {
-        // Get inputs from action.yml
-        const composeFilePaths = actions_wrapper_1.actionCore.getMultilineInput('compose-files');
-        const excludeImageNames = actions_wrapper_1.actionCore.getMultilineInput('exclude-images');
-        const cacheKeyPrefix = actions_wrapper_1.actionCore.getInput('cache-key-prefix') || 'docker-compose-image';
-        // Get Docker Compose services
-        const services = (0, docker_compose_file_1.getComposeServicesFromFiles)(composeFilePaths, excludeImageNames);
+        // Get action inputs from GitHub Actions environment
+        const composeFilePaths = coreWrapper.getMultilineInput('compose-files');
+        const excludeImageNames = coreWrapper.getMultilineInput('exclude-images');
+        const cacheKeyPrefix = coreWrapper.getInput('cache-key-prefix') || 'docker-compose-image';
+        const services = (0, docker_compose_file_1.getComposeServicesFromFiles)(composeFilePaths, excludeImageNames)
+            // Complete undefined platforms with getCurrentPlatformInfo()
+            .map((service) => {
+            if (service.platform !== undefined) {
+                return service;
+            }
+            const platformInfo = (0, platform_1.getCurrentPlatformInfo)();
+            if (!platformInfo) {
+                return service;
+            }
+            // Create platform string from platform info components
+            const platformStr = `${platformInfo.os}/${platformInfo.arch}${platformInfo.variant ? `/${platformInfo.variant}` : ''}`;
+            return {
+                ...service,
+                platform: platformStr,
+            };
+        })
+            // Filter out duplicates by keeping only the first occurrence of each image+platform combination
+            .filter((service, index, array) => {
+            const key = `${service.image}|${service.platform || 'default'}`;
+            return array.findIndex((s) => `${s.image}|${s.platform || 'default'}` === key) === index;
+        });
         if (services.length === 0) {
-            actions_wrapper_1.actionCore.info('No Docker services found in compose files or all services were excluded');
-            actions_wrapper_1.actionCore.setOutput('cache-hit', 'false');
-            actions_wrapper_1.actionCore.setOutput('image-list', '');
+            coreWrapper.info('No Docker services found in compose files or all services were excluded');
+            coreWrapper.setOutput('cache-hit', 'false');
+            coreWrapper.setOutput('image-list', '');
             return;
         }
-        // Output info about found services
-        actions_wrapper_1.actionCore.info(`Found ${services.length} services to cache`);
-        actions_wrapper_1.actionCore.setOutput('image-list', services.map((service) => service.image).join(' '));
-        // Process services concurrently and track results
+        coreWrapper.info(`Found ${services.length} services to cache`);
+        coreWrapper.setOutput('image-list', services.map((service) => service.image).join(' '));
+        // Process all services concurrently for efficiency
         const results = await Promise.all(services.map((service) => processService(service, cacheKeyPrefix)));
-        // Aggregate results
+        // Aggregate results for outputs and reporting
         const totalServices = services.length;
         const servicesRestoredFromCache = results.filter((result) => result.restoredFromCache).length;
         const allServicesSuccessful = results.every((result) => result.success);
         const allServicesFromCache = servicesRestoredFromCache === totalServices && totalServices > 0;
-        // Report cache status
-        actions_wrapper_1.actionCore.info(`${servicesRestoredFromCache} of ${totalServices} services restored from cache`);
-        actions_wrapper_1.actionCore.setOutput('cache-hit', allServicesFromCache.toString());
-        // Report overall status
+        coreWrapper.info(`${servicesRestoredFromCache} of ${totalServices} services restored from cache`);
+        coreWrapper.setOutput('cache-hit', allServicesFromCache.toString());
+        // Create summary table for better visibility in the GitHub Actions UI
+        const summary = coreWrapper.summary.addHeading('Docker Compose Cache Results').addTable([
+            [
+                { data: 'Image Name', header: true },
+                { data: 'Platform', header: true },
+                { data: 'Cache Hit', header: true },
+                { data: 'Status', header: true },
+                { data: 'Cache Key', header: true },
+                { data: 'Digest', header: true },
+            ],
+            ...results.map((result) => [
+                result.imageName,
+                result.platform || 'default',
+                result.restoredFromCache ? '✅' : '❌',
+                result.success ? 'Success' : 'Failed',
+                result.cacheKey || 'N/A',
+                result.digest?.substring(0, 16) || 'unknown',
+            ]),
+        ]);
+        summary
+            .addRaw(`Total Services: ${totalServices}`, true)
+            .addRaw(`Restored from Cache: ${servicesRestoredFromCache}/${totalServices}`, true)
+            .write();
         if (allServicesSuccessful) {
-            actions_wrapper_1.actionCore.info('Docker Compose Cache action completed successfully');
+            coreWrapper.info('Docker Compose Cache action completed successfully');
         }
         else {
-            actions_wrapper_1.actionCore.info('Docker Compose Cache action completed with some services not fully processed');
+            coreWrapper.info('Docker Compose Cache action completed with some services not fully processed');
         }
     }
     catch (error) {
         if (error instanceof Error) {
-            actions_wrapper_1.actionCore.setFailed(error.message);
+            coreWrapper.setFailed(error.message);
         }
         else {
-            actions_wrapper_1.actionCore.setFailed('Unknown error occurred');
+            coreWrapper.setFailed('Unknown error occurred');
         }
     }
 }
@@ -69953,6 +70207,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.sanitizePathComponent = sanitizePathComponent;
 /**
  * Sanitizes a string to make it safe for use in file paths
+ *
  * @param value - The string to sanitize
  * @returns A sanitized string safe for use in file paths
  */
@@ -69979,7 +70234,6 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.getCurrentOciPlatformString = getCurrentOciPlatformString;
 exports.parsePlatformString = parsePlatformString;
 exports.getCurrentPlatformInfo = getCurrentPlatformInfo;
-exports.sanitizePlatformComponent = sanitizePlatformComponent;
 /**
  * Maps Node.js architecture identifiers (`process.arch`) to their OCI equivalents.
  * Includes common aliases.
@@ -70040,6 +70294,7 @@ const NODE_TO_OCI_VARIANT_MAP = new Map([
 const VALID_OCI_VARIANTS = new Set(NODE_TO_OCI_VARIANT_MAP.values());
 /**
  * Internal helper to resolve an OCI architecture identifier.
+ *
  * @param arch - The architecture string to map (Node.js or OCI).
  * @returns The canonical OCI architecture string or `undefined`.
  */
@@ -70050,6 +70305,7 @@ function resolveOciArch(arch) {
 }
 /**
  * Internal helper to resolve an OCI OS identifier.
+ *
  * @param os - The OS string to map (Node.js or OCI).
  * @returns The canonical OCI OS string or `undefined`.
  */
@@ -70060,6 +70316,7 @@ function resolveOciOs(os) {
 }
 /**
  * Internal helper to resolve an OCI variant identifier.
+ *
  * @param variant - The variant string to map (Node.js arm_version or OCI).
  * @returns The canonical OCI variant string or `undefined`.
  */
@@ -70070,6 +70327,7 @@ function resolveOciVariant(variant) {
 }
 /**
  * Determines the OCI platform string (os/arch[/variant]) for the current Node.js runtime.
+ *
  * @returns The OCI platform string (e.g., "linux/amd64", "linux/arm/v7"), or `null` if resolution fails.
  */
 function getCurrentOciPlatformString() {
@@ -70090,6 +70348,7 @@ function getCurrentOciPlatformString() {
 }
 /**
  * Parses an OCI platform string into its components (OS, architecture, variant).
+ *
  * @param platformString - The platform string to parse (e.g., "linux/amd64", "windows/amd64/v8").
  * @returns A `PlatformInfo` object, or `null` if the string is invalid.
  */
@@ -70117,23 +70376,12 @@ function parsePlatformString(platformString) {
 }
 /**
  * Retrieves the OCI platform information (`PlatformInfo`) for the current Node.js runtime.
+ *
  * @returns A `PlatformInfo` object for the current environment, or `null` if resolution fails.
  */
 function getCurrentPlatformInfo() {
     const platformString = getCurrentOciPlatformString();
     return parsePlatformString(platformString);
-}
-/**
- * Sanitizes a platform component string (OS, arch, or variant) for safe use (e.g., in file names).
- * Replaces non-alphanumeric characters (excluding '.', '_', '-') with underscores.
- * @param component - The platform component string to sanitize.
- * @returns A sanitized string. Returns 'none' if the input is null or undefined.
- */
-function sanitizePlatformComponent(component) {
-    if (!component) {
-        return 'none';
-    }
-    return component.replace(/[^a-zA-Z0-9._-]/g, '_');
 }
 
 

@@ -17,24 +17,20 @@ export type PlatformInfo = {
 };
 /**
  * Determines the OCI platform string (os/arch[/variant]) for the current Node.js runtime.
+ *
  * @returns The OCI platform string (e.g., "linux/amd64", "linux/arm/v7"), or `null` if resolution fails.
  */
 export declare function getCurrentOciPlatformString(): string | null;
 /**
  * Parses an OCI platform string into its components (OS, architecture, variant).
+ *
  * @param platformString - The platform string to parse (e.g., "linux/amd64", "windows/amd64/v8").
  * @returns A `PlatformInfo` object, or `null` if the string is invalid.
  */
 export declare function parsePlatformString(platformString: string | null | undefined): PlatformInfo | null;
 /**
  * Retrieves the OCI platform information (`PlatformInfo`) for the current Node.js runtime.
+ *
  * @returns A `PlatformInfo` object for the current environment, or `null` if resolution fails.
  */
 export declare function getCurrentPlatformInfo(): PlatformInfo | null;
-/**
- * Sanitizes a platform component string (OS, arch, or variant) for safe use (e.g., in file names).
- * Replaces non-alphanumeric characters (excluding '.', '_', '-') with underscores.
- * @param component - The platform component string to sanitize.
- * @returns A sanitized string. Returns 'none' if the input is null or undefined.
- */
-export declare function sanitizePlatformComponent(component: string | null | undefined): string;
