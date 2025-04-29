@@ -69971,14 +69971,19 @@ function sanitizePathComponent(value) {
 "use strict";
 
 /**
- * Platform utility module for mapping between Node.js and OCI/Docker platform identifiers.
+ * @fileoverview Provides utilities for handling OCI (Open Container Initiative)
+ * platform identifiers (os, architecture, variant) within a Node.js environment.
+ * Includes mapping from Node.js values, parsing platform strings, and sanitization.
  */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.getCurrentOciPlatformString = getCurrentOciPlatformString;
 exports.parsePlatformString = parsePlatformString;
 exports.getCurrentPlatformInfo = getCurrentPlatformInfo;
 exports.sanitizePlatformComponent = sanitizePlatformComponent;
 /**
- * Mapping from Node.js architecture identifiers to OCI architecture identifiers
+ * Maps Node.js architecture identifiers (`process.arch`) to their OCI equivalents.
+ * Includes common aliases.
+ * @see https://nodejs.org/api/process.html#processarch
  */
 const NODE_TO_OCI_ARCH_MAP = new Map([
     ['x64', 'amd64'],
@@ -69991,7 +69996,7 @@ const NODE_TO_OCI_ARCH_MAP = new Map([
     ['mipsel', 'mipsle'],
     ['loong64', 'loong64'],
     ['riscv64', 'riscv64'],
-    // Common aliases
+    // Aliases
     ['aarch64', 'arm64'],
     ['x86_64', 'amd64'],
     ['x86', '386'],
@@ -69999,12 +70004,11 @@ const NODE_TO_OCI_ARCH_MAP = new Map([
     ['s390', 's390'],
     ['mips64el', 'mips64le'],
 ]);
+/** A set containing all valid OCI architecture values derived from the map. */
+const VALID_OCI_ARCHS = new Set(NODE_TO_OCI_ARCH_MAP.values());
 /**
- * Set of known OCI architecture values for fast lookup
- */
-const OCI_ARCH_VALUES = new Set(NODE_TO_OCI_ARCH_MAP.values());
-/**
- * Mapping from Node.js platform identifiers to OCI OS identifiers
+ * Maps Node.js platform identifiers (`process.platform`) to their OCI OS equivalents.
+ * @see https://nodejs.org/api/process.html#processplatform
  */
 const NODE_TO_OCI_OS_MAP = new Map([
     ['linux', 'linux'],
@@ -70016,68 +70020,114 @@ const NODE_TO_OCI_OS_MAP = new Map([
     ['sunos', 'solaris'],
     ['android', 'android'],
 ]);
+/** A set containing all valid OCI OS values derived from the map. */
+const VALID_OCI_OSS = new Set(NODE_TO_OCI_OS_MAP.values());
 /**
- * Set of known OCI OS values for fast lookup
+ * Maps Node.js specific ARM version identifiers or explicit variant strings
+ * to their canonical OCI variant equivalents.
  */
-const OCI_OS_VALUES = new Set(NODE_TO_OCI_OS_MAP.values());
+const NODE_TO_OCI_VARIANT_MAP = new Map([
+    // Node.js `arm_version` specific values
+    ['6', 'v6'],
+    ['7', 'v7'],
+    // Explicit OCI variants (allow passthrough)
+    ['v5', 'v5'],
+    ['v6', 'v6'],
+    ['v7', 'v7'],
+    ['v8', 'v8'],
+]);
+/** A set containing all valid OCI variant values derived from the map. */
+const VALID_OCI_VARIANTS = new Set(NODE_TO_OCI_VARIANT_MAP.values());
 /**
- * Maps Node.js architecture identifier to OCI architecture identifier
- * @param nodeArch - Node.js architecture identifier (e.g., 'x64', 'arm64')
- * @returns Corresponding OCI architecture identifier, or undefined if no mapping exists
+ * Internal helper to resolve an OCI architecture identifier.
+ * @param arch - The architecture string to map (Node.js or OCI).
+ * @returns The canonical OCI architecture string or `undefined`.
  */
-function mapNodeArchToOciArch(nodeArch) {
-    return NODE_TO_OCI_ARCH_MAP.get(nodeArch) ?? (OCI_ARCH_VALUES.has(nodeArch) ? nodeArch : undefined);
+function resolveOciArch(arch) {
+    if (!arch)
+        return undefined;
+    return NODE_TO_OCI_ARCH_MAP.get(arch) ?? (VALID_OCI_ARCHS.has(arch) ? arch : undefined);
 }
 /**
- * Maps Node.js OS identifier to OCI OS identifier
- * @param nodePlatform - Node.js OS identifier (e.g., 'linux', 'win32')
- * @returns Corresponding OCI OS identifier, or undefined if no mapping exists
+ * Internal helper to resolve an OCI OS identifier.
+ * @param os - The OS string to map (Node.js or OCI).
+ * @returns The canonical OCI OS string or `undefined`.
  */
-function mapNodeOsToOciOs(nodePlatform) {
-    return NODE_TO_OCI_OS_MAP.get(nodePlatform) ?? (OCI_OS_VALUES.has(nodePlatform) ? nodePlatform : undefined);
+function resolveOciOs(os) {
+    if (!os)
+        return undefined;
+    return NODE_TO_OCI_OS_MAP.get(os) ?? (VALID_OCI_OSS.has(os) ? os : undefined);
 }
 /**
- * Gets the OCI platform string for the current Node.js environment
- * @returns Platform string in "os/arch" format, or null if conversion failed
+ * Internal helper to resolve an OCI variant identifier.
+ * @param variant - The variant string to map (Node.js arm_version or OCI).
+ * @returns The canonical OCI variant string or `undefined`.
  */
-function getCurrentOciPlatform() {
-    const os = mapNodeOsToOciOs(process.platform);
-    const arch = mapNodeArchToOciArch(process.arch);
+function resolveOciVariant(variant) {
+    if (!variant)
+        return undefined;
+    return NODE_TO_OCI_VARIANT_MAP.get(variant) ?? (VALID_OCI_VARIANTS.has(variant) ? variant : undefined);
+}
+/**
+ * Determines the OCI platform string (os/arch[/variant]) for the current Node.js runtime.
+ * @returns The OCI platform string (e.g., "linux/amd64", "linux/arm/v7"), or `null` if resolution fails.
+ */
+function getCurrentOciPlatformString() {
+    const os = resolveOciOs(process.platform);
+    if (!os) {
+        // Could not resolve OS
+        return null;
+    }
+    const arch = resolveOciArch(process.arch);
+    if (!arch) {
+        // Could not resolve architecture
+        return null;
+    }
+    // Determine variant primarily for 'arm' architecture using Node's specific variable.
+    const nodeArmVersion = process.config?.variables?.arm_version;
+    const variant = arch === 'arm' ? resolveOciVariant(nodeArmVersion) : undefined;
+    return variant ? `${os}/${arch}/${variant}` : `${os}/${arch}`;
+}
+/**
+ * Parses an OCI platform string into its components (OS, architecture, variant).
+ * @param platformString - The platform string to parse (e.g., "linux/amd64", "windows/amd64/v8").
+ * @returns A `PlatformInfo` object, or `null` if the string is invalid.
+ */
+function parsePlatformString(platformString) {
+    if (!platformString) {
+        return null;
+    }
+    const parts = platformString.split('/');
+    // Must have at least os/arch, and they must not be empty strings
+    if (parts.length < 2 || !parts[0] || !parts[1]) {
+        // Invalid format
+        return null;
+    }
+    const os = resolveOciOs(parts[0]);
+    const arch = resolveOciArch(parts[1]);
+    const variantInput = parts.length > 2 && parts[2] ? parts[2] : undefined;
+    const variant = resolveOciVariant(variantInput);
+    // OS and Arch are mandatory and must be valid
     if (!os || !arch) {
+        // Invalid or unrecognized OS or Arch
         return null;
     }
-    return `${os}/${arch}`;
+    const result = { os, arch, ...(variant && { variant }) };
+    return result;
 }
 /**
- * Parses a platform string into its components (OS, architecture, variant)
- * @param platform - Platform string in "os/arch[/variant]" format
- * @returns Parsed platform components, or null if format is invalid
- */
-function parsePlatformString(platform) {
-    if (!platform) {
-        return null;
-    }
-    const parts = platform.split('/');
-    if (parts.length < 2) {
-        return null;
-    }
-    return {
-        os: parts[0],
-        arch: parts[1],
-        variant: parts.length > 2 ? parts[2] : undefined,
-    };
-}
-/**
- * Gets the platform information for the current environment
- * @returns Current environment's platform information, or null if unavailable
+ * Retrieves the OCI platform information (`PlatformInfo`) for the current Node.js runtime.
+ * @returns A `PlatformInfo` object for the current environment, or `null` if resolution fails.
  */
 function getCurrentPlatformInfo() {
-    return parsePlatformString(getCurrentOciPlatform());
+    const platformString = getCurrentOciPlatformString();
+    return parsePlatformString(platformString);
 }
 /**
- * Normalizes a platform component string for safe use in cache keys
- * @param component - Component string to normalize (OS, architecture, or variant)
- * @returns Safely normalized string, 'none' if component is undefined
+ * Sanitizes a platform component string (OS, arch, or variant) for safe use (e.g., in file names).
+ * Replaces non-alphanumeric characters (excluding '.', '_', '-') with underscores.
+ * @param component - The platform component string to sanitize.
+ * @returns A sanitized string. Returns 'none' if the input is null or undefined.
  */
 function sanitizePlatformComponent(component) {
     if (!component) {
