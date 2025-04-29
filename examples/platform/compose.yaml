@@ -1,4 +1,58 @@
 services:
-  hello_platform:
-    image: hello-world:linux
+  # Linux/AMD64 (Ubuntu runner)
+  hello_ubuntu_amd64:
+    image: alpine:latest
     platform: linux/amd64
+
+  # Linux/ARM64 (Ubuntu ARM runner)
+  hello_ubuntu_arm64:
+    image: alpine:latest
+    platform: linux/arm64
+
+  # Linux/ARM with variants
+  hello_arm_v6:
+    image: arm32v6/alpine:latest
+    platform: linux/arm/v6
+
+  hello_arm_v7:
+    image: arm32v7/alpine:latest
+    platform: linux/arm/v7
+
+  hello_arm_v8:
+    image: arm64v8/alpine:latest
+    platform: linux/arm64/v8
+
+  # Additional examples for common platform scenarios
+
+  # Multi-arch example with Alpine
+  alpine_service:
+    image: alpine:latest
+    platform: linux/amd64
+
+  # Database example with Postgres
+  postgres_service:
+    image: postgres:16
+    platform: linux/amd64
+    environment:
+      POSTGRES_PASSWORD: example
+
+  # Web server example with nginx
+  nginx_service:
+    image: nginx:alpine
+    platform: linux/amd64
+    ports:
+      - '8080:80'
+
+  # Raspberry Pi specific examples
+  raspberry_pi_node:
+    image: arm32v7/node:18
+    platform: linux/arm/v7
+
+  raspberry_pi_python:
+    image: arm32v7/python:3.11
+    platform: linux/arm/v7
+
+  # Jetson Nano / Raspberry Pi 4 64bit examples
+  jetson_nano_python:
+    image: arm64v8/python:3.11
+    platform: linux/arm64/v8
