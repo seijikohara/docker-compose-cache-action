@@ -1,9 +1,10 @@
-import * as coreWrapper from '../src/actions/core-wrapper';
-import { execCommand } from '../src/actions/exec-wrapper';
+import * as core from '@actions/core';
+import * as exec from '@actions/exec';
+
 import { getImageDigest, loadImageFromTar, pullImage, saveImageToTar } from '../src/docker-command';
 
 // Setup mocks
-jest.mock('../src/actions/core-wrapper', () => ({
+jest.mock('@actions/core', () => ({
   warning: jest.fn(),
   info: jest.fn(),
   debug: jest.fn(),
@@ -12,8 +13,8 @@ jest.mock('../src/actions/core-wrapper', () => ({
   getInput: jest.fn(),
 }));
 
-jest.mock('../src/actions/exec-wrapper', () => ({
-  execCommand: jest.fn(),
+jest.mock('@actions/exec', () => ({
+  exec: jest.fn(),
 }));
 
 describe('Docker Command Module', () => {
@@ -33,8 +34,8 @@ describe('Docker Command Module', () => {
         manifests: [],
       };
 
-      // Mock actionExec.exec
-      (execCommand as jest.Mock).mockImplementation((cmd, args, options) => {
+      // Mock exec.exec
+      (exec.exec as jest.Mock).mockImplementation((cmd, args, options) => {
         if (options && options.listeners && options.listeners.stdout) {
           options.listeners.stdout(Buffer.from(JSON.stringify(mockManifest)));
         }
@@ -44,7 +45,7 @@ describe('Docker Command Module', () => {
       const result = await getImageDigest('nginx:latest');
 
       expect(result).toBe(mockDigest);
-      expect(execCommand).toHaveBeenCalledWith(
+      expect(exec.exec).toHaveBeenCalledWith(
         'docker',
         ['buildx', 'imagetools', 'inspect', '--format', '{{json .Manifest}}', 'nginx:latest'],
         expect.any(Object)
@@ -52,8 +53,8 @@ describe('Docker Command Module', () => {
     });
 
     it('should return null when command fails', async () => {
-      // Mock actionExec.exec with error
-      (execCommand as jest.Mock).mockImplementation((cmd, args, options) => {
+      // Mock exec.exec with error
+      (exec.exec as jest.Mock).mockImplementation((cmd, args, options) => {
         if (options && options.listeners && options.listeners.stderr) {
           options.listeners.stderr(Buffer.from('Command failed'));
         }
@@ -63,12 +64,12 @@ describe('Docker Command Module', () => {
       const result = await getImageDigest('invalid:image');
 
       expect(result).toBeNull();
-      expect(coreWrapper.warning).toHaveBeenCalledWith(expect.stringContaining('Failed to get digest'));
+      expect(core.warning).toHaveBeenCalledWith(expect.stringContaining('Failed to get digest'));
     });
 
     it('should handle JSON parse errors', async () => {
-      // Mock actionExec.exec with invalid JSON output
-      (execCommand as jest.Mock).mockImplementation((cmd, args, options) => {
+      // Mock exec.exec with invalid JSON output
+      (exec.exec as jest.Mock).mockImplementation((cmd, args, options) => {
         if (options && options.listeners && options.listeners.stdout) {
           options.listeners.stdout(Buffer.from('Invalid JSON'));
         }
@@ -78,31 +79,31 @@ describe('Docker Command Module', () => {
       const result = await getImageDigest('nginx:latest');
 
       expect(result).toBeNull();
-      expect(coreWrapper.warning).toHaveBeenCalledWith(expect.stringContaining('Failed to parse manifest JSON'));
+      expect(core.warning).toHaveBeenCalledWith(expect.stringContaining('Failed to parse manifest JSON'));
     });
 
     it('should handle exceptions', async () => {
-      // Mock actionExec.exec to throw error
-      (execCommand as jest.Mock).mockImplementation(() => {
+      // Mock exec.exec to throw error
+      (exec.exec as jest.Mock).mockImplementation(() => {
         throw new Error('Unexpected error');
       });
 
       const result = await getImageDigest('nginx:latest');
 
       expect(result).toBeNull();
-      expect(coreWrapper.warning).toHaveBeenCalledWith(expect.stringContaining('Error getting digest'));
+      expect(core.warning).toHaveBeenCalledWith(expect.stringContaining('Error getting digest'));
     });
   });
 
   describe('saveImageToTar', () => {
     it('should return true when save succeeds', async () => {
       // Mock successful execution
-      (execCommand as jest.Mock).mockResolvedValue(0);
+      (exec.exec as jest.Mock).mockResolvedValue(0);
 
       const result = await saveImageToTar('nginx:latest', '/tmp/nginx.tar');
 
       expect(result).toBe(true);
-      expect(execCommand).toHaveBeenCalledWith(
+      expect(exec.exec).toHaveBeenCalledWith(
         'docker',
         ['save', '-o', '/tmp/nginx.tar', 'nginx:latest'],
         expect.any(Object)
@@ -111,84 +112,84 @@ describe('Docker Command Module', () => {
 
     it('should return false when save fails', async () => {
       // Mock failed execution
-      (execCommand as jest.Mock).mockResolvedValue(1);
+      (exec.exec as jest.Mock).mockResolvedValue(1);
 
       const result = await saveImageToTar('invalid:image', '/tmp/invalid.tar');
 
       expect(result).toBe(false);
-      expect(coreWrapper.warning).toHaveBeenCalledWith(expect.stringContaining('Failed to save image'));
+      expect(core.warning).toHaveBeenCalledWith(expect.stringContaining('Failed to save image'));
     });
   });
 
   describe('loadImageFromTar', () => {
     it('should return true when load succeeds', async () => {
       // Mock successful execution
-      (execCommand as jest.Mock).mockResolvedValue(0);
+      (exec.exec as jest.Mock).mockResolvedValue(0);
 
       const result = await loadImageFromTar('/tmp/nginx.tar');
 
       expect(result).toBe(true);
-      expect(execCommand).toHaveBeenCalledWith('docker', ['load', '-i', '/tmp/nginx.tar'], expect.any(Object));
+      expect(exec.exec).toHaveBeenCalledWith('docker', ['load', '-i', '/tmp/nginx.tar'], expect.any(Object));
     });
 
     it('should return false when load fails', async () => {
       // Mock failed execution
-      (execCommand as jest.Mock).mockResolvedValue(1);
+      (exec.exec as jest.Mock).mockResolvedValue(1);
 
       const result = await loadImageFromTar('/tmp/invalid.tar');
 
       expect(result).toBe(false);
-      expect(coreWrapper.warning).toHaveBeenCalledWith(expect.stringContaining('Failed to load image'));
+      expect(core.warning).toHaveBeenCalledWith(expect.stringContaining('Failed to load image'));
     });
   });
 
   describe('pullImage', () => {
     it('should return true when pull succeeds', async () => {
       // Mock successful execution
-      (execCommand as jest.Mock).mockResolvedValue(0);
+      (exec.exec as jest.Mock).mockResolvedValue(0);
 
       const result = await pullImage('nginx:latest');
 
       expect(result).toBe(true);
-      expect(execCommand).toHaveBeenCalledWith('docker', ['pull', 'nginx:latest'], expect.any(Object));
+      expect(exec.exec).toHaveBeenCalledWith('docker', ['pull', 'nginx:latest'], expect.any(Object));
     });
 
     it('should return false when pull fails', async () => {
       // Mock failed execution
-      (execCommand as jest.Mock).mockResolvedValue(1);
+      (exec.exec as jest.Mock).mockResolvedValue(1);
 
       const result = await pullImage('invalid:image');
 
       expect(result).toBe(false);
-      expect(coreWrapper.warning).toHaveBeenCalledWith(expect.stringContaining('Failed to pull image'));
+      expect(core.warning).toHaveBeenCalledWith(expect.stringContaining('Failed to pull image'));
     });
 
     it('should use platform flag when platform is specified', async () => {
       // Mock successful execution and reset mock
-      (execCommand as jest.Mock).mockResolvedValue(0);
+      (exec.exec as jest.Mock).mockResolvedValue(0);
       jest.clearAllMocks(); // Clear all mocks before test
 
       const result = await pullImage('nginx:latest', 'linux/arm64');
 
       expect(result).toBe(true);
-      expect(execCommand).toHaveBeenCalledWith(
+      expect(exec.exec).toHaveBeenCalledWith(
         'docker',
         ['pull', '--platform', 'linux/arm64', 'nginx:latest'],
         expect.any(Object)
       );
-      expect(coreWrapper.info).toHaveBeenCalledWith('Pulling image nginx:latest for platform linux/arm64');
+      expect(core.info).toHaveBeenCalledWith('Pulling image nginx:latest for platform linux/arm64');
     });
 
     it('should handle errors when pulling with platform', async () => {
       // Mock execution error
-      (execCommand as jest.Mock).mockImplementation(() => {
+      (exec.exec as jest.Mock).mockImplementation(() => {
         throw new Error('Platform not supported');
       });
 
       const result = await pullImage('nginx:latest', 'unsupported/platform');
 
       expect(result).toBe(false);
-      expect(coreWrapper.warning).toHaveBeenCalledWith(
+      expect(core.warning).toHaveBeenCalledWith(
         expect.stringContaining('Failed to pull image nginx:latest for platform unsupported/platform')
       );
     });

@@ -1,5 +1,5 @@
-import * as coreWrapper from './actions/core-wrapper';
-import { execCommand, ExecOptions } from './actions/exec-wrapper';
+import * as core from '@actions/core';
+import * as exec from '@actions/exec';
 
 /**
  * Platform information for Docker image manifest
@@ -47,7 +47,7 @@ export async function getImageDigest(imageName: string): Promise<string | null> 
     let stdoutData = '';
     let stderrData = '';
 
-    const options: ExecOptions = {
+    const options: exec.ExecOptions = {
       listeners: {
         stdout: (data: Buffer) => {
           stdoutData += data.toString();
@@ -60,14 +60,14 @@ export async function getImageDigest(imageName: string): Promise<string | null> 
     };
 
     // Execute docker buildx command to inspect the image manifest
-    const exitCode = await execCommand(
+    const exitCode = await exec.exec(
       'docker',
       ['buildx', 'imagetools', 'inspect', '--format', '{{json .Manifest}}', imageName],
       options
     );
 
     if (exitCode !== 0) {
-      coreWrapper.warning(`Failed to get digest for ${imageName}: ${stderrData}`);
+      core.warning(`Failed to get digest for ${imageName}: ${stderrData}`);
       return null;
     }
 
@@ -76,11 +76,11 @@ export async function getImageDigest(imageName: string): Promise<string | null> 
       const manifest = JSON.parse(stdoutData.trim()) as DockerManifest;
       return manifest.digest || null;
     } catch (parseError) {
-      coreWrapper.warning(`Failed to parse manifest JSON for ${imageName}: ${parseError}`);
+      core.warning(`Failed to parse manifest JSON for ${imageName}: ${parseError}`);
       return null;
     }
   } catch (error) {
-    coreWrapper.warning(`Error getting digest for ${imageName}: ${error}`);
+    core.warning(`Error getting digest for ${imageName}: ${error}`);
     return null;
   }
 }
@@ -96,16 +96,16 @@ export async function saveImageToTar(imageName: string, outputPath: string): Pro
   try {
     const options = { ignoreReturnCode: true };
     // Execute docker save command to create a tar archive of the image
-    const exitCode = await execCommand('docker', ['save', '-o', outputPath, imageName], options);
+    const exitCode = await exec.exec('docker', ['save', '-o', outputPath, imageName], options);
 
     if (exitCode !== 0) {
-      coreWrapper.warning(`Failed to save image ${imageName} to ${outputPath}`);
+      core.warning(`Failed to save image ${imageName} to ${outputPath}`);
       return false;
     }
 
     return true;
   } catch (error) {
-    coreWrapper.warning(`Failed to save image ${imageName}: ${error}`);
+    core.warning(`Failed to save image ${imageName}: ${error}`);
     return false;
   }
 }
@@ -120,16 +120,16 @@ export async function loadImageFromTar(tarPath: string): Promise<boolean> {
   try {
     const options = { ignoreReturnCode: true };
     // Execute docker load command to restore image from tar archive
-    const exitCode = await execCommand('docker', ['load', '-i', tarPath], options);
+    const exitCode = await exec.exec('docker', ['load', '-i', tarPath], options);
 
     if (exitCode !== 0) {
-      coreWrapper.warning(`Failed to load image from ${tarPath}`);
+      core.warning(`Failed to load image from ${tarPath}`);
       return false;
     }
 
     return true;
   } catch (error) {
-    coreWrapper.warning(`Failed to load image from ${tarPath}: ${error}`);
+    core.warning(`Failed to load image from ${tarPath}: ${error}`);
     return false;
   }
 }
@@ -148,20 +148,20 @@ export async function pullImage(imageName: string, platform?: string): Promise<b
     const args = platform ? ['pull', '--platform', platform, imageName] : ['pull', imageName];
 
     if (platform) {
-      coreWrapper.info(`Pulling image ${imageName} for platform ${platform}`);
+      core.info(`Pulling image ${imageName} for platform ${platform}`);
     }
 
     // Execute docker pull command
-    const exitCode = await execCommand('docker', args, options);
+    const exitCode = await exec.exec('docker', args, options);
 
     if (exitCode !== 0) {
-      coreWrapper.warning(`Failed to pull image ${imageName}${platform ? ` for platform ${platform}` : ''}`);
+      core.warning(`Failed to pull image ${imageName}${platform ? ` for platform ${platform}` : ''}`);
       return false;
     }
 
     return true;
   } catch (error) {
-    coreWrapper.warning(`Failed to pull image ${imageName}${platform ? ` for platform ${platform}` : ''}: ${error}`);
+    core.warning(`Failed to pull image ${imageName}${platform ? ` for platform ${platform}` : ''}: ${error}`);
     return false;
   }
 }

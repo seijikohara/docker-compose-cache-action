@@ -1,7 +1,6 @@
+import * as core from '@actions/core';
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';
-
-import * as coreWrapper from './actions/core-wrapper';
 
 /**
  * Represents a Docker Compose service definition with an image reference
@@ -58,19 +57,19 @@ export function getComposeServicesFromFiles(
           const parsed = yaml.load(content) as ComposeFile | null;
 
           if (!parsed) {
-            coreWrapper.debug(`Empty or invalid YAML file: ${file}`);
+            core.debug(`Empty or invalid YAML file: ${file}`);
             return [];
           }
 
           if (!parsed.services) {
-            coreWrapper.debug(`No services section found in ${file}`);
+            core.debug(`No services section found in ${file}`);
             return [];
           }
 
           // Return just the service definitions, discarding service names
           return Object.values(parsed.services);
         } catch (error) {
-          coreWrapper.warning(`Failed to parse ${file}: ${error}`);
+          core.warning(`Failed to parse ${file}: ${error}`);
           return [];
         }
       })
