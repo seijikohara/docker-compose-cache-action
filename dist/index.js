@@ -69361,271 +69361,6 @@ module.exports = {
 
 /***/ }),
 
-/***/ 3879:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.restoreCache = restoreCache;
-exports.saveCache = saveCache;
-/**
- * Wrapper module for GitHub Actions cache library.
- * Provides simplified access to GitHub Actions cache functionality.
- */
-const cache = __importStar(__nccwpck_require__(5116));
-/**
- * Restores cache from the provided paths
- *
- * @param paths - An array of file paths to restore from cache
- * @param primaryKey - Primary cache key to restore
- * @param restoreKeys - Optional fallback cache keys if primary key is not found
- * @returns The cache key that was restored, or undefined if cache miss
- */
-async function restoreCache(paths, primaryKey, restoreKeys) {
-    return cache.restoreCache(paths, primaryKey, restoreKeys);
-}
-/**
- * Saves cache from the provided paths
- *
- * @param paths - An array of file paths to cache
- * @param key - Cache key to save the paths with
- * @returns Cache id if successfully saved, -1 otherwise
- */
-async function saveCache(paths, key) {
-    return cache.saveCache(paths, key);
-}
-
-
-/***/ }),
-
-/***/ 8490:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.summary = void 0;
-exports.getInput = getInput;
-exports.getMultilineInput = getMultilineInput;
-exports.getBooleanInput = getBooleanInput;
-exports.setOutput = setOutput;
-exports.info = info;
-exports.warning = warning;
-exports.debug = debug;
-exports.setFailed = setFailed;
-/**
- * Wrapper module for GitHub Actions core library.
- * Provides simplified access to GitHub Actions core functionality for logging, inputs and outputs.
- */
-const core = __importStar(__nccwpck_require__(7484));
-/**
- * Gets the input value for the given input name
- *
- * @param name - Name of the input to get
- * @param options - Optional input options
- * @returns String value of the input
- */
-function getInput(name, options) {
-    return core.getInput(name, options);
-}
-/**
- * Gets the multiline input value for the given input name
- *
- * @param name - Name of the multiline input to get
- * @param options - Optional input options
- * @returns Array of strings, one for each line of the input
- */
-function getMultilineInput(name, options) {
-    return core.getMultilineInput(name, options);
-}
-/**
- * Gets the input value for the given input name as a boolean
- *
- * @param name - Name of the boolean input to get
- * @param options - Optional input options
- * @returns Boolean value of the input
- */
-function getBooleanInput(name, options) {
-    return core.getBooleanInput(name, options);
-}
-/**
- * Sets a value for the outputs of the action
- *
- * @param name - Name of the output to set
- * @param value - Value to set for the output
- */
-function setOutput(name, value) {
-    core.setOutput(name, value);
-}
-/**
- * Logs an info message to the action output
- *
- * @param message - Message to log at info level
- */
-function info(message) {
-    core.info(message);
-}
-/**
- * Logs a warning message to the action output
- *
- * @param message - Message to log at warning level
- */
-function warning(message) {
-    core.warning(message);
-}
-/**
- * Logs a debug message to the action output
- * Requires the workflow to have debug logging enabled
- *
- * @param message - Message to log at debug level
- */
-function debug(message) {
-    core.debug(message);
-}
-/**
- * Sets the action as failed with the given message
- *
- * @param message - Error message or Error object
- */
-function setFailed(message) {
-    core.setFailed(message);
-}
-/**
- * Gets access to the workflow summary functionality
- * Used to create a Markdown summary for the workflow
- */
-exports.summary = core.summary;
-
-
-/***/ }),
-
-/***/ 7112:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.execCommand = execCommand;
-/**
- * Wrapper module for GitHub Actions exec library.
- * Provides simplified access to command execution functionality.
- */
-const exec = __importStar(__nccwpck_require__(5236));
-/**
- * Executes a command in a shell
- *
- * @param commandLine - The command to execute
- * @param args - Optional arguments for the command
- * @param options - Optional execution options
- * @returns Promise that resolves to the exit code
- */
-async function execCommand(commandLine, args, options) {
-    return exec.exec(commandLine, args, options);
-}
-
-
-/***/ }),
-
 /***/ 4919:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
@@ -69669,8 +69404,8 @@ exports.getImageDigest = getImageDigest;
 exports.saveImageToTar = saveImageToTar;
 exports.loadImageFromTar = loadImageFromTar;
 exports.pullImage = pullImage;
-const coreWrapper = __importStar(__nccwpck_require__(8490));
-const exec_wrapper_1 = __nccwpck_require__(7112);
+const core = __importStar(__nccwpck_require__(7484));
+const exec = __importStar(__nccwpck_require__(5236));
 /**
  * Gets the image digest from Docker registry
  *
@@ -69696,9 +69431,9 @@ async function getImageDigest(imageName) {
             ignoreReturnCode: true,
         };
         // Execute docker buildx command to inspect the image manifest
-        const exitCode = await (0, exec_wrapper_1.execCommand)('docker', ['buildx', 'imagetools', 'inspect', '--format', '{{json .Manifest}}', imageName], options);
+        const exitCode = await exec.exec('docker', ['buildx', 'imagetools', 'inspect', '--format', '{{json .Manifest}}', imageName], options);
         if (exitCode !== 0) {
-            coreWrapper.warning(`Failed to get digest for ${imageName}: ${stderrData}`);
+            core.warning(`Failed to get digest for ${imageName}: ${stderrData}`);
             return null;
         }
         try {
@@ -69707,12 +69442,12 @@ async function getImageDigest(imageName) {
             return manifest.digest || null;
         }
         catch (parseError) {
-            coreWrapper.warning(`Failed to parse manifest JSON for ${imageName}: ${parseError}`);
+            core.warning(`Failed to parse manifest JSON for ${imageName}: ${parseError}`);
             return null;
         }
     }
     catch (error) {
-        coreWrapper.warning(`Error getting digest for ${imageName}: ${error}`);
+        core.warning(`Error getting digest for ${imageName}: ${error}`);
         return null;
     }
 }
@@ -69727,15 +69462,15 @@ async function saveImageToTar(imageName, outputPath) {
     try {
         const options = { ignoreReturnCode: true };
         // Execute docker save command to create a tar archive of the image
-        const exitCode = await (0, exec_wrapper_1.execCommand)('docker', ['save', '-o', outputPath, imageName], options);
+        const exitCode = await exec.exec('docker', ['save', '-o', outputPath, imageName], options);
         if (exitCode !== 0) {
-            coreWrapper.warning(`Failed to save image ${imageName} to ${outputPath}`);
+            core.warning(`Failed to save image ${imageName} to ${outputPath}`);
             return false;
         }
         return true;
     }
     catch (error) {
-        coreWrapper.warning(`Failed to save image ${imageName}: ${error}`);
+        core.warning(`Failed to save image ${imageName}: ${error}`);
         return false;
     }
 }
@@ -69749,15 +69484,15 @@ async function loadImageFromTar(tarPath) {
     try {
         const options = { ignoreReturnCode: true };
         // Execute docker load command to restore image from tar archive
-        const exitCode = await (0, exec_wrapper_1.execCommand)('docker', ['load', '-i', tarPath], options);
+        const exitCode = await exec.exec('docker', ['load', '-i', tarPath], options);
         if (exitCode !== 0) {
-            coreWrapper.warning(`Failed to load image from ${tarPath}`);
+            core.warning(`Failed to load image from ${tarPath}`);
             return false;
         }
         return true;
     }
     catch (error) {
-        coreWrapper.warning(`Failed to load image from ${tarPath}: ${error}`);
+        core.warning(`Failed to load image from ${tarPath}: ${error}`);
         return false;
     }
 }
@@ -69774,18 +69509,18 @@ async function pullImage(imageName, platform) {
         // Construct args array conditionally including platform flag if specified
         const args = platform ? ['pull', '--platform', platform, imageName] : ['pull', imageName];
         if (platform) {
-            coreWrapper.info(`Pulling image ${imageName} for platform ${platform}`);
+            core.info(`Pulling image ${imageName} for platform ${platform}`);
         }
         // Execute docker pull command
-        const exitCode = await (0, exec_wrapper_1.execCommand)('docker', args, options);
+        const exitCode = await exec.exec('docker', args, options);
         if (exitCode !== 0) {
-            coreWrapper.warning(`Failed to pull image ${imageName}${platform ? ` for platform ${platform}` : ''}`);
+            core.warning(`Failed to pull image ${imageName}${platform ? ` for platform ${platform}` : ''}`);
             return false;
         }
         return true;
     }
     catch (error) {
-        coreWrapper.warning(`Failed to pull image ${imageName}${platform ? ` for platform ${platform}` : ''}: ${error}`);
+        core.warning(`Failed to pull image ${imageName}${platform ? ` for platform ${platform}` : ''}: ${error}`);
         return false;
     }
 }
@@ -69833,9 +69568,9 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.getComposeServicesFromFiles = getComposeServicesFromFiles;
+const core = __importStar(__nccwpck_require__(7484));
 const fs = __importStar(__nccwpck_require__(9896));
 const yaml = __importStar(__nccwpck_require__(4281));
-const coreWrapper = __importStar(__nccwpck_require__(8490));
 /**
  * Default Docker Compose filenames to look for if none are specified
  */
@@ -69867,18 +69602,18 @@ function getComposeServicesFromFiles(composeFilePaths, excludeImageNames) {
             // Parse YAML content into a ComposeFile structure
             const parsed = yaml.load(content);
             if (!parsed) {
-                coreWrapper.debug(`Empty or invalid YAML file: ${file}`);
+                core.debug(`Empty or invalid YAML file: ${file}`);
                 return [];
             }
             if (!parsed.services) {
-                coreWrapper.debug(`No services section found in ${file}`);
+                core.debug(`No services section found in ${file}`);
                 return [];
             }
             // Return just the service definitions, discarding service names
             return Object.values(parsed.services);
         }
         catch (error) {
-            coreWrapper.warning(`Failed to parse ${file}: ${error}`);
+            core.warning(`Failed to parse ${file}: ${error}`);
             return [];
         }
     })
@@ -69929,9 +69664,9 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = run;
+const cache = __importStar(__nccwpck_require__(5116));
+const core = __importStar(__nccwpck_require__(7484));
 const path = __importStar(__nccwpck_require__(6928));
-const cacheWrapper = __importStar(__nccwpck_require__(3879));
-const coreWrapper = __importStar(__nccwpck_require__(8490));
 const docker_command_1 = __nccwpck_require__(4919);
 const docker_compose_file_1 = __nccwpck_require__(4329);
 const path_utils_1 = __nccwpck_require__(6696);
@@ -69987,7 +69722,7 @@ async function processService(service, cacheKeyPrefix) {
     // Get image digest for cache key generation
     const digest = await (0, docker_command_1.getImageDigest)(fullImageName);
     if (!digest) {
-        coreWrapper.warning(`Could not get digest for ${fullImageName}, skipping cache`);
+        core.warning(`Could not get digest for ${fullImageName}, skipping cache`);
         return {
             success: false,
             restoredFromCache: false,
@@ -70000,14 +69735,14 @@ async function processService(service, cacheKeyPrefix) {
     const cacheKey = generateCacheKey(cacheKeyPrefix, imageName, imageTag, service.platform, digest);
     const cachePath = generateTarPath(imageName, imageTag, service.platform, digest);
     if (service.platform) {
-        coreWrapper.info(`Using platform ${service.platform} for ${fullImageName}`);
+        core.info(`Using platform ${service.platform} for ${fullImageName}`);
     }
-    coreWrapper.info(`Cache key for ${fullImageName}: ${cacheKey}`);
-    coreWrapper.debug(`Cache path: ${cachePath}`);
+    core.info(`Cache key for ${fullImageName}: ${cacheKey}`);
+    core.debug(`Cache path: ${cachePath}`);
     // Try to restore from cache first
-    const cacheHit = await cacheWrapper.restoreCache([cachePath], cacheKey);
+    const cacheHit = await cache.restoreCache([cachePath], cacheKey);
     if (cacheHit) {
-        coreWrapper.info(`Cache hit for ${fullImageName}, loading from cache`);
+        core.info(`Cache hit for ${fullImageName}, loading from cache`);
         const loadSuccess = await (0, docker_command_1.loadImageFromTar)(cachePath);
         return {
             success: loadSuccess,
@@ -70019,10 +69754,10 @@ async function processService(service, cacheKeyPrefix) {
         };
     }
     // Handle cache miss - pull the image
-    coreWrapper.info(`Cache miss for ${fullImageName}, pulling and saving`);
+    core.info(`Cache miss for ${fullImageName}, pulling and saving`);
     const pullSuccess = await (0, docker_command_1.pullImage)(fullImageName, service.platform);
     if (!pullSuccess) {
-        coreWrapper.warning(`Failed to pull ${fullImageName}`);
+        core.warning(`Failed to pull ${fullImageName}`);
         return {
             success: false,
             restoredFromCache: false,
@@ -70035,7 +69770,7 @@ async function processService(service, cacheKeyPrefix) {
     // Verify the digest matches after pull
     const newDigest = await (0, docker_command_1.getImageDigest)(fullImageName);
     if (newDigest !== digest) {
-        coreWrapper.warning(`Digest mismatch for ${fullImageName}: expected ${digest}, got ${newDigest}`);
+        core.warning(`Digest mismatch for ${fullImageName}: expected ${digest}, got ${newDigest}`);
         return {
             success: false,
             restoredFromCache: false,
@@ -70048,7 +69783,7 @@ async function processService(service, cacheKeyPrefix) {
     // Save the image to tar file
     const saveSuccess = await (0, docker_command_1.saveImageToTar)(fullImageName, cachePath);
     if (!saveSuccess) {
-        coreWrapper.warning(`Failed to save image to tar: ${fullImageName}`);
+        core.warning(`Failed to save image to tar: ${fullImageName}`);
         return {
             success: false,
             restoredFromCache: false,
@@ -70060,13 +69795,13 @@ async function processService(service, cacheKeyPrefix) {
     }
     // Save to cache
     try {
-        const cacheResult = await cacheWrapper.saveCache([cachePath], cacheKey);
+        const cacheResult = await cache.saveCache([cachePath], cacheKey);
         const cacheSuccess = cacheResult !== -1;
         if (cacheSuccess) {
-            coreWrapper.info(`Cached ${fullImageName} with key ${cacheKey}`);
+            core.info(`Cached ${fullImageName} with key ${cacheKey}`);
         }
         else {
-            coreWrapper.debug(`Cache was not saved for ${fullImageName} (cache ID: ${cacheResult})`);
+            core.debug(`Cache was not saved for ${fullImageName} (cache ID: ${cacheResult})`);
         }
         return {
             success: true,
@@ -70081,17 +69816,17 @@ async function processService(service, cacheKeyPrefix) {
         // Handle known cache saving errors gracefully without failing the operation
         if (error instanceof Error) {
             if (error.message.includes('already exists')) {
-                coreWrapper.debug(`Cache already exists for ${fullImageName}: ${error.message}`);
+                core.debug(`Cache already exists for ${fullImageName}: ${error.message}`);
             }
             else if (error.message.includes('unable to upload')) {
-                coreWrapper.debug(`Unable to upload cache for ${fullImageName}: ${error.message}`);
+                core.debug(`Unable to upload cache for ${fullImageName}: ${error.message}`);
             }
             else {
-                coreWrapper.debug(`Error saving cache for ${fullImageName}: ${error.message}`);
+                core.debug(`Error saving cache for ${fullImageName}: ${error.message}`);
             }
         }
         else {
-            coreWrapper.debug(`Unknown error saving cache for ${fullImageName}: ${String(error)}`);
+            core.debug(`Unknown error saving cache for ${fullImageName}: ${String(error)}`);
         }
         return {
             success: true,
@@ -70111,9 +69846,9 @@ async function processService(service, cacheKeyPrefix) {
 async function run() {
     try {
         // Get action inputs from GitHub Actions environment
-        const composeFilePaths = coreWrapper.getMultilineInput('compose-files');
-        const excludeImageNames = coreWrapper.getMultilineInput('exclude-images');
-        const cacheKeyPrefix = coreWrapper.getInput('cache-key-prefix') || 'docker-compose-image';
+        const composeFilePaths = core.getMultilineInput('compose-files');
+        const excludeImageNames = core.getMultilineInput('exclude-images');
+        const cacheKeyPrefix = core.getInput('cache-key-prefix') || 'docker-compose-image';
         const services = (0, docker_compose_file_1.getComposeServicesFromFiles)(composeFilePaths, excludeImageNames)
             // Complete undefined platforms with getCurrentPlatformInfo()
             .map((service) => {
@@ -70137,13 +69872,13 @@ async function run() {
             return array.findIndex((s) => `${s.image}|${s.platform || 'default'}` === key) === index;
         });
         if (services.length === 0) {
-            coreWrapper.info('No Docker services found in compose files or all services were excluded');
-            coreWrapper.setOutput('cache-hit', 'false');
-            coreWrapper.setOutput('image-list', '');
+            core.info('No Docker services found in compose files or all services were excluded');
+            core.setOutput('cache-hit', 'false');
+            core.setOutput('image-list', '');
             return;
         }
-        coreWrapper.info(`Found ${services.length} services to cache`);
-        coreWrapper.setOutput('image-list', services.map((service) => service.image).join(' '));
+        core.info(`Found ${services.length} services to cache`);
+        core.setOutput('image-list', services.map((service) => service.image).join(' '));
         // Process all services concurrently for efficiency
         const results = await Promise.all(services.map((service) => processService(service, cacheKeyPrefix)));
         // Aggregate results for outputs and reporting
@@ -70151,10 +69886,10 @@ async function run() {
         const servicesRestoredFromCache = results.filter((result) => result.restoredFromCache).length;
         const allServicesSuccessful = results.every((result) => result.success);
         const allServicesFromCache = servicesRestoredFromCache === totalServices && totalServices > 0;
-        coreWrapper.info(`${servicesRestoredFromCache} of ${totalServices} services restored from cache`);
-        coreWrapper.setOutput('cache-hit', allServicesFromCache.toString());
+        core.info(`${servicesRestoredFromCache} of ${totalServices} services restored from cache`);
+        core.setOutput('cache-hit', allServicesFromCache.toString());
         // Create summary table for better visibility in the GitHub Actions UI
-        const summary = coreWrapper.summary.addHeading('Docker Compose Cache Results').addTable([
+        const summary = core.summary.addHeading('Docker Compose Cache Results').addTable([
             [
                 { data: 'Image Name', header: true },
                 { data: 'Platform', header: true },
@@ -70177,18 +69912,18 @@ async function run() {
             .addRaw(`Restored from Cache: ${servicesRestoredFromCache}/${totalServices}`, true)
             .write();
         if (allServicesSuccessful) {
-            coreWrapper.info('Docker Compose Cache action completed successfully');
+            core.info('Docker Compose Cache action completed successfully');
         }
         else {
-            coreWrapper.info('Docker Compose Cache action completed with some services not fully processed');
+            core.info('Docker Compose Cache action completed with some services not fully processed');
         }
     }
     catch (error) {
         if (error instanceof Error) {
-            coreWrapper.setFailed(error.message);
+            core.setFailed(error.message);
         }
         else {
-            coreWrapper.setFailed('Unknown error occurred');
+            core.setFailed('Unknown error occurred');
         }
     }
 }

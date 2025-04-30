@@ -1,5 +1,6 @@
-import * as cacheWrapper from '../src/actions/cache-wrapper';
-import * as coreWrapper from '../src/actions/core-wrapper';
+import * as cache from '@actions/cache';
+import * as core from '@actions/core';
+
 import * as dockerCommand from '../src/docker-command';
 import * as dockerComposeFile from '../src/docker-compose-file';
 import * as platform from '../src/platform';
@@ -12,7 +13,7 @@ jest.mock('../src/main', () => {
   };
 });
 
-jest.mock('../src/actions/core-wrapper', () => {
+jest.mock('@actions/core', () => {
   return {
     getInput: jest.fn(),
     getMultilineInput: jest.fn(),
@@ -30,7 +31,7 @@ jest.mock('../src/actions/core-wrapper', () => {
   };
 });
 
-jest.mock('../src/actions/cache-wrapper', () => {
+jest.mock('@actions/cache', () => {
   return {
     restoreCache: jest.fn(),
     saveCache: jest.fn(),
@@ -44,14 +45,14 @@ jest.mock('../src/docker-compose-file');
 import { run } from '../src/main';
 
 describe('Main Module', () => {
-  const mockGetInput = coreWrapper.getInput as jest.Mock;
-  const mockGetMultilineInput = coreWrapper.getMultilineInput as jest.Mock;
-  const mockSetOutput = coreWrapper.setOutput as jest.Mock;
-  const mockInfo = coreWrapper.info as jest.Mock;
-  const mockWarning = coreWrapper.warning as jest.Mock;
-  const mockSetFailed = coreWrapper.setFailed as jest.Mock;
-  const mockRestoreCache = cacheWrapper.restoreCache as jest.Mock;
-  const mockSaveCache = cacheWrapper.saveCache as jest.Mock;
+  const mockGetInput = core.getInput as jest.Mock;
+  const mockGetMultilineInput = core.getMultilineInput as jest.Mock;
+  const mockSetOutput = core.setOutput as jest.Mock;
+  const mockInfo = core.info as jest.Mock;
+  const mockWarning = core.warning as jest.Mock;
+  const mockSetFailed = core.setFailed as jest.Mock;
+  const mockRestoreCache = cache.restoreCache as jest.Mock;
+  const mockSaveCache = cache.saveCache as jest.Mock;
 
   const mockServices = [
     { image: 'nginx:latest' },
@@ -204,7 +205,7 @@ describe('Main Module', () => {
     await run();
 
     expect(mockSetFailed).not.toHaveBeenCalled();
-    expect(coreWrapper.debug).toHaveBeenCalledWith(expect.stringContaining('Cache already exists'));
+    expect(core.debug).toHaveBeenCalledWith(expect.stringContaining('Cache already exists'));
   });
 
   it('should handle "unable to upload" error when saving cache', async () => {
@@ -216,7 +217,7 @@ describe('Main Module', () => {
     await run();
 
     expect(mockSetFailed).not.toHaveBeenCalled();
-    expect(coreWrapper.debug).toHaveBeenCalledWith(expect.stringContaining('Unable to upload cache'));
+    expect(core.debug).toHaveBeenCalledWith(expect.stringContaining('Unable to upload cache'));
   });
 
   it('should handle digest mismatch after pull', async () => {

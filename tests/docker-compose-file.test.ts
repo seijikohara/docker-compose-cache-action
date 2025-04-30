@@ -1,11 +1,11 @@
+import * as core from '@actions/core';
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';
 
-import * as coreWrapper from '../src/actions/core-wrapper';
 import { getComposeServicesFromFiles } from '../src/docker-compose-file';
 
 // Mock dependencies
-jest.mock('../src/actions/core-wrapper', () => ({
+jest.mock('@actions/core', () => ({
   debug: jest.fn(),
   warning: jest.fn(),
 }));
@@ -14,8 +14,8 @@ jest.mock('fs');
 jest.mock('js-yaml');
 
 describe('Docker Compose File Module', () => {
-  const warningMock = coreWrapper.warning as jest.Mock;
-  const debugMock = coreWrapper.debug as jest.Mock;
+  const warningMock = core.warning as jest.Mock;
+  const debugMock = core.debug as jest.Mock;
 
   beforeEach(() => {
     jest.clearAllMocks();

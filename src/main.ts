@@ -1,7 +1,7 @@
+import * as cache from '@actions/cache';
+import * as core from '@actions/core';
 import * as path from 'path';
 
-import * as cacheWrapper from './actions/cache-wrapper';
-import * as coreWrapper from './actions/core-wrapper';
 import { getImageDigest, loadImageFromTar, pullImage, saveImageToTar } from './docker-command';
 import { ComposeService, getComposeServicesFromFiles } from './docker-compose-file';
 import { sanitizePathComponent } from './path-utils';
@@ -87,7 +87,7 @@ async function processService(service: ComposeService, cacheKeyPrefix: string): 
   // Get image digest for cache key generation
   const digest = await getImageDigest(fullImageName);
   if (!digest) {
-    coreWrapper.warning(`Could not get digest for ${fullImageName}, skipping cache`);
+    core.warning(`Could not get digest for ${fullImageName}, skipping cache`);
     return {
       success: false,
       restoredFromCache: false,
@@ -102,16 +102,16 @@ async function processService(service: ComposeService, cacheKeyPrefix: string): 
   const cachePath = generateTarPath(imageName, imageTag, service.platform, digest);
 
   if (service.platform) {
-    coreWrapper.info(`Using platform ${service.platform} for ${fullImageName}`);
+    core.info(`Using platform ${service.platform} for ${fullImageName}`);
   }
-  coreWrapper.info(`Cache key for ${fullImageName}: ${cacheKey}`);
-  coreWrapper.debug(`Cache path: ${cachePath}`);
+  core.info(`Cache key for ${fullImageName}: ${cacheKey}`);
+  core.debug(`Cache path: ${cachePath}`);
 
   // Try to restore from cache first
-  const cacheHit = await cacheWrapper.restoreCache([cachePath], cacheKey);
+  const cacheHit = await cache.restoreCache([cachePath], cacheKey);
 
   if (cacheHit) {
-    coreWrapper.info(`Cache hit for ${fullImageName}, loading from cache`);
+    core.info(`Cache hit for ${fullImageName}, loading from cache`);
     const loadSuccess = await loadImageFromTar(cachePath);
     return {
       success: loadSuccess,
@@ -124,10 +124,10 @@ async function processService(service: ComposeService, cacheKeyPrefix: string): 
   }
 
   // Handle cache miss - pull the image
-  coreWrapper.info(`Cache miss for ${fullImageName}, pulling and saving`);
+  core.info(`Cache miss for ${fullImageName}, pulling and saving`);
   const pullSuccess = await pullImage(fullImageName, service.platform);
   if (!pullSuccess) {
-    coreWrapper.warning(`Failed to pull ${fullImageName}`);
+    core.warning(`Failed to pull ${fullImageName}`);
     return {
       success: false,
       restoredFromCache: false,
@@ -141,7 +141,7 @@ async function processService(service: ComposeService, cacheKeyPrefix: string): 
   // Verify the digest matches after pull
   const newDigest = await getImageDigest(fullImageName);
   if (newDigest !== digest) {
-    coreWrapper.warning(`Digest mismatch for ${fullImageName}: expected ${digest}, got ${newDigest}`);
+    core.warning(`Digest mismatch for ${fullImageName}: expected ${digest}, got ${newDigest}`);
     return {
       success: false,
       restoredFromCache: false,
@@ -155,7 +155,7 @@ async function processService(service: ComposeService, cacheKeyPrefix: string): 
   // Save the image to tar file
   const saveSuccess = await saveImageToTar(fullImageName, cachePath);
   if (!saveSuccess) {
-    coreWrapper.warning(`Failed to save image to tar: ${fullImageName}`);
+    core.warning(`Failed to save image to tar: ${fullImageName}`);
     return {
       success: false,
       restoredFromCache: false,
@@ -168,13 +168,13 @@ async function processService(service: ComposeService, cacheKeyPrefix: string): 
 
   // Save to cache
   try {
-    const cacheResult = await cacheWrapper.saveCache([cachePath], cacheKey);
+    const cacheResult = await cache.saveCache([cachePath], cacheKey);
     const cacheSuccess = cacheResult !== -1;
 
     if (cacheSuccess) {
-      coreWrapper.info(`Cached ${fullImageName} with key ${cacheKey}`);
+      core.info(`Cached ${fullImageName} with key ${cacheKey}`);
     } else {
-      coreWrapper.debug(`Cache was not saved for ${fullImageName} (cache ID: ${cacheResult})`);
+      core.debug(`Cache was not saved for ${fullImageName} (cache ID: ${cacheResult})`);
     }
 
     return {
@@ -189,14 +189,14 @@ async function processService(service: ComposeService, cacheKeyPrefix: string): 
     // Handle known cache saving errors gracefully without failing the operation
     if (error instanceof Error) {
       if (error.message.includes('already exists')) {
-        coreWrapper.debug(`Cache already exists for ${fullImageName}: ${error.message}`);
+        core.debug(`Cache already exists for ${fullImageName}: ${error.message}`);
       } else if (error.message.includes('unable to upload')) {
-        coreWrapper.debug(`Unable to upload cache for ${fullImageName}: ${error.message}`);
+        core.debug(`Unable to upload cache for ${fullImageName}: ${error.message}`);
       } else {
-        coreWrapper.debug(`Error saving cache for ${fullImageName}: ${error.message}`);
+        core.debug(`Error saving cache for ${fullImageName}: ${error.message}`);
       }
     } else {
-      coreWrapper.debug(`Unknown error saving cache for ${fullImageName}: ${String(error)}`);
+      core.debug(`Unknown error saving cache for ${fullImageName}: ${String(error)}`);
     }
     return {
       success: true,
@@ -217,9 +217,9 @@ async function processService(service: ComposeService, cacheKeyPrefix: string): 
 export async function run(): Promise<void> {
   try {
     // Get action inputs from GitHub Actions environment
-    const composeFilePaths: ReadonlyArray<string> = coreWrapper.getMultilineInput('compose-files');
-    const excludeImageNames: ReadonlyArray<string> = coreWrapper.getMultilineInput('exclude-images');
-    const cacheKeyPrefix = coreWrapper.getInput('cache-key-prefix') || 'docker-compose-image';
+    const composeFilePaths: ReadonlyArray<string> = core.getMultilineInput('compose-files');
+    const excludeImageNames: ReadonlyArray<string> = core.getMultilineInput('exclude-images');
+    const cacheKeyPrefix = core.getInput('cache-key-prefix') || 'docker-compose-image';
 
     const services = getComposeServicesFromFiles(composeFilePaths, excludeImageNames)
       // Complete undefined platforms with getCurrentPlatformInfo()
@@ -250,14 +250,14 @@ export async function run(): Promise<void> {
       });
 
     if (services.length === 0) {
-      coreWrapper.info('No Docker services found in compose files or all services were excluded');
-      coreWrapper.setOutput('cache-hit', 'false');
-      coreWrapper.setOutput('image-list', '');
+      core.info('No Docker services found in compose files or all services were excluded');
+      core.setOutput('cache-hit', 'false');
+      core.setOutput('image-list', '');
       return;
     }
 
-    coreWrapper.info(`Found ${services.length} services to cache`);
-    coreWrapper.setOutput('image-list', services.map((service) => service.image).join(' '));
+    core.info(`Found ${services.length} services to cache`);
+    core.setOutput('image-list', services.map((service) => service.image).join(' '));
 
     // Process all services concurrently for efficiency
     const results = await Promise.all(services.map((service) => processService(service, cacheKeyPrefix)));
@@ -268,11 +268,11 @@ export async function run(): Promise<void> {
     const allServicesSuccessful = results.every((result) => result.success);
     const allServicesFromCache = servicesRestoredFromCache === totalServices && totalServices > 0;
 
-    coreWrapper.info(`${servicesRestoredFromCache} of ${totalServices} services restored from cache`);
-    coreWrapper.setOutput('cache-hit', allServicesFromCache.toString());
+    core.info(`${servicesRestoredFromCache} of ${totalServices} services restored from cache`);
+    core.setOutput('cache-hit', allServicesFromCache.toString());
 
     // Create summary table for better visibility in the GitHub Actions UI
-    const summary = coreWrapper.summary.addHeading('Docker Compose Cache Results').addTable([
+    const summary = core.summary.addHeading('Docker Compose Cache Results').addTable([
       [
         { data: 'Image Name', header: true },
         { data: 'Platform', header: true },
@@ -297,15 +297,15 @@ export async function run(): Promise<void> {
       .write();
 
     if (allServicesSuccessful) {
-      coreWrapper.info('Docker Compose Cache action completed successfully');
+      core.info('Docker Compose Cache action completed successfully');
     } else {
-      coreWrapper.info('Docker Compose Cache action completed with some services not fully processed');
+      core.info('Docker Compose Cache action completed with some services not fully processed');
     }
   } catch (error) {
     if (error instanceof Error) {
-      coreWrapper.setFailed(error.message);
+      core.setFailed(error.message);
     } else {
-      coreWrapper.setFailed('Unknown error occurred');
+      core.setFailed('Unknown error occurred');
     }
   }
 }
