@@ -1,0 +1,119 @@
+name: Update Major Version Tag
+
+on:
+  push:
+    tags:
+      # Trigger workflow on push of semantic version tags (e.g., v1.0.0, v1.2.3)
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  update-major-version-tag:
+    runs-on: ubuntu-latest
+    # Prevent multiple runs for the same major version tag from running concurrently.
+    # If a new run starts for the same group, cancel the older one(s).
+    concurrency:
+      # Group by major version (e.g., 'major-v1') extracted from the tag name.
+      # Relies on github.ref_name being available and in 'vX.Y.Z' format for tag pushes.
+      group: major-${{ github.ref_name.split('.')[0] }}-${{ github.workflow }}
+      cancel-in-progress: true
+
+    permissions:
+      # Required to checkout the repository and push the major version tag.
+      contents: write
+
+    steps:
+      # Checkout the repository code.
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Fetch all history and tags. This is necessary to check
+          # if the major version tag already exists locally.
+          fetch-depth: 0
+
+      # Extract version information from the pushed tag.
+      - name: Get version from tag
+        id: get-version
+        run: |
+          # Extract version number from tag ref (e.g., refs/tags/v1.2.3 -> 1.2.3)
+          # Use github.ref_name which is guaranteed by the trigger condition
+          VERSION=${GITHUB_REF_NAME#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          # Extract major version number (e.g., 1.2.3 -> 1)
+          MAJOR_VERSION=$(echo $VERSION | cut -d. -f1)
+          echo "major_version=$MAJOR_VERSION" >> $GITHUB_OUTPUT
+
+          echo "Triggering tag: ${GITHUB_REF_NAME}"
+          echo "Full version extracted: $VERSION"
+          echo "Major version extracted: $MAJOR_VERSION"
+
+      # Configure Git credentials for pushing the tag.
+      - name: Configure Git Credentials
+        run: |
+          # Set Git user identity for the tagging action.
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Configure authentication using the GITHUB_TOKEN provided by Actions.
+          # This is more secure than embedding the token in the push URL.
+          git config --global --add http.https://github.com/.extraheader "Authorization: Basic $(echo -n x-access-token:${{ secrets.GITHUB_TOKEN }} | base64)"
+
+      # Create or update the major version tag (e.g., v1).
+      - name: Update or create major version tag
+        id: update_tag
+        env:
+          # Pass major version and triggering tag name as environment variables.
+          MAJOR_VERSION: ${{ steps.get-version.outputs.major_version }}
+          PUSHED_TAG_NAME: ${{ github.ref_name }}
+        run: |
+          # Construct the major version tag name (e.g., v1).
+          MAJOR_VERSION_TAG="v${MAJOR_VERSION}"
+          # Get the full commit SHA of the current commit.
+          CURRENT_COMMIT=$(git rev-parse HEAD)
+          # Get the short commit SHA for display purposes (e.g., in summary).
+          SHORT_COMMIT_SHA=$(git rev-parse --short HEAD)
+
+          echo "Attempting to point tag '$MAJOR_VERSION_TAG' to commit $CURRENT_COMMIT (triggered by tag '$PUSHED_TAG_NAME')"
+
+          # Check if the major version tag already exists locally.
+          if git rev-parse "$MAJOR_VERSION_TAG" >/dev/null 2>&1; then
+            echo "Tag '$MAJOR_VERSION_TAG' already exists. Updating it."
+            # Update the existing annotated tag forcefully (-f).
+            git tag -fa "$MAJOR_VERSION_TAG" -m "chore(release): update $MAJOR_VERSION_TAG to point to $PUSHED_TAG_NAME ($CURRENT_COMMIT)"
+            TAG_ACTION="Updated" # Record action (English, past tense)
+          else
+            echo "Tag '$MAJOR_VERSION_TAG' does not exist. Creating it."
+            # Create a new annotated tag (-a).
+            git tag -a "$MAJOR_VERSION_TAG" -m "chore(release): create $MAJOR_VERSION_TAG based on $PUSHED_TAG_NAME ($CURRENT_COMMIT)"
+            TAG_ACTION="Created" # Record action (English, past tense)
+          fi
+
+          # Push the major version tag to the remote repository.
+          # --force is required because we might overwrite an existing tag.
+          echo "Pushing tag '$MAJOR_VERSION_TAG'..."
+          git push origin "$MAJOR_VERSION_TAG" --force
+
+          echo "Successfully ${TAG_ACTION,,} and pushed tag '$MAJOR_VERSION_TAG'." # Use lowercase action in log message
+
+          # --- Add Summary Information using Markdown ---
+          # Append Markdown content to the $GITHUB_STEP_SUMMARY environment variable.
+          # This content will appear on the workflow run's summary page.
+          echo "### Major Version Tag ${TAG_ACTION}" >> $GITHUB_STEP_SUMMARY # H3 Title
+          echo "" >> $GITHUB_STEP_SUMMARY # Newline
+          echo "| Action        | Trigger Tag         | Major Tag           | Commit SHA |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------------|---------------------|---------------------|------------|" >> $GITHUB_STEP_SUMMARY
+          # Use English action name (TAG_ACTION) for the summary table content.
+          echo "| ${TAG_ACTION} | \`${PUSHED_TAG_NAME}\` | \`${MAJOR_VERSION_TAG}\` | \`${SHORT_COMMIT_SHA}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY # Newline
+          # Use English action name (TAG_ACTION) for the summary description.
+          echo "Major version tag **${MAJOR_VERSION_TAG}** was **${TAG_ACTION,,}** to point to commit \`${SHORT_COMMIT_SHA}\` (triggered by \`${PUSHED_TAG_NAME}\`)." >> $GITHUB_STEP_SUMMARY
+
+      # Clean up Git credentials (best practice).
+      - name: Clean up Git Credentials
+        # Ensure this step always runs, even if previous steps fail.
+        if: always()
+        run: |
+          echo "Cleaning up Git credentials..."
+          # Remove the temporary authentication header.
+          # Use '|| true' to ignore errors if the header was not set.
+          git config --global --unset http.https://github.com/.extraheader || true
+          echo "Git credentials cleaned up."
