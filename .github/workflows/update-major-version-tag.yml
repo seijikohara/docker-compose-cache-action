@@ -5,6 +5,7 @@ on:
     tags:
       # Trigger workflow on push of semantic version tags (e.g., v1.0.0, v1.2.3)
       - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
 
 jobs:
   update-major-version-tag:
@@ -12,9 +13,8 @@ jobs:
     # Prevent multiple runs for the same major version tag from running concurrently.
     # If a new run starts for the same group, cancel the older one(s).
     concurrency:
-      # Group by major version (e.g., 'major-v1') extracted from the tag name.
-      # Relies on github.ref_name being available and in 'vX.Y.Z' format for tag pushes.
-      group: major-${{ github.ref_name.split('.')[0] }}-${{ github.workflow }}
+      # Use the full ref_name (tag) for concurrency group
+      group: major-tag-${{ github.ref_name }}-${{ github.workflow }}
       cancel-in-progress: true
 
     permissions:
