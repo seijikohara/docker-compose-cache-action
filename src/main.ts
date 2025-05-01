@@ -272,7 +272,7 @@ export async function run(): Promise<void> {
     core.setOutput('cache-hit', allServicesFromCache.toString());
 
     // Create summary table for better visibility in the GitHub Actions UI
-    const summary = core.summary.addHeading('Docker Compose Cache Results').addTable([
+    const summary = core.summary.addHeading('Docker Compose Cache Results', 2).addTable([
       [
         { data: 'Image Name', header: true },
         { data: 'Platform', header: true },
