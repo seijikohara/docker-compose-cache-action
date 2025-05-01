@@ -279,7 +279,6 @@ export async function run(): Promise<void> {
         { data: 'Cache Hit', header: true },
         { data: 'Status', header: true },
         { data: 'Cache Key', header: true },
-        { data: 'Digest', header: true },
       ],
       ...results.map((result) => [
         result.imageName,
@@ -287,7 +286,6 @@ export async function run(): Promise<void> {
         result.restoredFromCache ? '✅' : '❌',
         result.success ? 'Success' : 'Failed',
         result.cacheKey || 'N/A',
-        result.digest?.substring(0, 16) || 'unknown',
       ]),
     ]);
 
