@@ -1,5 +1,6 @@
 import * as cache from '@actions/cache';
 import * as core from '@actions/core';
+import { formatDuration, intervalToDuration } from 'date-fns';
 import * as path from 'path';
 
 import { getImageDigest, loadImageFromTar, pullImage, saveImageToTar } from './docker-command';
@@ -260,7 +261,26 @@ export async function run(): Promise<void> {
     core.setOutput('image-list', services.map((service) => service.image).join(' '));
 
     // Process all services concurrently for efficiency
-    const results = await Promise.all(services.map((service) => processService(service, cacheKeyPrefix)));
+    const results = await Promise.all(
+      services.map(async (service) => {
+        const startTime = performance.now(); // Record start time
+        const result = await processService(service, cacheKeyPrefix);
+        const endTime = performance.now(); // Record end time
+        const duration = intervalToDuration({
+          start: 0,
+          end: endTime - startTime,
+        });
+
+        return {
+          ...result,
+          humanReadableDuration: formatDuration(duration, {
+            format: ['hours', 'minutes', 'seconds'],
+            zero: false,
+            delimiter: ' ',
+          }),
+        };
+      })
+    );
 
     // Aggregate results for outputs and reporting
     const totalServices = services.length;
@@ -272,23 +292,27 @@ export async function run(): Promise<void> {
     core.setOutput('cache-hit', allServicesFromCache.toString());
 
     // Create summary table for better visibility in the GitHub Actions UI
-    const summary = core.summary.addHeading('Docker Compose Cache Results').addTable([
+    const summary = core.summary.addHeading('Docker Compose Cache Results', 2).addTable([
       [
         { data: 'Image Name', header: true },
         { data: 'Platform', header: true },
         { data: 'Cache Hit', header: true },
         { data: 'Status', header: true },
+        { data: 'Duration', header: true },
         { data: 'Cache Key', header: true },
-        { data: 'Digest', header: true },
       ],
-      ...results.map((result) => [
-        result.imageName,
-        result.platform || 'default',
-        result.restoredFromCache ? '✅' : '❌',
-        result.success ? 'Success' : 'Failed',
-        result.cacheKey || 'N/A',
-        result.digest?.substring(0, 16) || 'unknown',
-      ]),
+      ...results.map((result) => {
+        // Handle duration formatting
+
+        return [
+          result.imageName,
+          result.platform || 'default',
+          result.restoredFromCache ? '✅' : '❌',
+          result.success ? 'Success' : 'Failed',
+          result.humanReadableDuration,
+          result.cacheKey || 'N/A',
+        ];
+      }),
     ]);
 
     summary
