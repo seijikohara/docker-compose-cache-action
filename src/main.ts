@@ -1,6 +1,7 @@
 import * as cache from '@actions/cache';
 import * as core from '@actions/core';
 import { formatDuration, intervalToDuration } from 'date-fns';
+import { chain } from 'lodash';
 import * as path from 'path';
 
 import { getImageDigest, loadImageFromTar, pullImage, saveImageToTar } from './docker-command';
@@ -231,7 +232,7 @@ export async function run(): Promise<void> {
     const excludeImageNames: ReadonlyArray<string> = core.getMultilineInput('exclude-images');
     const cacheKeyPrefix = core.getInput('cache-key-prefix') || 'docker-compose-image';
 
-    const serviceDefinitions = getComposeServicesFromFiles(composeFilePaths, excludeImageNames)
+    const serviceDefinitions = chain(getComposeServicesFromFiles(composeFilePaths, excludeImageNames))
       // Complete undefined platforms with getCurrentPlatformInfo()
       .map((serviceDefinition) => {
         if (serviceDefinition.platform !== undefined) {
@@ -254,13 +255,8 @@ export async function run(): Promise<void> {
         };
       })
       // Filter out duplicates by keeping only the first occurrence of each image+platform combination
-      .filter((serviceDefinition, index, serviceArray) => {
-        const serviceKey = `${serviceDefinition.image}|${serviceDefinition.platform || 'default'}`;
-        return (
-          serviceArray.findIndex((service) => `${service.image}|${service.platform || 'default'}` === serviceKey) ===
-          index
-        );
-      });
+      .uniqBy((serviceDefinition) => `${serviceDefinition.image}|${serviceDefinition.platform || 'default'}`)
+      .value();
 
     if (serviceDefinitions.length === 0) {
       core.info('No Docker services found in compose files or all services were excluded');
