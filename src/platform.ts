@@ -142,34 +142,38 @@ export function getCurrentOciPlatformString(): string | undefined {
 /**
  * Parses an OCI platform string into its components (OS, architecture, variant).
  *
- * @param platformString - The platform string to parse (e.g., "linux/amd64", "windows/amd64/v8").
+ * @param ociPlatformString - The platform string to parse (e.g., "linux/amd64", "windows/amd64/v8").
  * @returns A `PlatformInfo` object, or `undefined` if the string is invalid.
  */
-export function parsePlatformString(platformString?: string): PlatformInfo | undefined {
-  if (!platformString) {
+export function parsePlatformString(ociPlatformString?: string): PlatformInfo | undefined {
+  if (!ociPlatformString) {
     return undefined;
   }
 
-  const parts = platformString.split('/');
+  const platformComponents = ociPlatformString.split('/');
   // Must have at least os/arch, and they must not be empty strings
-  if (parts.length < 2 || !parts[0] || !parts[1]) {
+  if (platformComponents.length < 2 || !platformComponents[0] || !platformComponents[1]) {
     // Invalid format
     return undefined;
   }
 
-  const os = resolveOciOs(parts[0]);
-  const arch = resolveOciArch(parts[1]);
-  const variantInput = parts.length > 2 && parts[2] ? parts[2] : undefined;
-  const variant = resolveOciVariant(variantInput);
+  const resolvedOs = resolveOciOs(platformComponents[0]);
+  const resolvedArch = resolveOciArch(platformComponents[1]);
+  const rawVariant = platformComponents.length > 2 && platformComponents[2] ? platformComponents[2] : undefined;
+  const resolvedVariant = resolveOciVariant(rawVariant);
 
   // OS and Arch are mandatory and must be valid
-  if (!os || !arch) {
+  if (!resolvedOs || !resolvedArch) {
     // Invalid or unrecognized OS or Arch
     return undefined;
   }
 
-  const result: PlatformInfo = { os, arch, ...(variant && { variant }) };
-  return result;
+  const platformInfo: PlatformInfo = {
+    os: resolvedOs,
+    arch: resolvedArch,
+    ...(resolvedVariant && { variant: resolvedVariant }),
+  };
+  return platformInfo;
 }
 
 /**
@@ -178,6 +182,6 @@ export function parsePlatformString(platformString?: string): PlatformInfo | und
  * @returns A `PlatformInfo` object for the current environment, or `undefined` if resolution fails.
  */
 export function getCurrentPlatformInfo(): PlatformInfo | undefined {
-  const platformString = getCurrentOciPlatformString();
-  return parsePlatformString(platformString);
+  const currentOciPlatformString = getCurrentOciPlatformString();
+  return parsePlatformString(currentOciPlatformString);
 }
