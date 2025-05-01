@@ -133,7 +133,7 @@ export function getCurrentOciPlatformString(): string | undefined {
   }
 
   // Determine variant primarily for 'arm' architecture using Node's specific variable.
-  const nodeArmVersion = (process.config?.variables as Record<string, unknown>)?.arm_version as string;
+  const nodeArmVersion = (process.config?.variables as Record<string, unknown>)?.arm_version as string | undefined;
   const variant = arch === 'arm' ? resolveOciVariant(nodeArmVersion) : undefined;
 
   return variant ? `${os}/${arch}/${variant}` : `${os}/${arch}`;
