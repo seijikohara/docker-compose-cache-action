@@ -39,49 +39,49 @@ type DockerManifest = {
  * Uses 'docker buildx imagetools inspect' to retrieve the manifest digest
  *
  * @param imageName - Docker image name with optional tag
- * @returns Promise resolving to digest string or null on failure
+ * @returns Promise resolving to digest string or undefined on failure
  */
-export async function getImageDigest(imageName: string): Promise<string | null> {
+export async function getImageDigest(imageName: string): Promise<string | undefined> {
   try {
     // Use accumulators to avoid mutable state
-    let stdoutData = '';
-    let stderrData = '';
+    let stdoutContent = '';
+    let stderrContent = '';
 
-    const options: exec.ExecOptions = {
+    const execOptions: exec.ExecOptions = {
       listeners: {
         stdout: (data: Buffer) => {
-          stdoutData += data.toString();
+          stdoutContent += data.toString();
         },
         stderr: (data: Buffer) => {
-          stderrData += data.toString();
+          stderrContent += data.toString();
         },
       },
       ignoreReturnCode: true,
     };
 
     // Execute docker buildx command to inspect the image manifest
-    const exitCode = await exec.exec(
+    const commandExitCode = await exec.exec(
       'docker',
       ['buildx', 'imagetools', 'inspect', '--format', '{{json .Manifest}}', imageName],
-      options
+      execOptions
     );
 
-    if (exitCode !== 0) {
-      core.warning(`Failed to get digest for ${imageName}: ${stderrData}`);
-      return null;
+    if (commandExitCode !== 0) {
+      core.warning(`Failed to get digest for ${imageName}: ${stderrContent}`);
+      return undefined;
     }
 
     try {
       // Parse the JSON output to extract the digest
-      const manifest = JSON.parse(stdoutData.trim()) as DockerManifest;
-      return manifest.digest || null;
-    } catch (parseError) {
-      core.warning(`Failed to parse manifest JSON for ${imageName}: ${parseError}`);
-      return null;
+      const manifest = JSON.parse(stdoutContent.trim()) as DockerManifest;
+      return manifest.digest || undefined;
+    } catch (manifestParseError) {
+      core.warning(`Failed to parse manifest JSON for ${imageName}: ${manifestParseError}`);
+      return undefined;
     }
   } catch (error) {
     core.warning(`Error getting digest for ${imageName}: ${error}`);
-    return null;
+    return undefined;
   }
 }
 
@@ -94,11 +94,11 @@ export async function getImageDigest(imageName: string): Promise<string | null> 
  */
 export async function saveImageToTar(imageName: string, outputPath: string): Promise<boolean> {
   try {
-    const options = { ignoreReturnCode: true };
+    const execOptions = { ignoreReturnCode: true };
     // Execute docker save command to create a tar archive of the image
-    const exitCode = await exec.exec('docker', ['save', '-o', outputPath, imageName], options);
+    const commandExitCode = await exec.exec('docker', ['save', '-o', outputPath, imageName], execOptions);
 
-    if (exitCode !== 0) {
+    if (commandExitCode !== 0) {
       core.warning(`Failed to save image ${imageName} to ${outputPath}`);
       return false;
     }
@@ -118,11 +118,11 @@ export async function saveImageToTar(imageName: string, outputPath: string): Pro
  */
 export async function loadImageFromTar(tarPath: string): Promise<boolean> {
   try {
-    const options = { ignoreReturnCode: true };
+    const execOptions = { ignoreReturnCode: true };
     // Execute docker load command to restore image from tar archive
-    const exitCode = await exec.exec('docker', ['load', '-i', tarPath], options);
+    const commandExitCode = await exec.exec('docker', ['load', '-i', tarPath], execOptions);
 
-    if (exitCode !== 0) {
+    if (commandExitCode !== 0) {
       core.warning(`Failed to load image from ${tarPath}`);
       return false;
     }
@@ -143,18 +143,18 @@ export async function loadImageFromTar(tarPath: string): Promise<boolean> {
  */
 export async function pullImage(imageName: string, platform?: string): Promise<boolean> {
   try {
-    const options = { ignoreReturnCode: true };
+    const execOptions = { ignoreReturnCode: true };
     // Construct args array conditionally including platform flag if specified
-    const args = platform ? ['pull', '--platform', platform, imageName] : ['pull', imageName];
+    const dockerCommandArguments = platform ? ['pull', '--platform', platform, imageName] : ['pull', imageName];
 
     if (platform) {
       core.info(`Pulling image ${imageName} for platform ${platform}`);
     }
 
     // Execute docker pull command
-    const exitCode = await exec.exec('docker', args, options);
+    const commandExitCode = await exec.exec('docker', dockerCommandArguments, execOptions);
 
-    if (exitCode !== 0) {
+    if (commandExitCode !== 0) {
       core.warning(`Failed to pull image ${imageName}${platform ? ` for platform ${platform}` : ''}`);
       return false;
     }

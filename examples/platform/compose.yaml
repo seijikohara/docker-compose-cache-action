@@ -4,11 +4,6 @@ services:
     image: alpine:latest
     platform: linux/amd64
 
-  # Linux/ARM64 (Ubuntu ARM runner)
-  hello_ubuntu_arm64:
-    image: alpine:latest
-    platform: linux/arm64
-
   # Linux/ARM with variants
   hello_arm_v6:
     image: arm32v6/alpine:latest

@@ -23,54 +23,55 @@ describe('Docker Compose File Module', () => {
     (fs.existsSync as jest.Mock).mockReturnValue(true);
 
     // Mock yaml.load to parse YAML content properly
-    (yaml.load as jest.Mock).mockImplementation((content: string) => {
-      // Return null for empty content
-      if (!content) return null;
+    (yaml.load as jest.Mock).mockImplementation((yamlContent: string) => {
+      // Return undefined for empty content
+      if (!yamlContent) return undefined;
 
       // Version only case (no services section)
-      if (content === 'version: "3.8"') {
+      if (yamlContent === 'version: "3.8"') {
         return { version: '3.8' };
       }
 
       // Parse content with services
-      if (content.includes('services:')) {
+      if (yamlContent.includes('services:')) {
         // Parse service lines from YAML content
-        const serviceLines = content.split('\n').filter((line: string) => line.includes('image:'));
-        const services: Record<string, Record<string, string>> = {};
+        const serviceImageLines = yamlContent.split('\n').filter((textLine: string) => textLine.includes('image:'));
+        const serviceDefinitions: Record<string, Record<string, string>> = {};
 
         // Extract service names like 'nginx:'
         const serviceNameRegex = /\s+(\w+):/;
-        const serviceNames = content
+        const serviceNames = yamlContent
           .split('\n')
-          .filter((line: string) => serviceNameRegex.test(line))
-          .map((line: string) => line.match(serviceNameRegex)![1]);
+          .filter((textLine: string) => serviceNameRegex.test(textLine))
+          .map((textLine: string) => textLine.match(serviceNameRegex)![1]);
 
-        serviceNames.forEach((name: string, index: number) => {
-          const serviceLine = serviceLines[index] || '';
-          if (serviceLine) {
-            const image = serviceLine.split('image:')[1]?.trim();
-            if (image) {
-              services[name] = { image };
+        serviceNames.forEach((serviceName: string, serviceIndex: number) => {
+          const serviceImageLine = serviceImageLines[serviceIndex] || '';
+          if (serviceImageLine) {
+            const imageValue = serviceImageLine.split('image:')[1]?.trim();
+            if (imageValue) {
+              serviceDefinitions[serviceName] = { image: imageValue };
 
               // Handle platform if specified
-              const platformLine = content
+              const platformLine = yamlContent
                 .split('\n')
                 .find(
-                  (line: string) =>
-                    line.includes(`${name}:`) ||
-                    (line.includes('platform:') && content.indexOf(line) > content.indexOf(`${name}:`))
+                  (textLine: string) =>
+                    textLine.includes(`${serviceName}:`) ||
+                    (textLine.includes('platform:') &&
+                      yamlContent.indexOf(textLine) > yamlContent.indexOf(`${serviceName}:`))
                 );
               if (platformLine && platformLine.includes('platform:')) {
-                services[name].platform = platformLine.split('platform:')[1]?.trim();
+                serviceDefinitions[serviceName].platform = platformLine.split('platform:')[1]?.trim();
               }
             }
           }
         });
 
-        return { services };
+        return { services: serviceDefinitions };
       }
 
-      return null;
+      return undefined;
     });
   });
 
@@ -78,40 +79,40 @@ describe('Docker Compose File Module', () => {
     /**
      * Helper function to create YAML content for testing
      */
-    const createComposeYaml = (services: Record<string, { image: string; platform?: string }>) => {
+    const createComposeYaml = (serviceDefinitions: Record<string, { image: string; platform?: string }>) => {
       return `services:
-${Object.entries(services)
+${Object.entries(serviceDefinitions)
   .map(
-    ([name, config]) => `  ${name}:
-    image: ${config.image}${config.platform ? `\n    platform: ${config.platform}` : ''}`
+    ([serviceName, serviceConfig]) => `  ${serviceName}:
+    image: ${serviceConfig.image}${serviceConfig.platform ? `\n    platform: ${serviceConfig.platform}` : ''}`
   )
   .join('\n')}`;
     };
 
     it('should find services from specific compose file', () => {
-      const composeContent = createComposeYaml({
+      const mockComposeContent = createComposeYaml({
         nginx: { image: 'nginx:latest' },
         redis: { image: 'redis:alpine' },
       });
 
       // Mock file reading
-      (fs.readFileSync as jest.Mock).mockReturnValue(composeContent);
+      (fs.readFileSync as jest.Mock).mockReturnValue(mockComposeContent);
 
-      const services = getComposeServicesFromFiles(['docker-compose.yml'], []);
+      const extractedServices = getComposeServicesFromFiles(['docker-compose.yml'], []);
 
-      expect(services.length).toBe(2);
-      expect(services).toContainEqual({ image: 'nginx:latest' });
-      expect(services).toContainEqual({ image: 'redis:alpine' });
+      expect(extractedServices.length).toBe(2);
+      expect(extractedServices).toContainEqual({ image: 'nginx:latest' });
+      expect(extractedServices).toContainEqual({ image: 'redis:alpine' });
     });
 
     it('should handle platform specifications', () => {
       // Create compose file YAML with platform specifications
-      const composeContent = `services:
+      const mockComposeContent = `services:
   nginx:
     image: nginx:latest
     platform: linux/amd64`;
 
-      (fs.readFileSync as jest.Mock).mockReturnValue(composeContent);
+      (fs.readFileSync as jest.Mock).mockReturnValue(mockComposeContent);
 
       // Configure yaml mock to include platform in service
       (yaml.load as jest.Mock).mockReturnValue({
@@ -123,97 +124,97 @@ ${Object.entries(services)
         },
       });
 
-      const services = getComposeServicesFromFiles(['docker-compose.yml'], []);
+      const extractedServices = getComposeServicesFromFiles(['docker-compose.yml'], []);
 
-      expect(services.length).toBe(1);
-      expect(services[0]).toEqual({ image: 'nginx:latest', platform: 'linux/amd64' });
+      expect(extractedServices.length).toBe(1);
+      expect(extractedServices[0]).toEqual({ image: 'nginx:latest', platform: 'linux/amd64' });
     });
 
     it('should exclude specified images', () => {
-      const composeContent = createComposeYaml({
+      const mockComposeContent = createComposeYaml({
         nginx: { image: 'nginx:latest' },
         redis: { image: 'redis:alpine' },
         postgres: { image: 'postgres:13' },
       });
 
-      (fs.readFileSync as jest.Mock).mockReturnValue(composeContent);
+      (fs.readFileSync as jest.Mock).mockReturnValue(mockComposeContent);
 
       // Exclude redis and postgres
-      const excludeImages = ['redis:alpine', 'postgres:13'];
-      const services = getComposeServicesFromFiles(['docker-compose.yml'], excludeImages);
+      const imagesToExclude = ['redis:alpine', 'postgres:13'];
+      const extractedServices = getComposeServicesFromFiles(['docker-compose.yml'], imagesToExclude);
 
-      expect(services.length).toBe(1);
-      expect(services[0]).toEqual({ image: 'nginx:latest' });
+      expect(extractedServices.length).toBe(1);
+      expect(extractedServices[0]).toEqual({ image: 'nginx:latest' });
     });
 
     it('should process multiple compose files', () => {
-      const composeContent1 = createComposeYaml({
+      const mockComposeContent1 = createComposeYaml({
         nginx: { image: 'nginx:latest' },
       });
 
-      const composeContent2 = createComposeYaml({
+      const mockComposeContent2 = createComposeYaml({
         redis: { image: 'redis:alpine' },
       });
 
       // Mock file reading for different files
-      (fs.readFileSync as jest.Mock).mockImplementation((file) => {
-        if (file === 'docker-compose.yml') {
-          return composeContent1;
-        } else if (file === 'docker-compose.override.yml') {
-          return composeContent2;
+      (fs.readFileSync as jest.Mock).mockImplementation((filePath) => {
+        if (filePath === 'docker-compose.yml') {
+          return mockComposeContent1;
+        } else if (filePath === 'docker-compose.override.yml') {
+          return mockComposeContent2;
         }
         return '';
       });
 
-      const services = getComposeServicesFromFiles(['docker-compose.yml', 'docker-compose.override.yml'], []);
+      const extractedServices = getComposeServicesFromFiles(['docker-compose.yml', 'docker-compose.override.yml'], []);
 
-      expect(services.length).toBe(2);
-      expect(services).toContainEqual({ image: 'nginx:latest' });
-      expect(services).toContainEqual({ image: 'redis:alpine' });
+      expect(extractedServices.length).toBe(2);
+      expect(extractedServices).toContainEqual({ image: 'nginx:latest' });
+      expect(extractedServices).toContainEqual({ image: 'redis:alpine' });
     });
 
     it('should handle services without images', () => {
-      const composeContent = `services:
+      const mockComposeContent = `services:
   app:
     build: .
   nginx:
     image: nginx:latest`;
 
-      (fs.readFileSync as jest.Mock).mockReturnValue(composeContent);
-      const services = getComposeServicesFromFiles(['docker-compose.yml'], []);
+      (fs.readFileSync as jest.Mock).mockReturnValue(mockComposeContent);
+      const extractedServices = getComposeServicesFromFiles(['docker-compose.yml'], []);
 
-      expect(services.length).toBe(1);
-      expect(services[0]).toEqual({ image: 'nginx:latest' });
+      expect(extractedServices.length).toBe(1);
+      expect(extractedServices[0]).toEqual({ image: 'nginx:latest' });
     });
 
     it('should search for default compose files when no input is provided', () => {
-      const composeContent = createComposeYaml({
+      const mockComposeContent = createComposeYaml({
         nginx: { image: 'nginx:latest' },
       });
 
-      (fs.readFileSync as jest.Mock).mockReturnValue(composeContent);
+      (fs.readFileSync as jest.Mock).mockReturnValue(mockComposeContent);
 
       // Configure existsSync behavior to match default file count
-      (fs.existsSync as jest.Mock).mockImplementation((path) => {
+      (fs.existsSync as jest.Mock).mockImplementation((filePath) => {
         // Only the first file exists
-        return path === 'compose.yaml';
+        return filePath === 'compose.yaml';
       });
 
       // Empty input should search for default files
-      const services = getComposeServicesFromFiles([], []);
+      const extractedServices = getComposeServicesFromFiles([], []);
 
       // fs.existsSync should be called for each of the 4 default files
       expect(fs.existsSync).toHaveBeenCalledTimes(4);
       // Only one file exists, so services count should be 1
-      expect(services.length).toBe(1);
+      expect(extractedServices.length).toBe(1);
     });
 
     it('should handle empty compose file', () => {
       // Mock empty file
       (fs.readFileSync as jest.Mock).mockReturnValue('');
-      const services = getComposeServicesFromFiles(['docker-compose.yml'], []);
+      const extractedServices = getComposeServicesFromFiles(['docker-compose.yml'], []);
 
-      expect(services.length).toBe(0);
+      expect(extractedServices.length).toBe(0);
       expect(debugMock).toHaveBeenCalledWith(expect.stringContaining('Empty or invalid YAML file'));
     });
 
@@ -222,13 +223,13 @@ ${Object.entries(services)
       (fs.readFileSync as jest.Mock).mockReturnValue('version: "3.8"');
 
       // Mock implementation - ignoring unused parameter
-      (debugMock as jest.Mock).mockImplementation((_: string) => {
+      (debugMock as jest.Mock).mockImplementation((_debugMessage: string) => {
         // No-op
       });
 
-      const services = getComposeServicesFromFiles(['docker-compose.yml'], []);
+      const extractedServices = getComposeServicesFromFiles(['docker-compose.yml'], []);
 
-      expect(services.length).toBe(0);
+      expect(extractedServices.length).toBe(0);
       expect(debugMock).toHaveBeenCalled();
     });
 
@@ -238,18 +239,18 @@ ${Object.entries(services)
         throw new Error('File read error');
       });
 
-      const services = getComposeServicesFromFiles(['docker-compose.yml'], []);
+      const extractedServices = getComposeServicesFromFiles(['docker-compose.yml'], []);
 
-      expect(services.length).toBe(0);
+      expect(extractedServices.length).toBe(0);
       expect(warningMock).toHaveBeenCalledWith(expect.stringContaining('Failed to parse'));
     });
 
     it('should handle non-existent files', () => {
       // Mock existsSync to return false
       (fs.existsSync as jest.Mock).mockReturnValue(false);
-      const services = getComposeServicesFromFiles(['non-existent.yml'], []);
+      const extractedServices = getComposeServicesFromFiles(['non-existent.yml'], []);
 
-      expect(services.length).toBe(0);
+      expect(extractedServices.length).toBe(0);
       // The file doesn't exist, so it shouldn't be read
       expect(fs.readFileSync).not.toHaveBeenCalled();
     });

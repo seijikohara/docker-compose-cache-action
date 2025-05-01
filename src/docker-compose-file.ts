@@ -40,40 +40,42 @@ export function getComposeServicesFromFiles(
   excludeImageNames: ReadonlyArray<string>
 ): ReadonlyArray<ComposeService> {
   // Convert exclude list to a Set for O(1) lookups
-  const excludedImages: ReadonlySet<string> = new Set(excludeImageNames);
+  const excludedImageSet: ReadonlySet<string> = new Set(excludeImageNames);
 
   // Use provided paths or default filenames if none provided
-  const filesToProcess: ReadonlyArray<string> =
+  const composeFilesToProcess: ReadonlyArray<string> =
     composeFilePaths.length > 0
-      ? composeFilePaths.filter((file) => fs.existsSync(file))
-      : DEFAULT_COMPOSE_FILE_NAMES.filter((file) => fs.existsSync(file));
+      ? composeFilePaths.filter((filePath) => fs.existsSync(filePath))
+      : DEFAULT_COMPOSE_FILE_NAMES.filter((fileName) => fs.existsSync(fileName));
 
   return (
-    filesToProcess
-      .flatMap((file) => {
+    composeFilesToProcess
+      .flatMap((composeFilePath) => {
         try {
-          const content = fs.readFileSync(file, 'utf8');
+          const fileContent = fs.readFileSync(composeFilePath, 'utf8');
           // Parse YAML content into a ComposeFile structure
-          const parsed = yaml.load(content) as ComposeFile | null;
+          const parsedComposeFile = yaml.load(fileContent) as ComposeFile | undefined;
 
-          if (!parsed) {
-            core.debug(`Empty or invalid YAML file: ${file}`);
+          if (!parsedComposeFile) {
+            core.debug(`Empty or invalid YAML file: ${composeFilePath}`);
             return [];
           }
 
-          if (!parsed.services) {
-            core.debug(`No services section found in ${file}`);
+          if (!parsedComposeFile.services) {
+            core.debug(`No services section found in ${composeFilePath}`);
             return [];
           }
 
           // Return just the service definitions, discarding service names
-          return Object.values(parsed.services);
-        } catch (error) {
-          core.warning(`Failed to parse ${file}: ${error}`);
+          return Object.values(parsedComposeFile.services);
+        } catch (parsingError) {
+          core.warning(`Failed to parse ${composeFilePath}: ${parsingError}`);
           return [];
         }
       })
       // Filter out services with no image property or excluded images
-      .filter((service) => service.image !== undefined && !excludedImages.has(service.image))
+      .filter(
+        (serviceDefinition) => serviceDefinition.image !== undefined && !excludedImageSet.has(serviceDefinition.image)
+      )
   );
 }
