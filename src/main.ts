@@ -16,8 +16,8 @@ type ServiceProcessingResult = {
   readonly restoredFromCache: boolean;
   readonly imageName: string;
   readonly cacheKey: string;
-  readonly digest: string | undefined;
-  readonly platform: string | undefined;
+  readonly digest?: string;
+  readonly platform?: string;
   readonly error?: string;
 };
 
@@ -27,16 +27,16 @@ type ServiceProcessingResult = {
  * @param cacheKeyPrefix - Prefix to use for the cache key
  * @param imageName - Docker image name (without tag)
  * @param imageTag - Docker image tag
- * @param servicePlatform - Platform string (e.g. 'linux/amd64') or undefined
  * @param digest - Image digest
+ * @param servicePlatform - Platform string (e.g. 'linux/amd64') or undefined
  * @returns A unique cache key string
  */
 function generateCacheKey(
   cacheKeyPrefix: string,
   imageName: string,
   imageTag: string,
-  servicePlatform: string | undefined,
-  digest: string
+  digest: string,
+  servicePlatform?: string
 ): string {
   // Sanitize components to ensure valid cache key
   const sanitizedImageName = sanitizePathComponent(imageName);
@@ -57,17 +57,12 @@ function generateCacheKey(
  *
  * @param imageName - Docker image name (without tag)
  * @param imageTag - Docker image tag
- * @param servicePlatform - Platform string (e.g. 'linux/amd64') or undefined
  * @param digest - Image digest
+ * @param servicePlatform - Platform string (e.g. 'linux/amd64') or undefined
  * @returns Absolute path to the tar file
  */
-function generateTarPath(
-  imageName: string,
-  imageTag: string,
-  servicePlatform: string | undefined,
-  digest: string
-): string {
-  const tarFileName = generateCacheKey('', imageName, imageTag, servicePlatform, digest);
+function generateTarPath(imageName: string, imageTag: string, digest: string, servicePlatform?: string): string {
+  const tarFileName = generateCacheKey('', imageName, imageTag, digest, servicePlatform);
   return path.join(process.env.RUNNER_TEMP || '/tmp', `${tarFileName}.tar`);
 }
 
@@ -99,8 +94,8 @@ async function processService(service: ComposeService, cacheKeyPrefix: string): 
     };
   }
 
-  const cacheKey = generateCacheKey(cacheKeyPrefix, imageName, imageTag, service.platform, digest);
-  const cachePath = generateTarPath(imageName, imageTag, service.platform, digest);
+  const cacheKey = generateCacheKey(cacheKeyPrefix, imageName, imageTag, digest, service.platform);
+  const cachePath = generateTarPath(imageName, imageTag, digest, service.platform);
 
   if (service.platform) {
     core.info(`Using platform ${service.platform} for ${fullImageName}`);

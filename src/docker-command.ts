@@ -39,9 +39,9 @@ type DockerManifest = {
  * Uses 'docker buildx imagetools inspect' to retrieve the manifest digest
  *
  * @param imageName - Docker image name with optional tag
- * @returns Promise resolving to digest string or null on failure
+ * @returns Promise resolving to digest string or undefined on failure
  */
-export async function getImageDigest(imageName: string): Promise<string | null> {
+export async function getImageDigest(imageName: string): Promise<string | undefined> {
   try {
     // Use accumulators to avoid mutable state
     let stdoutData = '';
@@ -68,20 +68,20 @@ export async function getImageDigest(imageName: string): Promise<string | null> 
 
     if (exitCode !== 0) {
       core.warning(`Failed to get digest for ${imageName}: ${stderrData}`);
-      return null;
+      return undefined;
     }
 
     try {
       // Parse the JSON output to extract the digest
       const manifest = JSON.parse(stdoutData.trim()) as DockerManifest;
-      return manifest.digest || null;
+      return manifest.digest || undefined;
     } catch (parseError) {
       core.warning(`Failed to parse manifest JSON for ${imageName}: ${parseError}`);
-      return null;
+      return undefined;
     }
   } catch (error) {
     core.warning(`Error getting digest for ${imageName}: ${error}`);
-    return null;
+    return undefined;
   }
 }
 

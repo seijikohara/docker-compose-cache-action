@@ -24,8 +24,8 @@ describe('Docker Compose File Module', () => {
 
     // Mock yaml.load to parse YAML content properly
     (yaml.load as jest.Mock).mockImplementation((content: string) => {
-      // Return null for empty content
-      if (!content) return null;
+      // Return undefined for empty content
+      if (!content) return undefined;
 
       // Version only case (no services section)
       if (content === 'version: "3.8"') {
@@ -70,7 +70,7 @@ describe('Docker Compose File Module', () => {
         return { services };
       }
 
-      return null;
+      return undefined;
     });
   });
 

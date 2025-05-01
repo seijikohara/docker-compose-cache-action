@@ -24,7 +24,7 @@ describe('Platform Module', () => {
       mockPlatformAndArch('linux', 'x64');
       const result = getCurrentPlatformInfo();
 
-      expect(result).not.toBeNull();
+      expect(result).not.toBeUndefined();
       expect(result?.os).toBe('linux');
       expect(result?.arch).toBe('amd64');
       expect(result?.variant).toBeUndefined();
@@ -34,7 +34,7 @@ describe('Platform Module', () => {
       mockPlatformAndArch('win32', 'arm64');
       const result = getCurrentPlatformInfo();
 
-      expect(result).not.toBeNull();
+      expect(result).not.toBeUndefined();
       expect(result?.os).toBe('windows');
       expect(result?.arch).toBe('arm64');
     });
@@ -43,7 +43,7 @@ describe('Platform Module', () => {
       mockPlatformAndArch('darwin', 'x64');
       const result = getCurrentPlatformInfo();
 
-      expect(result).not.toBeNull();
+      expect(result).not.toBeUndefined();
       expect(result?.os).toBe('darwin');
       expect(result?.arch).toBe('amd64');
     });
@@ -51,11 +51,11 @@ describe('Platform Module', () => {
     it('should handle unknown platform or architecture', () => {
       mockPlatformAndArch('unknown', 'x64');
       let result = getCurrentPlatformInfo();
-      expect(result).toBeNull();
+      expect(result).toBeUndefined();
 
       mockPlatformAndArch('linux', 'unknown');
       result = getCurrentPlatformInfo();
-      expect(result).toBeNull();
+      expect(result).toBeUndefined();
     });
 
     it('should return platform info for Linux arm v7', () => {
@@ -65,7 +65,7 @@ describe('Platform Module', () => {
       });
       const result = getCurrentPlatformInfo();
 
-      expect(result).not.toBeNull();
+      expect(result).not.toBeUndefined();
       expect(result?.os).toBe('linux');
       expect(result?.arch).toBe('arm');
       expect(result?.variant).toBe('v7');

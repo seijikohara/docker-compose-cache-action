@@ -52,7 +52,7 @@ describe('Docker Command Module', () => {
       );
     });
 
-    it('should return null when command fails', async () => {
+    it('should return undefined when command fails', async () => {
       // Mock exec.exec with error
       (exec.exec as jest.Mock).mockImplementation((cmd, args, options) => {
         if (options && options.listeners && options.listeners.stderr) {
@@ -63,7 +63,7 @@ describe('Docker Command Module', () => {
 
       const result = await getImageDigest('invalid:image');
 
-      expect(result).toBeNull();
+      expect(result).toBeUndefined();
       expect(core.warning).toHaveBeenCalledWith(expect.stringContaining('Failed to get digest'));
     });
 
@@ -78,7 +78,7 @@ describe('Docker Command Module', () => {
 
       const result = await getImageDigest('nginx:latest');
 
-      expect(result).toBeNull();
+      expect(result).toBeUndefined();
       expect(core.warning).toHaveBeenCalledWith(expect.stringContaining('Failed to parse manifest JSON'));
     });
 
@@ -90,7 +90,7 @@ describe('Docker Command Module', () => {
 
       const result = await getImageDigest('nginx:latest');
 
-      expect(result).toBeNull();
+      expect(result).toBeUndefined();
       expect(core.warning).toHaveBeenCalledWith(expect.stringContaining('Error getting digest'));
     });
   });

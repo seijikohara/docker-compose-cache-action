@@ -44,6 +44,12 @@ jest.mock('../src/docker-compose-file');
 
 import { run } from '../src/main';
 
+jest.mock('../src/path-utils', () => {
+  return {
+    sanitizePathComponent: jest.fn((value) => value),
+  };
+});
+
 describe('Main Module', () => {
   const mockGetInput = core.getInput as jest.Mock;
   const mockGetMultilineInput = core.getMultilineInput as jest.Mock;
@@ -53,6 +59,7 @@ describe('Main Module', () => {
   const mockSetFailed = core.setFailed as jest.Mock;
   const mockRestoreCache = cache.restoreCache as jest.Mock;
   const mockSaveCache = cache.saveCache as jest.Mock;
+  const mockDebug = core.debug as jest.Mock;
 
   const mockServices = [
     { image: 'nginx:latest' },
@@ -68,7 +75,7 @@ describe('Main Module', () => {
       arch: 'amd64',
     });
 
-    (dockerCommand.getImageDigest as jest.Mock).mockResolvedValue('sha256:1234567890abcdef');
+    (dockerCommand.getImageDigest as jest.Mock).mockResolvedValue('sha256:digest');
     (dockerCommand.pullImage as jest.Mock).mockResolvedValue(true);
     (dockerCommand.saveImageToTar as jest.Mock).mockResolvedValue(true);
     (dockerCommand.loadImageFromTar as jest.Mock).mockResolvedValue(true);
@@ -95,12 +102,31 @@ describe('Main Module', () => {
       }
     });
 
+    // Add default implementations for mock methods
+    mockInfo.mockImplementation((msg) => {
+      // Simulate messages like cache hits
+      if (msg.includes('Cache key for')) {
+        return;
+      } else if (msg.includes('platform')) {
+        return;
+      }
+    });
+
+    mockDebug.mockImplementation(() => {});
+
     process.env.RUNNER_TEMP = '/tmp';
   });
 
   it('should process services and set outputs', async () => {
-    mockRestoreCache.mockResolvedValue(null);
+    mockRestoreCache.mockResolvedValue(undefined);
     mockSaveCache.mockResolvedValue(123);
+
+    // Set specific messages to be returned
+    mockInfo.mockImplementation((msg) => {
+      if (msg.includes('Cache key for')) {
+        return;
+      }
+    });
 
     await run();
 
@@ -117,6 +143,13 @@ describe('Main Module', () => {
 
   it('should handle cache hits', async () => {
     mockRestoreCache.mockResolvedValue('cache-key');
+
+    // Simulate cache hit messages
+    mockInfo.mockImplementation((msg) => {
+      if (msg.includes('Cache hit for')) {
+        return;
+      }
+    });
 
     await run();
 
@@ -136,7 +169,7 @@ describe('Main Module', () => {
   });
 
   it('should handle errors in Docker commands', async () => {
-    (dockerCommand.getImageDigest as jest.Mock).mockResolvedValue(null);
+    (dockerCommand.getImageDigest as jest.Mock).mockResolvedValue(undefined);
 
     await run();
 
@@ -157,7 +190,14 @@ describe('Main Module', () => {
   it('should use platform from service when specified', async () => {
     const platformService = { image: 'nginx:alpine', platform: 'linux/arm64' };
     (dockerComposeFile.getComposeServicesFromFiles as jest.Mock).mockReturnValue([platformService]);
-    mockRestoreCache.mockResolvedValue(null);
+    mockRestoreCache.mockResolvedValue(undefined);
+
+    // Simulate platform messages
+    mockInfo.mockImplementation((msg) => {
+      if (msg === 'Using platform linux/arm64 for nginx:alpine') {
+        return;
+      }
+    });
 
     await run();
 
@@ -169,7 +209,14 @@ describe('Main Module', () => {
     mockGetInput.mockImplementation((_name) => {
       return '';
     });
-    mockRestoreCache.mockResolvedValue(null);
+    mockRestoreCache.mockResolvedValue(undefined);
+
+    // Simulate cache key messages
+    mockInfo.mockImplementation((msg) => {
+      if (msg.match(/Cache key for .* docker-compose-image-/)) {
+        return;
+      }
+    });
 
     await run();
 
@@ -197,31 +244,45 @@ describe('Main Module', () => {
   });
 
   it('should handle "already exists" error when saving cache', async () => {
-    mockRestoreCache.mockResolvedValue(null);
+    mockRestoreCache.mockResolvedValue(undefined);
     mockSaveCache.mockImplementation(() => {
       throw new Error('Unable to reserve cache with key, key already exists');
     });
 
-    await run();
-
-    expect(mockSetFailed).not.toHaveBeenCalled();
-    expect(core.debug).toHaveBeenCalledWith(expect.stringContaining('Cache already exists'));
-  });
-
-  it('should handle "unable to upload" error when saving cache', async () => {
-    mockRestoreCache.mockResolvedValue(null);
-    mockSaveCache.mockImplementation(() => {
-      throw new Error('unable to upload cache');
+    // Simulate debug messages
+    mockDebug.mockImplementation((msg) => {
+      if (msg.includes('Cache already exists')) {
+        return;
+      }
     });
 
     await run();
 
     expect(mockSetFailed).not.toHaveBeenCalled();
-    expect(core.debug).toHaveBeenCalledWith(expect.stringContaining('Unable to upload cache'));
+    expect(mockDebug).toHaveBeenCalledWith(expect.stringContaining('Cache already exists'));
+  });
+
+  it('should handle "unable to upload" error when saving cache', async () => {
+    mockRestoreCache.mockResolvedValue(undefined);
+    mockSaveCache.mockImplementation(() => {
+      throw new Error('unable to upload cache');
+    });
+
+    // Simulate debug messages
+    mockDebug.mockImplementation((msg) => {
+      if (msg.includes('Unable to upload cache')) {
+        return;
+      }
+    });
+
+    await run();
+
+    expect(mockSetFailed).not.toHaveBeenCalled();
+    expect(mockDebug).toHaveBeenCalledWith(expect.stringContaining('Unable to upload cache'));
   });
 
   it('should handle digest mismatch after pull', async () => {
-    mockRestoreCache.mockResolvedValue(null);
+    mockRestoreCache.mockResolvedValue(undefined);
     const singleService = { image: 'nginx:latest' };
     (dockerComposeFile.getComposeServicesFromFiles as jest.Mock).mockReturnValue([singleService]);
 
@@ -235,7 +296,21 @@ describe('Main Module', () => {
   });
 
   it('should handle partial cache hits with multiple services', async () => {
-    mockRestoreCache.mockResolvedValueOnce('cache-key').mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+    mockRestoreCache
+      .mockResolvedValueOnce('cache-key')
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined);
+
+    // Explicitly set mocks for loadImageFromTar and pullImage
+    (dockerCommand.loadImageFromTar as jest.Mock).mockReturnValue(true);
+    (dockerCommand.pullImage as jest.Mock).mockReturnValue(true);
+
+    // Simulate service restoration messages
+    mockInfo.mockImplementation((msg) => {
+      if (msg.match(/\d+ of 3 services restored from cache/)) {
+        return;
+      }
+    });
 
     await run();
 
@@ -247,6 +322,20 @@ describe('Main Module', () => {
 
   it('should set cache-hit to true when all services are cached', async () => {
     mockRestoreCache.mockResolvedValue('cache-key');
+
+    // Simulate service restoration messages
+    mockInfo.mockImplementation((msg) => {
+      if (msg === '3 of 3 services restored from cache') {
+        return;
+      }
+    });
+
+    // Set output for cache-hit
+    mockSetOutput.mockImplementation((key, _value) => {
+      if (key === 'cache-hit') {
+        return;
+      }
+    });
 
     await run();
 

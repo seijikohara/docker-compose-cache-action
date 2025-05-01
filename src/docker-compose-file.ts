@@ -54,7 +54,7 @@ export function getComposeServicesFromFiles(
         try {
           const content = fs.readFileSync(file, 'utf8');
           // Parse YAML content into a ComposeFile structure
-          const parsed = yaml.load(content) as ComposeFile | null;
+          const parsed = yaml.load(content) as ComposeFile | undefined;
 
           if (!parsed) {
             core.debug(`Empty or invalid YAML file: ${file}`);
