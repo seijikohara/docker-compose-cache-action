@@ -18,19 +18,19 @@ export type PlatformInfo = {
 /**
  * Determines the OCI platform string (os/arch[/variant]) for the current Node.js runtime.
  *
- * @returns The OCI platform string (e.g., "linux/amd64", "linux/arm/v7"), or `null` if resolution fails.
+ * @returns The OCI platform string (e.g., "linux/amd64", "linux/arm/v7"), or `undefined` if resolution fails.
  */
-export declare function getCurrentOciPlatformString(): string | null;
+export declare function getCurrentOciPlatformString(): string | undefined;
 /**
  * Parses an OCI platform string into its components (OS, architecture, variant).
  *
- * @param platformString - The platform string to parse (e.g., "linux/amd64", "windows/amd64/v8").
- * @returns A `PlatformInfo` object, or `null` if the string is invalid.
+ * @param ociPlatformString - The platform string to parse (e.g., "linux/amd64", "windows/amd64/v8").
+ * @returns A `PlatformInfo` object, or `undefined` if the string is invalid.
  */
-export declare function parsePlatformString(platformString: string | null | undefined): PlatformInfo | null;
+export declare function parsePlatformString(ociPlatformString?: string): PlatformInfo | undefined;
 /**
  * Retrieves the OCI platform information (`PlatformInfo`) for the current Node.js runtime.
  *
- * @returns A `PlatformInfo` object for the current environment, or `null` if resolution fails.
+ * @returns A `PlatformInfo` object for the current environment, or `undefined` if resolution fails.
  */
-export declare function getCurrentPlatformInfo(): PlatformInfo | null;
+export declare function getCurrentPlatformInfo(): PlatformInfo | undefined;

@@ -4,9 +4,9 @@
  * Uses 'docker buildx imagetools inspect' to retrieve the manifest digest
  *
  * @param imageName - Docker image name with optional tag
- * @returns Promise resolving to digest string or null on failure
+ * @returns Promise resolving to digest string or undefined on failure
  */
-export declare function getImageDigest(imageName: string): Promise<string | null>;
+export declare function getImageDigest(imageName: string): Promise<string | undefined>;
 /**
  * Saves Docker image to a tar file
  *
