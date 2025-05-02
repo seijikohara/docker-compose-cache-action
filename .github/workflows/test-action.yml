@@ -1,4 +1,4 @@
-name: Test Cache Action
+name: Docker Compose Cache Action Test Suite
 
 on:
   push:
@@ -12,28 +12,23 @@ on:
   workflow_dispatch:
 
 jobs:
-  # Generate a unique run ID to ensure clean cache state for each test run
-  setup:
-    name: Setup Test Environment
+  generate-run-id:
+    name: Generate Unique Run ID
     runs-on: ubuntu-latest
     outputs:
       run_id: ${{ steps.set-run-id.outputs.run_id }}
     steps:
-      - name: Generate unique run ID
+      - name: Set Run ID
         id: set-run-id
         run: |
-          # Generate a unique ID using timestamp and more entropy
-          TIMESTAMP=$(date +%Y%m%d%H%M%S)
-          RANDOM_PART=$(od -An -N4 -tx4 /dev/urandom | tr -d ' \n')
-          UNIQUE_ID="test-${TIMESTAMP}-${RANDOM_PART}"
-          echo "Generated unique run ID: ${UNIQUE_ID}"
-          echo "run_id=${UNIQUE_ID}" >> "${GITHUB_OUTPUT}"
+          UNIQUE_ID="test-$(date +%Y%m%d%H%M%S)-$(openssl rand -hex 2)"
+          echo "Generated Run ID: $UNIQUE_ID"
+          echo "run_id=$UNIQUE_ID" >> "$GITHUB_OUTPUT"
 
-  # First run tests (No Cache expected)
-  first-run-tests:
-    name: First Run - ${{ matrix.scenario }}
+  test-first-run:
+    name: Test Cache Miss - ${{ matrix.scenario }}
     runs-on: ubuntu-latest
-    needs: setup
+    needs: generate-run-id
     strategy:
       fail-fast: false
       matrix:
@@ -62,46 +57,36 @@ jobs:
     outputs:
       test-result: ${{ steps.validate.outputs.result }}
     steps:
-      - name: Checkout repository
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      # Use the actual Docker Compose Cache Action from the repository
-      - name: Run Docker Compose Cache Action
-        id: docker-compose-cache
+      - name: Run Cache Action
+        id: docker-cache
         uses: ./
         with:
           compose-files: ${{ matrix.files }}
           exclude-images: ${{ matrix.exclude }}
-          # Generate scenario-specific cache key to prevent cache sharing between matrix jobs
-          cache-key-prefix: ${{ needs.setup.outputs.run_id }}-${{ github.run_attempt }}-${{ matrix.scenario }}
+          cache-key-prefix: ${{ needs.generate-run-id.outputs.run_id }}-${{ github.run_attempt }}-${{ matrix.scenario }}
 
-      # Verify no cache hit on first run
-      - name: Validate cache miss on first run
+      - name: Assert Cache Miss
         id: validate
         run: |
-          # Use the Action's built-in cache-hit output directly
-          CACHE_HIT="${{ steps.docker-compose-cache.outputs.cache-hit }}"
-          IMAGE_LIST="${{ steps.docker-compose-cache.outputs.image-list }}"
-
-          echo "Test scenario: ${{ matrix.scenario }}"
-          echo "Images detected: ${IMAGE_LIST}"
-          echo "Cache hit: ${CACHE_HIT}"
-
-          # First run should always have a cache miss unless no images are defined
-          if [[ -n "${IMAGE_LIST}" && "${CACHE_HIT}" == "true" ]]; then
-            echo "::error::❌ Unexpected cache hit on first run!"
+          hit="${{ steps.docker-cache.outputs.cache-hit }}"
+          list="${{ steps.docker-cache.outputs.image-list }}"
+          echo "Scenario: ${{ matrix.scenario }}"
+          echo "Images: $list"
+          echo "Cache Hit: $hit"
+          [[ -n "$list" && "$hit" == "true" ]] && {
+            echo "::error::Unexpected cache hit on first run"
             echo "result=failure" >> $GITHUB_OUTPUT
             exit 1
-          else
-            echo "✅ Expected behavior: No cache hit on first run"
-            echo "result=success" >> $GITHUB_OUTPUT
-          fi
+          }
+          echo "result=success" >> $GITHUB_OUTPUT
 
-  # Second run tests (Cache Hit expected)
-  second-run-tests:
-    name: Second Run - ${{ matrix.scenario }}
+  test-second-run:
+    name: Test Cache Hit - ${{ matrix.scenario }}
     runs-on: ubuntu-latest
-    needs: [setup, first-run-tests]
+    needs: [generate-run-id, test-first-run]
     strategy:
       fail-fast: false
       matrix:
@@ -130,124 +115,70 @@ jobs:
     outputs:
       test-result: ${{ steps.validate.outputs.result }}
     steps:
-      - name: Checkout repository
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      # Use the actual Docker Compose Cache Action from the repository
-      - name: Run Docker Compose Cache Action
-        id: docker-compose-cache
+      - name: Run Cache Action
+        id: docker-cache
         uses: ./
         with:
           compose-files: ${{ matrix.files }}
           exclude-images: ${{ matrix.exclude }}
-          # Use the same cache key prefix as first run to ensure cache hit
-          cache-key-prefix: ${{ needs.setup.outputs.run_id }}-${{ github.run_attempt }}-${{ matrix.scenario }}
+          cache-key-prefix: ${{ needs.generate-run-id.outputs.run_id }}-${{ github.run_attempt }}-${{ matrix.scenario }}
 
-      # Verify cache hit on second run for scenarios with images
-      - name: Validate cache hit on second run
+      - name: Assert Cache Hit
         id: validate
         run: |
-          # Use the Action's built-in cache-hit output directly
-          CACHE_HIT="${{ steps.docker-compose-cache.outputs.cache-hit }}"
-          IMAGE_LIST="${{ steps.docker-compose-cache.outputs.image-list }}"
-
-          echo "Test scenario: ${{ matrix.scenario }}"
-          echo "Images detected: ${IMAGE_LIST}"
-          echo "Cache hit: ${CACHE_HIT}"
-
-          # Second run should have a cache hit if images are present
-          if [[ -n "${IMAGE_LIST}" && "${CACHE_HIT}" != "true" ]]; then
-            echo "::error::❌ Expected cache hit on second run but got miss!"
+          hit="${{ steps.docker-cache.outputs.cache-hit }}"
+          list="${{ steps.docker-cache.outputs.image-list }}"
+          echo "Scenario: ${{ matrix.scenario }}"
+          echo "Images: $list"
+          echo "Cache Hit: $hit"
+          [[ -n "$list" && "$hit" != "true" ]] && {
+            echo "::error::Expected cache hit on second run but got miss"
             echo "result=failure" >> $GITHUB_OUTPUT
             exit 1
-          else
-            echo "✅ Expected behavior: Cache hit on second run (or no images to cache)"
-            echo "result=success" >> $GITHUB_OUTPUT
-          fi
+          }
+          echo "result=success" >> $GITHUB_OUTPUT
 
-  # Collect test results and create summary
-  test-summary:
-    name: Test Scenarios Summary
+  summarize-tests:
+    name: Summarize Test Results
     runs-on: ubuntu-latest
-    needs: [first-run-tests, second-run-tests]
+    needs: [test-first-run, test-second-run]
     if: always()
     steps:
-      - name: Create Test Results Summary
+      - name: Generate Summary
         run: |
-          # Function to append content to summary file
-          append_summary() {
-            echo "$1" >> "${GITHUB_STEP_SUMMARY}"
-          }
-
-          # Initialize summary
-          append_summary "# Docker Compose Cache Action Test Results 🐳"
-          append_summary ""
-
-          # Get job status values
-          FIRST_RUN_STATUS="${{ needs.first-run-tests.result }}"
-          SECOND_RUN_STATUS="${{ needs.second-run-tests.result }}"
-
-          # Create first run tests table
-          append_summary "## First Run Tests Summary (Expected: Cache Miss)"
-          append_summary ""
-          append_summary "| Scenario | Status |"
-          append_summary "|----------|--------|"
-
-          # Add all scenarios with their status
+          append() { echo "$1" >> "$GITHUB_STEP_SUMMARY"; }
+          append "# Docker Compose Cache Action Test Results 🐳"
+          append ""
+          append "## First Run (Expecting Cache Miss)"
+          append "| Scenario | Status |"
+          append "|----------|--------|"
           for scenario in "Simple Compose" "Override Compose" "Platform Specific" "Multi-File Compose" "Image Exclusion" "No Images Defined" "Empty Compose File"; do
-            if [[ "${FIRST_RUN_STATUS}" == "success" ]]; then
-              append_summary "| ${scenario} | ✅ Pass |"
-            else
-              append_summary "| ${scenario} | ❌ Fail |"
-            fi
+            [[ "${{ needs.test-first-run.result }}" == "success" ]] && append "| $scenario | ✅ Pass |" || append "| $scenario | ❌ Fail |"
           done
-          append_summary ""
-
-          # Create second run tests table
-          append_summary "## Second Run Tests Summary (Expected: Cache Hit)"
-          append_summary ""
-          append_summary "| Scenario | Status |"
-          append_summary "|----------|--------|"
-
-          # Add all scenarios with their status
+          append ""
+          append "## Second Run (Expecting Cache Hit)"
+          append "| Scenario | Status |"
+          append "|----------|--------|"
           for scenario in "Simple Compose" "Override Compose" "Platform Specific" "Multi-File Compose" "Image Exclusion" "No Images Defined" "Empty Compose File"; do
-            if [[ "${SECOND_RUN_STATUS}" == "success" ]]; then
-              append_summary "| ${scenario} | ✅ Pass |"
-            else
-              append_summary "| ${scenario} | ❌ Fail |"
-            fi
+            [[ "${{ needs.test-second-run.result }}" == "success" ]] && append "| $scenario | ✅ Pass |" || append "| $scenario | ❌ Fail |"
           done
-          append_summary ""
-
-          # Add explanation of action outputs
-          append_summary "## 📋 Action Outputs Explained"
-          append_summary ""
-          append_summary "This action provides the following outputs:"
-          append_summary ""
-          append_summary "| Output | Description |"
-          append_summary "|--------|-------------|"
-          append_summary "| \`cache-hit\` | Boolean value indicating if all required images were restored from cache |"
-          append_summary "| \`image-list\` | Space-separated string of unique image names targeted for caching |"
-          append_summary ""
-
-          # Final test status
-          if [[ "${{ needs.first-run-tests.result }}" == "success" && "${{ needs.second-run-tests.result }}" == "success" ]]; then
-            SUCCESS="true"
+          append ""
+          append "## 📋 Action Outputs"
+          append "| Output | Description |"
+          append "|--------|-------------|"
+          append "| `cache-hit` | true if all images were restored from cache |"
+          append "| `image-list` | Space-separated list of image names |"
+          append ""
+          append "## 🔗 Links"
+          append "- [Run Logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          append "- [Artifacts](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts)"
+          append ""
+          if [[ "${{ needs.test-first-run.result }}" == "success" && "${{ needs.test-second-run.result }}" == "success" ]]; then
+            append "## ✅ All tests passed."
           else
-            SUCCESS="false"
-          fi
-
-          append_summary "## 📝 Final Test Summary"
-          append_summary ""
-
-          if [[ "${SUCCESS}" == "true" ]]; then
-            append_summary "Overall test status: ✅ All tests passed"
-          else
-            append_summary "Overall test status: ❌ Some tests failed"
-
-            # Add more detailed information about failures when they occur
-            append_summary ""
-            append_summary "### ⚠️ Test Failure Details"
-            append_summary ""
-            append_summary "For detailed information about failures, check the individual job logs."
+            append "## ❌ Some tests failed."
+            append "### Check job logs for failure details."
           fi
