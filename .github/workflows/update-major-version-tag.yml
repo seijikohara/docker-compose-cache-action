@@ -1,27 +1,11 @@
-name: Update Major Version Tag
+name: Update Major Version Tags
 
 on:
-  push:
-    tags:
-      - 'v[0-9]+\.[0-9]+\.[0-9]+'
   workflow_dispatch:
-    inputs:
-      tag_name:
-        description: 'Semantic version tag to process (e.g., v1.2.3)'
-        required: true
-        type: string
-      commit_sha:
-        description: 'Target commit SHA to tag (optional; defaults to HEAD)'
-        required: false
-        type: string
 
 jobs:
-  update-major-version-tag:
+  update-major-tags:
     runs-on: ubuntu-latest
-    concurrency:
-      group: major-tag-${{ github.ref_name || inputs.tag_name }}
-      cancel-in-progress: true
-
     permissions:
       contents: write
 
@@ -31,52 +15,39 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fetch tags explicitly
+      - name: Fetch all tags
         run: git fetch --tags
 
-      - name: Get version from input or tag
-        id: get-version
-        run: |
-          if [ -n "${{ github.event.inputs.tag_name }}" ]; then
-            TAG_NAME="${{ github.event.inputs.tag_name }}"
-          else
-            TAG_NAME="${GITHUB_REF_NAME}"
-          fi
-
-          VERSION=$(echo "$TAG_NAME" | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          MAJOR_VERSION=$(echo $VERSION | cut -d. -f1)
-          echo "major_version=$MAJOR_VERSION" >> $GITHUB_OUTPUT
-          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
-
-      - name: Configure Git Credentials
+      - name: Configure Git
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
 
-      - name: Update or create major version tag
-        id: update_tag
-        env:
-          MAJOR_VERSION: ${{ steps.get-version.outputs.major_version }}
-          PUSHED_TAG_NAME: ${{ steps.get-version.outputs.tag_name }}
-          COMMIT_SHA: ${{ github.event.inputs.commit_sha }}
+      - name: Update major version tags
         run: |
-          MAJOR_VERSION_TAG="v${MAJOR_VERSION}"
-          if [ -n "$COMMIT_SHA" ]; then
-            TARGET_COMMIT="$COMMIT_SHA"
-          else
-            TARGET_COMMIT=$(git rev-parse HEAD)
-          fi
-          SHORT_COMMIT_SHA=$(git rev-parse --short "$TARGET_COMMIT")
-
-          git tag -fa "$MAJOR_VERSION_TAG" "$TARGET_COMMIT" -m "chore(release): update or create $MAJOR_VERSION_TAG based on $PUSHED_TAG_NAME ($TARGET_COMMIT)"
-
-          git push origin "$MAJOR_VERSION_TAG" --force
-
-          echo "### Major Version Tag Updated or Created" >> $GITHUB_STEP_SUMMARY
+          echo "### 📌 Updating Major Version Tags" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Action        | Trigger Tag         | Major Tag           | Commit SHA |" >> $GITHUB_STEP_SUMMARY
-          echo "|---------------|---------------------|---------------------|------------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Updated/Created | \`${PUSHED_TAG_NAME}\` | \`${MAJOR_VERSION_TAG}\` | \`${SHORT_COMMIT_SHA}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Major version tag **${MAJOR_VERSION_TAG}** was **updated or created** to point to commit \`${SHORT_COMMIT_SHA}\` (triggered by \`${PUSHED_TAG_NAME}\`)." >> $GITHUB_STEP_SUMMARY
+          echo "| Major Tag | Latest Semantic Tag | Commit SHA |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|----------------------|------------|" >> $GITHUB_STEP_SUMMARY
+
+          # Get all semantic version tags and sort them
+          git tag \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+            | sort -V \
+            | while read tag; do
+                version=$(echo "$tag" | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+')
+                major=$(echo "$version" | cut -d. -f1)
+                major_tag="v$major"
+                commit_sha=$(git rev-list -n 1 "$tag")
+
+                # Store latest semantic tag per major version
+                echo "$major_tag $tag $commit_sha"
+              done \
+            | awk '{ a[$1]=$2; b[$1]=$3 } END { for (k in a) print k, a[k], b[k] }' \
+            | sort \
+            | while read major_tag latest_tag commit_sha; do
+                short_sha=$(git rev-parse --short "$commit_sha")
+                git tag -fa "$major_tag" "$commit_sha" -m "chore(release): update $major_tag to point to $latest_tag"
+                git push origin "$major_tag" --force
+                echo "| \`$major_tag\` | \`$latest_tag\` | \`$short_sha\` |" >> $GITHUB_STEP_SUMMARY
+              done
