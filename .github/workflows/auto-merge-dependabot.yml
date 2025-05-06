@@ -83,7 +83,6 @@ jobs:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh pr review --approve "$PR_URL"
           gh pr merge "$PR_URL" --auto --merge
 
       - name: Summarize workflow outcome
