@@ -17,9 +17,9 @@ type ServiceProcessingResult = {
   readonly restoredFromCache: boolean;
   readonly imageName: string;
   readonly cacheKey: string;
-  readonly digest?: string;
-  readonly platform?: string;
-  readonly error?: string;
+  readonly digest: string | undefined;
+  readonly platform: string | undefined;
+  readonly error: string | undefined;
 };
 
 /**
@@ -37,7 +37,7 @@ function generateCacheKey(
   imageName: string,
   imageTag: string,
   imageDigest: string,
-  servicePlatformString?: string
+  servicePlatformString: string | undefined
 ): string {
   // Sanitize components to ensure valid cache key
   const sanitizedImageName = sanitizePathComponent(imageName);
@@ -66,7 +66,7 @@ function generateTarPath(
   imageName: string,
   imageTag: string,
   imageDigest: string,
-  servicePlatformString?: string
+  servicePlatformString: string | undefined
 ): string {
   const tarFileName = generateCacheKey('', imageName, imageTag, imageDigest, servicePlatformString);
   return path.join(process.env.RUNNER_TEMP || '/tmp', `${tarFileName}.tar`);
@@ -100,6 +100,7 @@ async function processService(
       cacheKey: '',
       digest: undefined,
       platform: serviceDefinition.platform,
+      error: `Could not get digest for ${fullImageName}`,
     };
   }
 
@@ -131,6 +132,7 @@ async function processService(
       cacheKey: serviceCacheKey,
       digest: imageDigest,
       platform: serviceDefinition.platform,
+      error: loadSuccess ? undefined : `Failed to load image from cache: ${fullImageName}`,
     };
   }
 
@@ -146,6 +148,7 @@ async function processService(
       cacheKey: serviceCacheKey,
       digest: imageDigest,
       platform: serviceDefinition.platform,
+      error: `Failed to pull image: ${fullImageName}`,
     };
   }
 
@@ -160,6 +163,7 @@ async function processService(
       cacheKey: serviceCacheKey,
       digest: imageDigest,
       platform: serviceDefinition.platform,
+      error: `Digest mismatch for ${fullImageName}: expected ${imageDigest}, got ${newImageDigest}`,
     };
   }
 
@@ -174,6 +178,7 @@ async function processService(
       cacheKey: serviceCacheKey,
       digest: imageDigest,
       platform: serviceDefinition.platform,
+      error: `Failed to save image to tar: ${fullImageName}`,
     };
   }
 
@@ -195,6 +200,7 @@ async function processService(
       cacheKey: serviceCacheKey,
       digest: imageDigest,
       platform: serviceDefinition.platform,
+      error: undefined,
     };
   } catch (cacheError) {
     // Handle known cache saving errors gracefully without failing the operation
@@ -216,6 +222,7 @@ async function processService(
       cacheKey: serviceCacheKey,
       digest: imageDigest,
       platform: serviceDefinition.platform,
+      error: undefined,
     };
   }
 }
