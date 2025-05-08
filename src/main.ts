@@ -4,7 +4,7 @@ import { formatDuration, intervalToDuration } from 'date-fns';
 import { chain } from 'lodash';
 import * as path from 'path';
 
-import { getImageDigest, loadImageFromTar, pullImage, saveImageToTar } from './docker-command';
+import { getImageDigest, getImageSize, loadImageFromTar, pullImage, saveImageToTar } from './docker-command';
 import { ComposeService, getComposeServicesFromFiles } from './docker-compose-file';
 import { sanitizePathComponent } from './path-utils';
 import { getCurrentPlatformInfo, parsePlatformString } from './platform';
@@ -20,7 +20,36 @@ type ServiceProcessingResult = {
   readonly digest: string | undefined;
   readonly platform: string | undefined;
   readonly error: string | undefined;
+  readonly imageSize: number | undefined;
 };
+
+/**
+ * Formats a file size in bytes to a human-readable string
+ *
+ * @param sizeInBytes - Size in bytes
+ * @returns Human-readable size string (e.g. "10.5 MB")
+ */
+function formatFileSize(sizeInBytes: number | undefined): string {
+  if (sizeInBytes === undefined) {
+    return 'N/A';
+  }
+
+  if (sizeInBytes === 0) {
+    return '0 Bytes';
+  }
+
+  const units = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB'] as const;
+  const i = Math.floor(Math.log(sizeInBytes) / Math.log(1024));
+
+  // Ensure we don't exceed the units array bounds
+  const unitIndex = Math.min(i, units.length - 1);
+
+  // Format with 2 decimal places and trim trailing zeros
+  // Use array access with validation to prevent ESLint warning
+  const unit = units[unitIndex as keyof typeof units] || units[0];
+
+  return `${(sizeInBytes / Math.pow(1024, unitIndex)).toFixed(2).replace(/\.0+$|(\.[0-9]*[1-9])0+$/, '$1')} ${unit}`;
+}
 
 /**
  * Formats the time difference between start and end timestamps into a human-readable duration string
@@ -121,6 +150,7 @@ async function processService(
       digest: undefined,
       platform: serviceDefinition.platform,
       error: `Could not get digest for ${fullImageName}`,
+      imageSize: undefined,
     };
   }
 
@@ -145,6 +175,10 @@ async function processService(
   if (cacheHitKey) {
     core.info(`Cache hit for ${fullImageName}, loading from cache`);
     const loadSuccess = await loadImageFromTar(imageTarPath);
+
+    // Get image size after loading from cache
+    const imageSize = loadSuccess ? await getImageSize(fullImageName) : undefined;
+
     return {
       success: loadSuccess,
       restoredFromCache: loadSuccess,
@@ -153,6 +187,7 @@ async function processService(
       digest: imageDigest,
       platform: serviceDefinition.platform,
       error: loadSuccess ? undefined : `Failed to load image from cache: ${fullImageName}`,
+      imageSize,
     };
   }
 
@@ -169,6 +204,7 @@ async function processService(
       digest: imageDigest,
       platform: serviceDefinition.platform,
       error: `Failed to pull image: ${fullImageName}`,
+      imageSize: undefined,
     };
   }
 
@@ -184,6 +220,7 @@ async function processService(
       digest: imageDigest,
       platform: serviceDefinition.platform,
       error: `Digest mismatch for ${fullImageName}: expected ${imageDigest}, got ${newImageDigest}`,
+      imageSize: undefined,
     };
   }
 
@@ -199,6 +236,7 @@ async function processService(
       digest: imageDigest,
       platform: serviceDefinition.platform,
       error: `Failed to save image to tar: ${fullImageName}`,
+      imageSize: undefined,
     };
   }
 
@@ -213,6 +251,9 @@ async function processService(
       core.debug(`Cache was not saved for ${fullImageName} (cache ID: ${cacheResultId})`);
     }
 
+    // Get image size after pulling
+    const imageSize = await getImageSize(fullImageName);
+
     return {
       success: true,
       restoredFromCache: false,
@@ -221,6 +262,7 @@ async function processService(
       digest: imageDigest,
       platform: serviceDefinition.platform,
       error: undefined,
+      imageSize,
     };
   } catch (cacheError) {
     // Handle known cache saving errors gracefully without failing the operation
@@ -235,6 +277,10 @@ async function processService(
     } else {
       core.debug(`Unknown error saving cache for ${fullImageName}: ${String(cacheError)}`);
     }
+
+    // Get image size even if cache saving failed
+    const imageSize = await getImageSize(fullImageName);
+
     return {
       success: true,
       restoredFromCache: false,
@@ -243,6 +289,7 @@ async function processService(
       digest: imageDigest,
       platform: serviceDefinition.platform,
       error: undefined,
+      imageSize,
     };
   }
 }
@@ -327,6 +374,7 @@ export async function run(): Promise<void> {
         { data: 'Image Name', header: true },
         { data: 'Platform', header: true },
         { data: 'Status', header: true },
+        { data: 'Size', header: true },
         { data: 'Duration', header: true },
         { data: 'Cache Key', header: true },
       ],
@@ -339,6 +387,7 @@ export async function run(): Promise<void> {
             : result.success
               ? '⬇️ Pulled'
               : `❌ Error: ${result.error || 'Unknown'}`,
+          formatFileSize(result.imageSize),
           result.humanReadableDuration,
           `\`${result.cacheKey || 'N/A'}\``,
         ];

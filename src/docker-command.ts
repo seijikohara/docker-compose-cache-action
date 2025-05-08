@@ -86,6 +86,56 @@ export async function getImageDigest(imageName: string): Promise<string | undefi
 }
 
 /**
+ * Gets the image size in bytes
+ *
+ * @param imageName - Docker image name with optional tag
+ * @returns Promise resolving to image size in bytes or undefined on failure
+ */
+export async function getImageSize(imageName: string): Promise<number | undefined> {
+  try {
+    // Use accumulators to avoid mutable state
+    let stdoutContent = '';
+    let stderrContent = '';
+
+    const execOptions: exec.ExecOptions = {
+      listeners: {
+        stdout: (data: Buffer) => {
+          stdoutContent += data.toString();
+        },
+        stderr: (data: Buffer) => {
+          stderrContent += data.toString();
+        },
+      },
+      ignoreReturnCode: true,
+    };
+
+    // Execute docker image inspect command to get size information
+    const commandExitCode = await exec.exec(
+      'docker',
+      ['image', 'inspect', '--format', '{{.Size}}', imageName],
+      execOptions
+    );
+
+    if (commandExitCode !== 0) {
+      core.warning(`Failed to get size for ${imageName}: ${stderrContent}`);
+      return undefined;
+    }
+
+    // Parse the output to get size in bytes
+    const size = parseInt(stdoutContent.trim(), 10);
+    if (isNaN(size)) {
+      core.warning(`Failed to parse image size for ${imageName}: invalid number`);
+      return undefined;
+    }
+
+    return size;
+  } catch (error) {
+    core.warning(`Error getting size for ${imageName}: ${error}`);
+    return undefined;
+  }
+}
+
+/**
  * Saves Docker image to a tar file
  *
  * @param imageName - Docker image name to save
