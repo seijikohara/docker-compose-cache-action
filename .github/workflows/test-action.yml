@@ -166,16 +166,6 @@ jobs:
             [[ "${{ needs.test-second-run.result }}" == "success" ]] && append "| $scenario | ✅ Pass |" || append "| $scenario | ❌ Fail |"
           done
           append ""
-          append "## 📋 Action Outputs"
-          append "| Output | Description |"
-          append "|--------|-------------|"
-          append "| `cache-hit` | true if all images were restored from cache |"
-          append "| `image-list` | Space-separated list of image names |"
-          append ""
-          append "## 🔗 Links"
-          append "- [Run Logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
-          append "- [Artifacts](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts)"
-          append ""
           if [[ "${{ needs.test-first-run.result }}" == "success" && "${{ needs.test-second-run.result }}" == "success" ]]; then
             append "## ✅ All tests passed."
           else
