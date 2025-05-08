@@ -311,7 +311,6 @@ export async function run(): Promise<void> {
       [
         { data: 'Image Name', header: true },
         { data: 'Platform', header: true },
-        { data: 'Cache Hit', header: true },
         { data: 'Status', header: true },
         { data: 'Duration', header: true },
         { data: 'Cache Key', header: true },
@@ -320,8 +319,11 @@ export async function run(): Promise<void> {
         return [
           result.imageName,
           result.platform || 'default',
-          result.restoredFromCache ? '✅' : '❌',
-          result.success ? 'Success' : 'Failed',
+          result.restoredFromCache
+            ? '✅ Cached'
+            : result.success
+              ? '⬇️ Pulled'
+              : `❌ Error: ${result.error || 'Unknown'}`,
           result.humanReadableDuration,
           result.cacheKey || 'N/A',
         ];
