@@ -16,6 +16,47 @@ Pulling Docker images can significantly slow down CI/CD workflows in GitHub Acti
 - **Selective image pulling** based on cache status and digest verification
 - **Supporting multiple Compose files** and image exclusion options
 
+### Processing Flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Workflow as GitHub Actions Workflow
+    participant Action as Docker Compose Cache Action
+    participant Cache as GitHub Actions Cache
+    participant Docker as Docker CLI
+    participant Registry as Docker Registry
+
+    Workflow->>Action: Start Action (inputs)
+    Action->>Action: Parse compose-files
+    loop For each Docker image (executed in parallel)
+        Action->>Docker: Get image digest
+        Docker->>Registry: Request image digest
+        Registry-->>Docker: Return image digest
+        Docker-->>Action: Return image digest
+        Action->>Action: Generate cache key
+        Action->>Cache: Restore from cache
+        alt Cache hit
+            Cache-->>Action: Return cached image tar
+            Action->>Docker: Load image from tar
+            Docker-->>Action: Image loaded
+        else Cache miss
+            Action->>Registry: Pull image
+            Registry-->>Docker: Download image
+            Docker-->>Action: Image pulled
+            Action->>Docker: Save image to tar
+            Docker-->>Action: Tar file created
+            Action->>Cache: Save to cache
+            Cache-->>Action: Cache saved
+        end
+        Action->>Docker: Get image size
+        Docker-->>Action: Return image size
+    end
+    Action->>Action: Aggregate results
+    Action->>Workflow: Return outputs (cache-hit, image-list)
+    Action->>Workflow: Create GitHub summary
+```
+
 ## Usage
 
 ### Quick Start
@@ -109,10 +150,41 @@ This action also handles platform-specific images automatically. When a platform
 
 ### Outputs
 
-| Output       | Description                                                                                                                                                                                                                                                                                                                                                        | Example Value                                                                                                                                                                               |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cache-hit`  | Boolean value (`'true'` or `'false'`) indicating if all images were restored from cache.                                                                                                                                                                                                                                                                           | `'true'`                                                                                                                                                                                    |
-| `image-list` | JSON array of image details with information about each image. Each image object contains: <br>- `name`: Image name with tag<br>- `platform`: Platform the image was pulled for<br>- `status`: Either 'Cached', 'Pulled', or 'Error'<br>- `size`: Size in bytes (numeric)<br>- `processingTimeMs`: Processing time in milliseconds<br>- `cacheKey`: Used cache key | `'[{"name":"mysql:8.0","platform":"linux/amd64","status":"Cached","size":524288000,"processingTimeMs":1200.5,"cacheKey":"docker-compose-image-mysql-8.0-linux-amd64-none-sha256:digest"}]'` |
+| Output       | Description                                                                                                                                                                                                                                                                                                                                                        | Example Value                                       |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------- |
+| `cache-hit`  | Boolean value (`'true'` or `'false'`) indicating if all images were restored from cache.                                                                                                                                                                                                                                                                           | `'true'`                                            |
+| `image-list` | JSON array of image details with information about each image. Each image object contains: <br>- `name`: Image name with tag<br>- `platform`: Platform the image was pulled for<br>- `status`: Either 'Cached', 'Pulled', or 'Error'<br>- `size`: Size in bytes (numeric)<br>- `processingTimeMs`: Processing time in milliseconds<br>- `cacheKey`: Used cache key | See [image-list example](#image-list-example) below |
+
+#### image-list Example
+
+```json
+[
+  {
+    "name": "mysql:8.0",
+    "platform": "linux/amd64",
+    "status": "Cached",
+    "size": 524288000,
+    "processingTimeMs": 1200.5,
+    "cacheKey": "docker-compose-image-mysql-8.0-linux-amd64-none-sha256:digest"
+  },
+  {
+    "name": "redis:alpine",
+    "platform": "linux/amd64",
+    "status": "Pulled",
+    "size": 32768000,
+    "processingTimeMs": 3500.2,
+    "cacheKey": "docker-compose-image-redis-alpine-linux-amd64-none-sha256:digest"
+  },
+  {
+    "name": "node:18",
+    "platform": "linux/amd64",
+    "status": "Cached",
+    "size": 128456789,
+    "processingTimeMs": 950.8,
+    "cacheKey": "docker-compose-image-node-18-linux-amd64-none-sha256:digest"
+  }
+]
+```
 
 ## Private Registry Authentication
 
