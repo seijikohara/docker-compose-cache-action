@@ -23,6 +23,26 @@ type ServiceProcessingResult = {
 };
 
 /**
+ * Formats the time difference between start and end timestamps into a human-readable duration string
+ *
+ * @param startTime - Start timestamp in milliseconds
+ * @param endTime - End timestamp in milliseconds
+ * @returns Human-readable duration string (e.g. "1 hour 2 minutes 3 seconds")
+ */
+function formatExecutionTime(startTime: number, endTime: number): string {
+  const duration = intervalToDuration({
+    start: 0,
+    end: endTime - startTime,
+  });
+
+  return formatDuration(duration, {
+    format: ['hours', 'minutes', 'seconds'],
+    zero: false,
+    delimiter: ' ',
+  });
+}
+
+/**
  * Generates a unique cache key for a Docker image
  *
  * @param cacheKeyPrefix - Prefix to use for the cache key
@@ -233,6 +253,9 @@ async function processService(
  * @returns Promise that resolves when the action completes
  */
 export async function run(): Promise<void> {
+  // Record action start time
+  const actionStartTime = performance.now();
+
   try {
     // Get action inputs from GitHub Actions environment
     const composeFilePaths: ReadonlyArray<string> = core.getMultilineInput('compose-files');
@@ -281,18 +304,10 @@ export async function run(): Promise<void> {
         const processingStartTime = performance.now(); // Record start time
         const processingResult = await processService(serviceDefinition, cacheKeyPrefix);
         const processingEndTime = performance.now(); // Record end time
-        const processingDuration = intervalToDuration({
-          start: 0,
-          end: processingEndTime - processingStartTime,
-        });
 
         return {
           ...processingResult,
-          humanReadableDuration: formatDuration(processingDuration, {
-            format: ['hours', 'minutes', 'seconds'],
-            zero: false,
-            delimiter: ' ',
-          }),
+          humanReadableDuration: formatExecutionTime(processingStartTime, processingEndTime),
         };
       })
     );
@@ -330,12 +345,19 @@ export async function run(): Promise<void> {
       }),
     ]);
 
+    // Record action end time and duration
+    const actionEndTime = performance.now();
+    const actionHumanReadableDuration = formatExecutionTime(actionStartTime, actionEndTime);
+
     summaryTable
       .addRaw(`Total Services: ${totalServiceCount}`, true)
       .addRaw(`Restored from Cache: ${cachedServiceCount}/${totalServiceCount}`, true)
+      .addRaw(`Total Execution Time: ${actionHumanReadableDuration}`, true)
       .addHeading('Referenced Compose Files', 3)
       .addList(composeFilePaths.map((filePath) => `\`${filePath}\``))
       .write();
+
+    core.info(`Action completed in ${actionHumanReadableDuration}`);
 
     if (allServicesSuccessful) {
       core.info('Docker Compose Cache action completed successfully');
