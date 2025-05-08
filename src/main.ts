@@ -317,15 +317,15 @@ export async function run(): Promise<void> {
       ],
       ...processingResults.map((result) => {
         return [
-          result.imageName,
-          result.platform || 'default',
+          `\`${result.imageName}\``,
+          `\`${result.platform || 'default'}\``,
           result.restoredFromCache
             ? '✅ Cached'
             : result.success
               ? '⬇️ Pulled'
               : `❌ Error: ${result.error || 'Unknown'}`,
           result.humanReadableDuration,
-          result.cacheKey || 'N/A',
+          `\`${result.cacheKey || 'N/A'}\``,
         ];
       }),
     ]);
@@ -333,6 +333,8 @@ export async function run(): Promise<void> {
     summaryTable
       .addRaw(`Total Services: ${totalServiceCount}`, true)
       .addRaw(`Restored from Cache: ${cachedServiceCount}/${totalServiceCount}`, true)
+      .addHeading('Referenced Compose Files', 3)
+      .addList(composeFilePaths.map((filePath) => `\`${filePath}\``))
       .write();
 
     if (allServicesSuccessful) {
