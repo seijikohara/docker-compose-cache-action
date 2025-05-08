@@ -320,45 +320,52 @@ export async function run(): Promise<void> {
     core.info(`${cachedServiceCount} of ${totalServiceCount} services restored from cache`);
     core.setOutput('cache-hit', allServicesFromCache.toString());
 
-    // Create summary table for better visibility in the GitHub Actions UI
-    const summaryTable = core.summary.addHeading('Docker Compose Cache Results', 2).addTable([
-      [
-        { data: 'Image Name', header: true },
-        { data: 'Platform', header: true },
-        { data: 'Status', header: true },
-        { data: 'Size', header: true },
-        { data: 'Duration', header: true },
-        { data: 'Cache Key', header: true },
-      ],
-      ...processingResults.map((result) => {
-        return [
-          `\`${result.imageName}\``,
-          `\`${result.platform || 'default'}\``,
-          result.restoredFromCache
-            ? '✅ Cached'
-            : result.success
-              ? '⬇️ Pulled'
-              : `❌ Error: ${result.error || 'Unknown'}`,
-          formatFileSize(result.imageSize),
-          result.humanReadableDuration,
-          `\`${result.cacheKey || 'N/A'}\``,
-        ];
-      }),
-    ]);
-
     // Record action end time and duration
     const actionEndTime = performance.now();
     const actionHumanReadableDuration = formatExecutionTime(actionStartTime, actionEndTime);
 
-    summaryTable
-      .addRaw('### Summary', true)
-      .addRaw('| Metric | Value |', true)
-      .addRaw('|--------|-------|', true)
-      .addRaw(`| **Total Services** | ${totalServiceCount} |`, true)
-      .addRaw(`| **Restored from Cache** | ${cachedServiceCount}/${totalServiceCount} |`, true)
-      .addRaw(`| **Total Execution Time** | ${actionHumanReadableDuration} |`, true)
+    // Create summary table for better visibility in the GitHub Actions UI
+    core.summary
+      .addHeading('Docker Compose Cache Results', 2)
+      .addTable([
+        [
+          { data: 'Image Name', header: true },
+          { data: 'Platform', header: true },
+          { data: 'Status', header: true },
+          { data: 'Size', header: true },
+          { data: 'Duration', header: true },
+          { data: 'Cache Key', header: true },
+        ],
+        ...processingResults.map((result) => {
+          return [
+            { data: result.imageName },
+            { data: result.platform || 'default' },
+            {
+              data: result.restoredFromCache
+                ? '✅ Cached'
+                : result.success
+                  ? '⬇️ Pulled'
+                  : `❌ Error: ${result.error || 'Unknown'}`,
+            },
+            { data: formatFileSize(result.imageSize) },
+            { data: result.humanReadableDuration },
+            { data: result.cacheKey || 'N/A' },
+          ];
+        }),
+      ])
+      // Add summary information in a consistent markdown format
+      .addHeading('Action summary', 3)
+      .addTable([
+        [
+          { data: 'Metric', header: true },
+          { data: 'Value', header: true },
+        ],
+        [{ data: 'Total Services' }, { data: `${totalServiceCount}` }],
+        [{ data: 'Restored from Cache' }, { data: `${cachedServiceCount}/${totalServiceCount}` }],
+        [{ data: 'Total Execution Time' }, { data: actionHumanReadableDuration }],
+      ])
       .addHeading('Referenced Compose Files', 3)
-      .addList(composeFilePaths.map((filePath) => `\`${filePath}\``))
+      .addList(composeFilePaths.map((filePath) => filePath))
       .write();
 
     core.info(`Action completed in ${actionHumanReadableDuration}`);
