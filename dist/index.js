@@ -86986,6 +86986,17 @@ const format_1 = __nccwpck_require__(16264);
 const path_utils_1 = __nccwpck_require__(66696);
 const platform_1 = __nccwpck_require__(23728);
 /**
+ * Sets the standard output values for the action
+ * Ensures consistent output formats and proper type handling
+ *
+ * @param cacheHit - Whether all images were restored from cache
+ * @param imageList - List of processed images with their details
+ */
+function setActionOutputs(cacheHit, imageList) {
+    core.setOutput('cache-hit', cacheHit.toString());
+    core.setOutput('image-list', JSON.stringify(imageList || []));
+}
+/**
  * Generates a unique cache key for a Docker image
  *
  * @param cacheKeyPrefix - Prefix to use for the cache key
@@ -87207,8 +87218,7 @@ async function run() {
             .value();
         if (serviceDefinitions.length === 0) {
             core.info('No Docker services found in compose files or all services were excluded');
-            core.setOutput('cache-hit', 'false');
-            core.setOutput('image-list', '');
+            setActionOutputs(false, []);
             return;
         }
         core.info(`Found ${serviceDefinitions.length} services to cache`);
@@ -87238,8 +87248,7 @@ async function run() {
             cacheKey: result.cacheKey || '',
         }));
         core.info(`${cachedServiceCount} of ${totalServiceCount} services restored from cache`);
-        core.setOutput('cache-hit', allServicesFromCache.toString());
-        core.setOutput('image-list', JSON.stringify(imageListOutput));
+        setActionOutputs(allServicesFromCache, imageListOutput);
         // Record action end time and duration
         const actionEndTime = performance.now();
         const actionHumanReadableDuration = (0, format_1.formatExecutionTime)(actionStartTime, actionEndTime);
