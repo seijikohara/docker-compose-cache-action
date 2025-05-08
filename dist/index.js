@@ -86625,6 +86625,67 @@ exports.pullImage = pullImage;
 const core = __importStar(__nccwpck_require__(37484));
 const exec = __importStar(__nccwpck_require__(95236));
 /**
+ * Executes a Docker command and logs execution time
+ *
+ * @param command - The command to execute (e.g., 'docker')
+ * @param args - Array of command arguments
+ * @param options - Execution options
+ * @returns Promise resolving to object containing exit code, stdout, and stderr
+ */
+async function executeDockerCommand(command, args, options) {
+    // Format command for logging
+    const fullCommand = `${command} ${args.join(' ')}`;
+    // Log command execution
+    core.info(`Executing: ${fullCommand}`);
+    // Record start time
+    const startTime = performance.now();
+    // Initialize stdout and stderr capture as arrays
+    const stdoutChunks = [];
+    const stderrChunks = [];
+    // Create a new options object with our stdout/stderr listeners
+    const execOptionsWithCapture = {
+        ...options,
+        listeners: {
+            ...options.listeners,
+            stdout: (data) => {
+                const text = data.toString();
+                stdoutChunks.push(text);
+                // If the original options had a stdout listener, call it
+                if (options.listeners?.stdout) {
+                    options.listeners.stdout(data);
+                }
+            },
+            stderr: (data) => {
+                const text = data.toString();
+                stderrChunks.push(text);
+                // If the original options had a stderr listener, call it
+                if (options.listeners?.stderr) {
+                    options.listeners.stderr(data);
+                }
+            },
+        },
+    };
+    try {
+        // Execute the command
+        const exitCode = await exec.exec(command, args, execOptionsWithCapture);
+        // Calculate and log execution time
+        const endTime = performance.now();
+        const executionTimeMs = Math.round(endTime - startTime);
+        core.info(`Command completed in ${executionTimeMs}ms: ${fullCommand}`);
+        // Join all chunks to create the complete output strings
+        const stdout = stdoutChunks.join('');
+        const stderr = stderrChunks.join('');
+        return { exitCode, stdout, stderr };
+    }
+    catch (error) {
+        // Log execution failure
+        const endTime = performance.now();
+        const executionTimeMs = Math.round(endTime - startTime);
+        core.error(`Command failed after ${executionTimeMs}ms: ${fullCommand}`);
+        throw error;
+    }
+}
+/**
  * Gets the image digest from Docker registry
  *
  * Uses 'docker buildx imagetools inspect' to retrieve the manifest digest
@@ -86634,29 +86695,18 @@ const exec = __importStar(__nccwpck_require__(95236));
  */
 async function getImageDigest(imageName) {
     try {
-        // Use accumulators to avoid mutable state
-        let stdoutContent = '';
-        let stderrContent = '';
         const execOptions = {
-            listeners: {
-                stdout: (data) => {
-                    stdoutContent += data.toString();
-                },
-                stderr: (data) => {
-                    stderrContent += data.toString();
-                },
-            },
             ignoreReturnCode: true,
         };
         // Execute docker buildx command to inspect the image manifest
-        const commandExitCode = await exec.exec('docker', ['buildx', 'imagetools', 'inspect', '--format', '{{json .Manifest}}', imageName], execOptions);
-        if (commandExitCode !== 0) {
-            core.warning(`Failed to get digest for ${imageName}: ${stderrContent}`);
+        const { exitCode, stdout, stderr } = await executeDockerCommand('docker', ['buildx', 'imagetools', 'inspect', '--format', '{{json .Manifest}}', imageName], execOptions);
+        if (exitCode !== 0) {
+            core.warning(`Failed to get digest for ${imageName}: ${stderr}`);
             return undefined;
         }
         try {
             // Parse the JSON output to extract the digest
-            const manifest = JSON.parse(stdoutContent.trim());
+            const manifest = JSON.parse(stdout.trim());
             return manifest.digest || undefined;
         }
         catch (manifestParseError) {
@@ -86677,28 +86727,17 @@ async function getImageDigest(imageName) {
  */
 async function getImageSize(imageName) {
     try {
-        // Use accumulators to avoid mutable state
-        let stdoutContent = '';
-        let stderrContent = '';
         const execOptions = {
-            listeners: {
-                stdout: (data) => {
-                    stdoutContent += data.toString();
-                },
-                stderr: (data) => {
-                    stderrContent += data.toString();
-                },
-            },
             ignoreReturnCode: true,
         };
         // Execute docker image inspect command to get size information
-        const commandExitCode = await exec.exec('docker', ['image', 'inspect', '--format', '{{.Size}}', imageName], execOptions);
-        if (commandExitCode !== 0) {
-            core.warning(`Failed to get size for ${imageName}: ${stderrContent}`);
+        const { exitCode, stdout, stderr } = await executeDockerCommand('docker', ['image', 'inspect', '--format', '{{.Size}}', imageName], execOptions);
+        if (exitCode !== 0) {
+            core.warning(`Failed to get size for ${imageName}: ${stderr}`);
             return undefined;
         }
         // Parse the output to get size in bytes
-        const size = parseInt(stdoutContent.trim(), 10);
+        const size = parseInt(stdout.trim(), 10);
         if (isNaN(size)) {
             core.warning(`Failed to parse image size for ${imageName}: invalid number`);
             return undefined;
@@ -86721,9 +86760,9 @@ async function saveImageToTar(imageName, outputPath) {
     try {
         const execOptions = { ignoreReturnCode: true };
         // Execute docker save command to create a tar archive of the image
-        const commandExitCode = await exec.exec('docker', ['save', '-o', outputPath, imageName], execOptions);
-        if (commandExitCode !== 0) {
-            core.warning(`Failed to save image ${imageName} to ${outputPath}`);
+        const { exitCode, stderr } = await executeDockerCommand('docker', ['save', '-o', outputPath, imageName], execOptions);
+        if (exitCode !== 0) {
+            core.warning(`Failed to save image ${imageName} to ${outputPath}: ${stderr}`);
             return false;
         }
         return true;
@@ -86743,9 +86782,9 @@ async function loadImageFromTar(tarPath) {
     try {
         const execOptions = { ignoreReturnCode: true };
         // Execute docker load command to restore image from tar archive
-        const commandExitCode = await exec.exec('docker', ['load', '-i', tarPath], execOptions);
-        if (commandExitCode !== 0) {
-            core.warning(`Failed to load image from ${tarPath}`);
+        const { exitCode, stderr } = await executeDockerCommand('docker', ['load', '-i', tarPath], execOptions);
+        if (exitCode !== 0) {
+            core.warning(`Failed to load image from ${tarPath}: ${stderr}`);
             return false;
         }
         return true;
@@ -86771,9 +86810,9 @@ async function pullImage(imageName, platform) {
             core.info(`Pulling image ${imageName} for platform ${platform}`);
         }
         // Execute docker pull command
-        const commandExitCode = await exec.exec('docker', dockerCommandArguments, execOptions);
-        if (commandExitCode !== 0) {
-            core.warning(`Failed to pull image ${imageName}${platform ? ` for platform ${platform}` : ''}`);
+        const { exitCode, stderr } = await executeDockerCommand('docker', dockerCommandArguments, execOptions);
+        if (exitCode !== 0) {
+            core.warning(`Failed to pull image ${imageName}${platform ? ` for platform ${platform}` : ''}: ${stderr}`);
             return false;
         }
         return true;
