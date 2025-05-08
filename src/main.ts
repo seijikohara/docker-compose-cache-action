@@ -24,6 +24,30 @@ type ServiceProcessingResult = {
 };
 
 /**
+ * Type definition for image list output
+ */
+type ImageListOutput = Array<{
+  name: string;
+  platform: string;
+  status: string;
+  size: number;
+  processingTimeMs: number;
+  cacheKey: string;
+}>;
+
+/**
+ * Sets the standard output values for the action
+ * Ensures consistent output formats and proper type handling
+ *
+ * @param cacheHit - Whether all images were restored from cache
+ * @param imageList - List of processed images with their details
+ */
+function setActionOutputs(cacheHit: boolean, imageList: ImageListOutput | undefined): void {
+  core.setOutput('cache-hit', cacheHit.toString());
+  core.setOutput('image-list', JSON.stringify(imageList || []));
+}
+
+/**
  * Generates a unique cache key for a Docker image
  *
  * @param cacheKeyPrefix - Prefix to use for the cache key
@@ -289,8 +313,7 @@ export async function run(): Promise<void> {
 
     if (serviceDefinitions.length === 0) {
       core.info('No Docker services found in compose files or all services were excluded');
-      core.setOutput('cache-hit', 'false');
-      core.setOutput('image-list', '');
+      setActionOutputs(false, []);
       return;
     }
 
@@ -328,8 +351,7 @@ export async function run(): Promise<void> {
     }));
 
     core.info(`${cachedServiceCount} of ${totalServiceCount} services restored from cache`);
-    core.setOutput('cache-hit', allServicesFromCache.toString());
-    core.setOutput('image-list', JSON.stringify(imageListOutput));
+    setActionOutputs(allServicesFromCache, imageListOutput);
 
     // Record action end time and duration
     const actionEndTime = performance.now();

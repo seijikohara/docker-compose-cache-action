@@ -179,7 +179,7 @@ describe('Main Module', () => {
 
     expect(mockCoreInfo).toHaveBeenCalledWith(expect.stringContaining('No Docker services found'));
     expect(mockCoreSetOutput).toHaveBeenCalledWith('cache-hit', 'false');
-    expect(mockCoreSetOutput).toHaveBeenCalledWith('image-list', '');
+    expect(mockCoreSetOutput).toHaveBeenCalledWith('image-list', '[]');
   });
 
   it('should handle errors in Docker commands', async () => {
