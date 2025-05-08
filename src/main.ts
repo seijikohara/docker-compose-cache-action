@@ -295,7 +295,6 @@ export async function run(): Promise<void> {
     }
 
     core.info(`Found ${serviceDefinitions.length} services to cache`);
-    core.setOutput('image-list', serviceDefinitions.map((service) => service.image).join(' '));
 
     // Process all services concurrently for efficiency
     const processingResults = await Promise.all(
@@ -306,6 +305,7 @@ export async function run(): Promise<void> {
 
         return {
           ...processingResult,
+          processingDuration: processingEndTime - processingStartTime,
           humanReadableDuration: formatExecutionTime(processingStartTime, processingEndTime),
         };
       })
@@ -317,8 +317,19 @@ export async function run(): Promise<void> {
     const allServicesSuccessful = processingResults.every((result) => result.success);
     const allServicesFromCache = cachedServiceCount === totalServiceCount && totalServiceCount > 0;
 
+    // Create JSON representation for image-list output
+    const imageListOutput = processingResults.map((result) => ({
+      name: result.imageName,
+      platform: result.platform || 'default',
+      status: result.restoredFromCache ? 'Cached' : result.success ? 'Pulled' : 'Error',
+      size: result.imageSize || 0,
+      processingTimeMs: result.processingDuration || 0,
+      cacheKey: result.cacheKey || '',
+    }));
+
     core.info(`${cachedServiceCount} of ${totalServiceCount} services restored from cache`);
     core.setOutput('cache-hit', allServicesFromCache.toString());
+    core.setOutput('image-list', JSON.stringify(imageListOutput));
 
     // Record action end time and duration
     const actionEndTime = performance.now();

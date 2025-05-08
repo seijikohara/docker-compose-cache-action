@@ -30,7 +30,7 @@ outputs:
   cache-hit:
     description: "Boolean value ('true' or 'false') indicating if *all* required images were restored from cache (and digests matched). Example: 'true'"
   image-list:
-    description: "Space-separated string of unique image names targeted for caching. Example: 'mysql:8.0 redis:alpine myapp:latest'"
+    description: 'JSON array of image details with information about each image. Example: ''[{"name":"mysql:8.0","platform":"linux/amd64","status":"Cached","size":524288000,"processingTimeMs":1200.5,"cacheKey":"docker-compose-image-mysql-8.0-linux-amd64-none-sha256:digest"},{"name":"redis:alpine","platform":"linux/amd64","status":"Pulled","size":32768000,"processingTimeMs":3500.2,"cacheKey":"docker-compose-image-redis-alpine-linux-amd64-none-sha256:digest"}]'''
 runs:
   using: 'node20'
   main: 'dist/index.js'
