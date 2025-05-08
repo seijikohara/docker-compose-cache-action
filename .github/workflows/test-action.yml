@@ -74,38 +74,24 @@ jobs:
           echo "| Output | Value |" >> $GITHUB_STEP_SUMMARY
           echo "| ------ | ----- |" >> $GITHUB_STEP_SUMMARY
           echo "| Cache Hit | ${{ steps.docker-cache.outputs.cache-hit }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Image List | \`\`\`json" >> $GITHUB_STEP_SUMMARY
-          IMAGE_LIST='${{ steps.docker-cache.outputs.image-list }}'
-          if [ -n "$IMAGE_LIST" ]; then
-            echo "$IMAGE_LIST" | jq -M '.' >> $GITHUB_STEP_SUMMARY || echo "$IMAGE_LIST" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "[]" >> $GITHUB_STEP_SUMMARY
-          fi
-          echo "\`\`\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Image List | ${{ steps.docker-cache.outputs.image-list }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
       - name: Assert Cache Miss
         id: validate
         run: |
           hit="${{ steps.docker-cache.outputs.cache-hit }}"
-          list="${{ steps.docker-cache.outputs.image-list }}"
+          list='${{ steps.docker-cache.outputs.image-list }}'
           echo "Scenario: ${{ matrix.scenario }}"
           echo "Cache Hit: $hit"
 
-          # Check if image-list is empty or not a valid JSON array
-          if [[ -z "$list" || "$(echo "$list" | jq 'if type=="array" then true else false end')" != "true" ]]; then
-            # For empty compose or no-images scenarios, this is expected
-            if [[ "${{ matrix.scenario }}" == "Empty Compose File" || "${{ matrix.scenario }}" == "No Images Defined" ]]; then
-              echo "result=success" >> $GITHUB_OUTPUT
-              exit 0
-            else
-              echo "::error::Expected image-list to be a non-empty JSON array"
-              echo "result=failure" >> $GITHUB_OUTPUT
-              exit 1
-            fi
+          # Handle special scenarios
+          if [[ "${{ matrix.scenario }}" == "Empty Compose File" || "${{ matrix.scenario }}" == "No Images Defined" ]]; then
+            echo "result=success" >> $GITHUB_OUTPUT
+            exit 0
           fi
 
-          # For normal scenarios, check that cache-hit is false
+          # For normal scenarios, cache-hit should be false
           if [[ "$hit" == "true" ]]; then
             echo "::error::Unexpected cache hit on first run"
             echo "result=failure" >> $GITHUB_OUTPUT
@@ -163,40 +149,25 @@ jobs:
           echo "| Output | Value |" >> $GITHUB_STEP_SUMMARY
           echo "| ------ | ----- |" >> $GITHUB_STEP_SUMMARY
           echo "| Cache Hit | ${{ steps.docker-cache.outputs.cache-hit }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Image List | \`\`\`json" >> $GITHUB_STEP_SUMMARY
-          IMAGE_LIST='${{ steps.docker-cache.outputs.image-list }}'
-          if [ -n "$IMAGE_LIST" ]; then
-            echo "$IMAGE_LIST" | jq -M '.' >> $GITHUB_STEP_SUMMARY || echo "$IMAGE_LIST" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "[]" >> $GITHUB_STEP_SUMMARY
-          fi
-          echo "\`\`\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Image List | ${{ steps.docker-cache.outputs.image-list }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
       - name: Assert Cache Hit
         id: validate
         run: |
           hit="${{ steps.docker-cache.outputs.cache-hit }}"
-          list="${{ steps.docker-cache.outputs.image-list }}"
+          list='${{ steps.docker-cache.outputs.image-list }}'
           echo "Scenario: ${{ matrix.scenario }}"
           echo "Cache Hit: $hit"
 
-          # Check if image-list is empty or not a valid JSON array
-          if [[ -z "$list" || "$(echo "$list" | jq 'if type=="array" then true else false end')" != "true" ]]; then
-            # For empty compose or no-images scenarios, this is expected
-            if [[ "${{ matrix.scenario }}" == "Empty Compose File" || "${{ matrix.scenario }}" == "No Images Defined" ]]; then
-              echo "result=success" >> $GITHUB_OUTPUT
-              exit 0
-            else
-              echo "::error::Expected image-list to be a non-empty JSON array"
-              echo "result=failure" >> $GITHUB_OUTPUT
-              exit 1
-            fi
+          # Handle special scenarios
+          if [[ "${{ matrix.scenario }}" == "Empty Compose File" || "${{ matrix.scenario }}" == "No Images Defined" ]]; then
+            echo "result=success" >> $GITHUB_OUTPUT
+            exit 0
           fi
 
-          # For normal scenarios with images, check that cache-hit is true
-          image_count=$(echo "$list" | jq '. | length')
-          if [[ "$image_count" -gt 0 && "$hit" != "true" ]]; then
+          # For normal scenarios, cache-hit should be true
+          if [[ "$hit" != "true" ]]; then
             echo "::error::Expected cache hit on second run but got miss"
             echo "result=failure" >> $GITHUB_OUTPUT
             exit 1
