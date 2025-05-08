@@ -7,8 +7,8 @@ import * as exec from '@actions/exec';
 type DockerPlatform = {
   readonly architecture: string;
   readonly os: string;
-  readonly variant?: string;
-  readonly 'os.version'?: string;
+  readonly variant: string | undefined;
+  readonly 'os.version': string | undefined;
 };
 
 /**
@@ -18,8 +18,8 @@ type DockerManifestEntry = {
   readonly mediaType: string;
   readonly digest: string;
   readonly size: number;
-  readonly platform?: DockerPlatform;
-  readonly annotations?: Record<string, string>;
+  readonly platform: DockerPlatform | undefined;
+  readonly annotations: Record<string, string> | undefined;
 };
 
 /**
@@ -141,7 +141,7 @@ export async function loadImageFromTar(tarPath: string): Promise<boolean> {
  * @param platform - Optional platform string (e.g., 'linux/amd64')
  * @returns Promise resolving to boolean indicating success or failure
  */
-export async function pullImage(imageName: string, platform?: string): Promise<boolean> {
+export async function pullImage(imageName: string, platform: string | undefined): Promise<boolean> {
   try {
     const execOptions = { ignoreReturnCode: true };
     // Construct args array conditionally including platform flag if specified

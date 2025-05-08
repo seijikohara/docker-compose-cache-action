@@ -7,14 +7,14 @@ import * as yaml from 'js-yaml';
  */
 export type ComposeService = {
   readonly image: string;
-  readonly platform?: string;
+  readonly platform: string | undefined;
 };
 
 /**
  * Represents the structure of a Docker Compose file
  */
 type ComposeFile = {
-  readonly services?: Record<string, ComposeService>;
+  readonly services: Record<string, ComposeService> | undefined;
 };
 
 /**
