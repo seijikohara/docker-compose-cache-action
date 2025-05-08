@@ -148,7 +148,7 @@ describe('Docker Command Module', () => {
       // Mock successful execution
       (exec.exec as jest.Mock).mockResolvedValue(0);
 
-      const pullSuccessful = await pullImage('nginx:latest');
+      const pullSuccessful = await pullImage('nginx:latest', undefined);
 
       expect(pullSuccessful).toBe(true);
       expect(exec.exec).toHaveBeenCalledWith('docker', ['pull', 'nginx:latest'], expect.any(Object));
@@ -158,7 +158,7 @@ describe('Docker Command Module', () => {
       // Mock failed execution
       (exec.exec as jest.Mock).mockResolvedValue(1);
 
-      const pullSuccessful = await pullImage('invalid:image');
+      const pullSuccessful = await pullImage('invalid:image', undefined);
 
       expect(pullSuccessful).toBe(false);
       expect(core.warning).toHaveBeenCalledWith(expect.stringContaining('Failed to pull image'));
