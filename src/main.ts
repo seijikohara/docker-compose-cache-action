@@ -350,9 +350,12 @@ export async function run(): Promise<void> {
     const actionHumanReadableDuration = formatExecutionTime(actionStartTime, actionEndTime);
 
     summaryTable
-      .addRaw(`Total Services: ${totalServiceCount}`, true)
-      .addRaw(`Restored from Cache: ${cachedServiceCount}/${totalServiceCount}`, true)
-      .addRaw(`Total Execution Time: ${actionHumanReadableDuration}`, true)
+      .addRaw('### Summary', true)
+      .addRaw('| Metric | Value |', true)
+      .addRaw('|--------|-------|', true)
+      .addRaw(`| **Total Services** | ${totalServiceCount} |`, true)
+      .addRaw(`| **Restored from Cache** | ${cachedServiceCount}/${totalServiceCount} |`, true)
+      .addRaw(`| **Total Execution Time** | ${actionHumanReadableDuration} |`, true)
       .addHeading('Referenced Compose Files', 3)
       .addList(composeFilePaths.map((filePath) => `\`${filePath}\``))
       .write();
