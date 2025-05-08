@@ -68,6 +68,15 @@ jobs:
           exclude-images: ${{ matrix.exclude }}
           cache-key-prefix: ${{ needs.generate-run-id.outputs.run_id }}-${{ github.run_attempt }}-${{ matrix.scenario }}
 
+      - name: Output Action Results to Summary
+        run: |
+          echo "## Action Outputs for ${{ matrix.scenario }} (First Run)" >> $GITHUB_STEP_SUMMARY
+          echo "| Output | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "| ------ | ----- |" >> $GITHUB_STEP_SUMMARY
+          echo "| Cache Hit | ${{ steps.docker-cache.outputs.cache-hit }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Image List | ${{ steps.docker-cache.outputs.image-list }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
       - name: Assert Cache Miss
         id: validate
         run: |
@@ -125,6 +134,15 @@ jobs:
           compose-files: ${{ matrix.files }}
           exclude-images: ${{ matrix.exclude }}
           cache-key-prefix: ${{ needs.generate-run-id.outputs.run_id }}-${{ github.run_attempt }}-${{ matrix.scenario }}
+
+      - name: Output Action Results to Summary
+        run: |
+          echo "## Action Outputs for ${{ matrix.scenario }} (Second Run)" >> $GITHUB_STEP_SUMMARY
+          echo "| Output | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "| ------ | ----- |" >> $GITHUB_STEP_SUMMARY
+          echo "| Cache Hit | ${{ steps.docker-cache.outputs.cache-hit }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Image List | ${{ steps.docker-cache.outputs.image-list }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
 
       - name: Assert Cache Hit
         id: validate
