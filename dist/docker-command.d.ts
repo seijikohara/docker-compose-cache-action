@@ -29,4 +29,4 @@ export declare function loadImageFromTar(tarPath: string): Promise<boolean>;
  * @param platform - Optional platform string (e.g., 'linux/amd64')
  * @returns Promise resolving to boolean indicating success or failure
  */
-export declare function pullImage(imageName: string, platform?: string): Promise<boolean>;
+export declare function pullImage(imageName: string, platform: string | undefined): Promise<boolean>;

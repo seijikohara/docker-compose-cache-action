@@ -3,7 +3,7 @@
  */
 export type ComposeService = {
     readonly image: string;
-    readonly platform?: string;
+    readonly platform: string | undefined;
 };
 /**
  * Extracts Docker Compose services from specified files and filters them

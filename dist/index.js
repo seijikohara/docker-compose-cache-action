@@ -86949,6 +86949,7 @@ async function processService(serviceDefinition, cacheKeyPrefix) {
             cacheKey: '',
             digest: undefined,
             platform: serviceDefinition.platform,
+            error: `Could not get digest for ${fullImageName}`,
         };
     }
     const serviceCacheKey = generateCacheKey(cacheKeyPrefix, baseImageName, imageTag, imageDigest, serviceDefinition.platform);
@@ -86970,6 +86971,7 @@ async function processService(serviceDefinition, cacheKeyPrefix) {
             cacheKey: serviceCacheKey,
             digest: imageDigest,
             platform: serviceDefinition.platform,
+            error: loadSuccess ? undefined : `Failed to load image from cache: ${fullImageName}`,
         };
     }
     // Handle cache miss - pull the image
@@ -86984,6 +86986,7 @@ async function processService(serviceDefinition, cacheKeyPrefix) {
             cacheKey: serviceCacheKey,
             digest: imageDigest,
             platform: serviceDefinition.platform,
+            error: `Failed to pull image: ${fullImageName}`,
         };
     }
     // Verify the digest matches after pull
@@ -86997,6 +87000,7 @@ async function processService(serviceDefinition, cacheKeyPrefix) {
             cacheKey: serviceCacheKey,
             digest: imageDigest,
             platform: serviceDefinition.platform,
+            error: `Digest mismatch for ${fullImageName}: expected ${imageDigest}, got ${newImageDigest}`,
         };
     }
     // Save the image to tar file
@@ -87010,6 +87014,7 @@ async function processService(serviceDefinition, cacheKeyPrefix) {
             cacheKey: serviceCacheKey,
             digest: imageDigest,
             platform: serviceDefinition.platform,
+            error: `Failed to save image to tar: ${fullImageName}`,
         };
     }
     // Save to cache
@@ -87029,6 +87034,7 @@ async function processService(serviceDefinition, cacheKeyPrefix) {
             cacheKey: serviceCacheKey,
             digest: imageDigest,
             platform: serviceDefinition.platform,
+            error: undefined,
         };
     }
     catch (cacheError) {
@@ -87054,6 +87060,7 @@ async function processService(serviceDefinition, cacheKeyPrefix) {
             cacheKey: serviceCacheKey,
             digest: imageDigest,
             platform: serviceDefinition.platform,
+            error: undefined,
         };
     }
 }
@@ -87209,59 +87216,60 @@ exports.getCurrentPlatformInfo = getCurrentPlatformInfo;
  * Includes common aliases.
  * @see https://nodejs.org/api/process.html#processarch
  */
-const NODE_TO_OCI_ARCH_MAP = new Map([
-    ['x64', 'amd64'],
-    ['arm64', 'arm64'],
-    ['ia32', '386'],
-    ['arm', 'arm'],
-    ['ppc64', 'ppc64le'],
-    ['s390x', 's390x'],
-    ['mips', 'mips'],
-    ['mipsel', 'mipsle'],
-    ['loong64', 'loong64'],
-    ['riscv64', 'riscv64'],
+const NODE_TO_OCI_ARCH = {
+    // Node.js architectures
+    x64: 'amd64',
+    arm64: 'arm64',
+    ia32: '386',
+    arm: 'arm',
+    ppc64: 'ppc64le',
+    s390x: 's390x',
+    mips: 'mips',
+    mipsel: 'mipsle',
+    loong64: 'loong64',
+    riscv64: 'riscv64',
     // Aliases
-    ['aarch64', 'arm64'],
-    ['x86_64', 'amd64'],
-    ['x86', '386'],
-    ['ppc', 'ppc'],
-    ['s390', 's390'],
-    ['mips64el', 'mips64le'],
-]);
+    aarch64: 'arm64',
+    x86_64: 'amd64',
+    x86: '386',
+    ppc: 'ppc',
+    s390: 's390',
+    mips64el: 'mips64le',
+};
 /** A set containing all valid OCI architecture values derived from the map. */
-const VALID_OCI_ARCHS = new Set(NODE_TO_OCI_ARCH_MAP.values());
+const VALID_OCI_ARCHS = new Set(Object.values(NODE_TO_OCI_ARCH));
 /**
  * Maps Node.js platform identifiers (`process.platform`) to their OCI OS equivalents.
  * @see https://nodejs.org/api/process.html#processplatform
  */
-const NODE_TO_OCI_OS_MAP = new Map([
-    ['linux', 'linux'],
-    ['win32', 'windows'],
-    ['darwin', 'darwin'],
-    ['aix', 'aix'],
-    ['freebsd', 'freebsd'],
-    ['openbsd', 'openbsd'],
-    ['sunos', 'solaris'],
-    ['android', 'android'],
-]);
+const NODE_TO_OCI_OS = {
+    linux: 'linux',
+    win32: 'windows',
+    darwin: 'darwin',
+    aix: 'aix',
+    freebsd: 'freebsd',
+    openbsd: 'openbsd',
+    sunos: 'solaris',
+    android: 'android',
+};
 /** A set containing all valid OCI OS values derived from the map. */
-const VALID_OCI_OSS = new Set(NODE_TO_OCI_OS_MAP.values());
+const VALID_OCI_OSS = new Set(Object.values(NODE_TO_OCI_OS));
 /**
  * Maps Node.js specific ARM version identifiers or explicit variant strings
  * to their canonical OCI variant equivalents.
  */
-const NODE_TO_OCI_VARIANT_MAP = new Map([
+const NODE_TO_OCI_VARIANT = {
     // Node.js `arm_version` specific values
-    ['6', 'v6'],
-    ['7', 'v7'],
+    '6': 'v6',
+    '7': 'v7',
     // Explicit OCI variants (allow passthrough)
-    ['v5', 'v5'],
-    ['v6', 'v6'],
-    ['v7', 'v7'],
-    ['v8', 'v8'],
-]);
+    v5: 'v5',
+    v6: 'v6',
+    v7: 'v7',
+    v8: 'v8',
+};
 /** A set containing all valid OCI variant values derived from the map. */
-const VALID_OCI_VARIANTS = new Set(NODE_TO_OCI_VARIANT_MAP.values());
+const VALID_OCI_VARIANTS = new Set(Object.values(NODE_TO_OCI_VARIANT));
 /**
  * Internal helper to resolve an OCI architecture identifier.
  *
@@ -87271,7 +87279,11 @@ const VALID_OCI_VARIANTS = new Set(NODE_TO_OCI_VARIANT_MAP.values());
 function resolveOciArch(arch) {
     if (!arch)
         return undefined;
-    return NODE_TO_OCI_ARCH_MAP.get(arch) ?? (VALID_OCI_ARCHS.has(arch) ? arch : undefined);
+    // Safely check existence before accessing the property
+    if (arch in NODE_TO_OCI_ARCH) {
+        return NODE_TO_OCI_ARCH[arch];
+    }
+    return VALID_OCI_ARCHS.has(arch) ? arch : undefined;
 }
 /**
  * Internal helper to resolve an OCI OS identifier.
@@ -87282,7 +87294,11 @@ function resolveOciArch(arch) {
 function resolveOciOs(os) {
     if (!os)
         return undefined;
-    return NODE_TO_OCI_OS_MAP.get(os) ?? (VALID_OCI_OSS.has(os) ? os : undefined);
+    // Safely check existence before accessing the property
+    if (os in NODE_TO_OCI_OS) {
+        return NODE_TO_OCI_OS[os];
+    }
+    return VALID_OCI_OSS.has(os) ? os : undefined;
 }
 /**
  * Internal helper to resolve an OCI variant identifier.
@@ -87293,7 +87309,11 @@ function resolveOciOs(os) {
 function resolveOciVariant(variant) {
     if (!variant)
         return undefined;
-    return NODE_TO_OCI_VARIANT_MAP.get(variant) ?? (VALID_OCI_VARIANTS.has(variant) ? variant : undefined);
+    // Safely check existence before accessing the property
+    if (variant in NODE_TO_OCI_VARIANT) {
+        return NODE_TO_OCI_VARIANT[variant];
+    }
+    return VALID_OCI_VARIANTS.has(variant) ? variant : undefined;
 }
 /**
  * Determines the OCI platform string (os/arch[/variant]) for the current Node.js runtime.
@@ -87341,10 +87361,11 @@ function parsePlatformString(ociPlatformString) {
         // Invalid or unrecognized OS or Arch
         return undefined;
     }
+    // Always include variant property, even if it's undefined
     const platformInfo = {
         os: resolvedOs,
         arch: resolvedArch,
-        ...(resolvedVariant && { variant: resolvedVariant }),
+        variant: resolvedVariant,
     };
     return platformInfo;
 }
