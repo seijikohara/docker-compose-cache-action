@@ -81,15 +81,23 @@ jobs:
         id: validate
         run: |
           hit="${{ steps.docker-cache.outputs.cache-hit }}"
-          list="${{ steps.docker-cache.outputs.image-list }}"
+          list='${{ steps.docker-cache.outputs.image-list }}'
           echo "Scenario: ${{ matrix.scenario }}"
-          echo "Images: $list"
           echo "Cache Hit: $hit"
-          [[ -n "$list" && "$hit" == "true" ]] && {
+
+          # Handle special scenarios
+          if [[ "${{ matrix.scenario }}" == "Empty Compose File" || "${{ matrix.scenario }}" == "No Images Defined" ]]; then
+            echo "result=success" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # For normal scenarios, cache-hit should be false
+          if [[ "$hit" == "true" ]]; then
             echo "::error::Unexpected cache hit on first run"
             echo "result=failure" >> $GITHUB_OUTPUT
             exit 1
-          }
+          fi
+
           echo "result=success" >> $GITHUB_OUTPUT
 
   test-second-run:
@@ -148,15 +156,23 @@ jobs:
         id: validate
         run: |
           hit="${{ steps.docker-cache.outputs.cache-hit }}"
-          list="${{ steps.docker-cache.outputs.image-list }}"
+          list='${{ steps.docker-cache.outputs.image-list }}'
           echo "Scenario: ${{ matrix.scenario }}"
-          echo "Images: $list"
           echo "Cache Hit: $hit"
-          [[ -n "$list" && "$hit" != "true" ]] && {
+
+          # Handle special scenarios
+          if [[ "${{ matrix.scenario }}" == "Empty Compose File" || "${{ matrix.scenario }}" == "No Images Defined" ]]; then
+            echo "result=success" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # For normal scenarios, cache-hit should be true
+          if [[ "$hit" != "true" ]]; then
             echo "::error::Expected cache hit on second run but got miss"
             echo "result=failure" >> $GITHUB_OUTPUT
             exit 1
-          }
+          fi
+
           echo "result=success" >> $GITHUB_OUTPUT
 
   summarize-tests:

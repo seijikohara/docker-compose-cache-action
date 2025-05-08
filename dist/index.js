@@ -86986,6 +86986,17 @@ const format_1 = __nccwpck_require__(16264);
 const path_utils_1 = __nccwpck_require__(66696);
 const platform_1 = __nccwpck_require__(23728);
 /**
+ * Sets the standard output values for the action
+ * Ensures consistent output formats and proper type handling
+ *
+ * @param cacheHit - Whether all images were restored from cache
+ * @param imageList - List of processed images with their details
+ */
+function setActionOutputs(cacheHit, imageList) {
+    core.setOutput('cache-hit', cacheHit.toString());
+    core.setOutput('image-list', JSON.stringify(imageList || []));
+}
+/**
  * Generates a unique cache key for a Docker image
  *
  * @param cacheKeyPrefix - Prefix to use for the cache key
@@ -87207,12 +87218,10 @@ async function run() {
             .value();
         if (serviceDefinitions.length === 0) {
             core.info('No Docker services found in compose files or all services were excluded');
-            core.setOutput('cache-hit', 'false');
-            core.setOutput('image-list', '');
+            setActionOutputs(false, []);
             return;
         }
         core.info(`Found ${serviceDefinitions.length} services to cache`);
-        core.setOutput('image-list', serviceDefinitions.map((service) => service.image).join(' '));
         // Process all services concurrently for efficiency
         const processingResults = await Promise.all(serviceDefinitions.map(async (serviceDefinition) => {
             const processingStartTime = performance.now(); // Record start time
@@ -87220,6 +87229,7 @@ async function run() {
             const processingEndTime = performance.now(); // Record end time
             return {
                 ...processingResult,
+                processingDuration: processingEndTime - processingStartTime,
                 humanReadableDuration: (0, format_1.formatExecutionTime)(processingStartTime, processingEndTime),
             };
         }));
@@ -87228,8 +87238,17 @@ async function run() {
         const cachedServiceCount = processingResults.filter((result) => result.restoredFromCache).length;
         const allServicesSuccessful = processingResults.every((result) => result.success);
         const allServicesFromCache = cachedServiceCount === totalServiceCount && totalServiceCount > 0;
+        // Create JSON representation for image-list output
+        const imageListOutput = processingResults.map((result) => ({
+            name: result.imageName,
+            platform: result.platform || 'default',
+            status: result.restoredFromCache ? 'Cached' : result.success ? 'Pulled' : 'Error',
+            size: result.imageSize || 0,
+            processingTimeMs: result.processingDuration || 0,
+            cacheKey: result.cacheKey || '',
+        }));
         core.info(`${cachedServiceCount} of ${totalServiceCount} services restored from cache`);
-        core.setOutput('cache-hit', allServicesFromCache.toString());
+        setActionOutputs(allServicesFromCache, imageListOutput);
         // Record action end time and duration
         const actionEndTime = performance.now();
         const actionHumanReadableDuration = (0, format_1.formatExecutionTime)(actionStartTime, actionEndTime);
@@ -87242,7 +87261,7 @@ async function run() {
                 { data: 'Platform', header: true },
                 { data: 'Status', header: true },
                 { data: 'Size', header: true },
-                { data: 'Duration', header: true },
+                { data: 'Processing Time', header: true },
                 { data: 'Cache Key', header: true },
             ],
             ...processingResults.map((result) => {

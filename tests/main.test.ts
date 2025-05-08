@@ -132,8 +132,21 @@ describe('Main Module', () => {
     await run();
 
     expect(dockerComposeFile.getComposeServicesFromFiles).toHaveBeenCalledWith(['docker-compose.yml'], []);
-    expect(mockCoreSetOutput).toHaveBeenCalledWith('image-list', expect.stringContaining('nginx:latest'));
     expect(mockCoreSetOutput).toHaveBeenCalledWith('cache-hit', 'false');
+
+    // Test for JSON image-list output format
+    const imageListOutput = mockCoreSetOutput.mock.calls.find((call) => call[0] === 'image-list')?.[1];
+    expect(imageListOutput).toBeDefined();
+    const parsedImageList = JSON.parse(imageListOutput);
+    expect(Array.isArray(parsedImageList)).toBe(true);
+    expect(parsedImageList.length).toBeGreaterThan(0);
+    expect(parsedImageList[0]).toHaveProperty('name');
+    expect(parsedImageList[0]).toHaveProperty('platform');
+    expect(parsedImageList[0]).toHaveProperty('status');
+    expect(parsedImageList[0]).toHaveProperty('size');
+    expect(parsedImageList[0]).toHaveProperty('processingTimeMs');
+    expect(parsedImageList[0]).toHaveProperty('cacheKey');
+
     expect(dockerCommand.getImageDigest).toHaveBeenCalled();
     // Since platform info is now added, check that the call was made with any string platform instead of undefined
     expect(dockerCommand.pullImage).toHaveBeenCalledWith('nginx:latest', expect.any(String));
@@ -166,7 +179,7 @@ describe('Main Module', () => {
 
     expect(mockCoreInfo).toHaveBeenCalledWith(expect.stringContaining('No Docker services found'));
     expect(mockCoreSetOutput).toHaveBeenCalledWith('cache-hit', 'false');
-    expect(mockCoreSetOutput).toHaveBeenCalledWith('image-list', '');
+    expect(mockCoreSetOutput).toHaveBeenCalledWith('image-list', '[]');
   });
 
   it('should handle errors in Docker commands', async () => {
