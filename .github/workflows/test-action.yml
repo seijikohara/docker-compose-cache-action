@@ -75,7 +75,12 @@ jobs:
           echo "| ------ | ----- |" >> $GITHUB_STEP_SUMMARY
           echo "| Cache Hit | ${{ steps.docker-cache.outputs.cache-hit }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Image List | \`\`\`json" >> $GITHUB_STEP_SUMMARY
-          echo "${{ steps.docker-cache.outputs.image-list }}" | jq '.' >> $GITHUB_STEP_SUMMARY
+          IMAGE_LIST='${{ steps.docker-cache.outputs.image-list }}'
+          if [ -n "$IMAGE_LIST" ]; then
+            echo "$IMAGE_LIST" | jq -M '.' >> $GITHUB_STEP_SUMMARY || echo "$IMAGE_LIST" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "[]" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "\`\`\` |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
@@ -159,7 +164,12 @@ jobs:
           echo "| ------ | ----- |" >> $GITHUB_STEP_SUMMARY
           echo "| Cache Hit | ${{ steps.docker-cache.outputs.cache-hit }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Image List | \`\`\`json" >> $GITHUB_STEP_SUMMARY
-          echo "${{ steps.docker-cache.outputs.image-list }}" | jq '.' >> $GITHUB_STEP_SUMMARY
+          IMAGE_LIST='${{ steps.docker-cache.outputs.image-list }}'
+          if [ -n "$IMAGE_LIST" ]; then
+            echo "$IMAGE_LIST" | jq -M '.' >> $GITHUB_STEP_SUMMARY || echo "$IMAGE_LIST" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "[]" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "\`\`\` |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
