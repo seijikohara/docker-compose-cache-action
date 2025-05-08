@@ -1,6 +1,5 @@
 import * as core from '@actions/core';
 import * as fs from 'fs';
-import * as yaml from 'js-yaml';
 
 import { getComposeServicesFromFiles } from '../src/docker-compose-file';
 
@@ -11,7 +10,6 @@ jest.mock('@actions/core', () => ({
 }));
 
 jest.mock('fs');
-jest.mock('js-yaml');
 
 describe('Docker Compose File Module', () => {
   const warningMock = core.warning as jest.Mock;
@@ -21,58 +19,6 @@ describe('Docker Compose File Module', () => {
     jest.clearAllMocks();
     // Mock existsSync to return true by default
     (fs.existsSync as jest.Mock).mockReturnValue(true);
-
-    // Mock yaml.load to parse YAML content properly
-    (yaml.load as jest.Mock).mockImplementation((yamlContent: string) => {
-      // Return undefined for empty content
-      if (!yamlContent) return undefined;
-
-      // Version only case (no services section)
-      if (yamlContent === 'version: "3.8"') {
-        return { version: '3.8' };
-      }
-
-      // Parse content with services
-      if (yamlContent.includes('services:')) {
-        // Parse service lines from YAML content
-        const serviceImageLines = yamlContent.split('\n').filter((textLine: string) => textLine.includes('image:'));
-        const serviceDefinitions: Record<string, Record<string, string>> = {};
-
-        // Extract service names like 'nginx:'
-        const serviceNameRegex = /\s+(\w+):/;
-        const serviceNames = yamlContent
-          .split('\n')
-          .filter((textLine: string) => serviceNameRegex.test(textLine))
-          .map((textLine: string) => textLine.match(serviceNameRegex)![1]);
-
-        serviceNames.forEach((serviceName: string, serviceIndex: number) => {
-          const serviceImageLine = serviceImageLines[serviceIndex] || '';
-          if (serviceImageLine) {
-            const imageValue = serviceImageLine.split('image:')[1]?.trim();
-            if (imageValue) {
-              serviceDefinitions[serviceName] = { image: imageValue };
-
-              // Handle platform if specified
-              const platformLine = yamlContent
-                .split('\n')
-                .find(
-                  (textLine: string) =>
-                    textLine.includes(`${serviceName}:`) ||
-                    (textLine.includes('platform:') &&
-                      yamlContent.indexOf(textLine) > yamlContent.indexOf(`${serviceName}:`))
-                );
-              if (platformLine && platformLine.includes('platform:')) {
-                serviceDefinitions[serviceName].platform = platformLine.split('platform:')[1]?.trim();
-              }
-            }
-          }
-        });
-
-        return { services: serviceDefinitions };
-      }
-
-      return undefined;
-    });
   });
 
   describe('getComposeServicesFromFiles', () => {
@@ -107,22 +53,11 @@ ${Object.entries(serviceDefinitions)
 
     it('should handle platform specifications', () => {
       // Create compose file YAML with platform specifications
-      const mockComposeContent = `services:
-  nginx:
-    image: nginx:latest
-    platform: linux/amd64`;
+      const mockComposeContent = createComposeYaml({
+        nginx: { image: 'nginx:latest', platform: 'linux/amd64' },
+      });
 
       (fs.readFileSync as jest.Mock).mockReturnValue(mockComposeContent);
-
-      // Configure yaml mock to include platform in service
-      (yaml.load as jest.Mock).mockReturnValue({
-        services: {
-          nginx: {
-            image: 'nginx:latest',
-            platform: 'linux/amd64',
-          },
-        },
-      });
 
       const extractedServices = getComposeServicesFromFiles(['docker-compose.yml'], []);
 
@@ -221,11 +156,6 @@ ${Object.entries(serviceDefinitions)
     it('should handle compose file without services section', () => {
       // Mock file without services section
       (fs.readFileSync as jest.Mock).mockReturnValue('version: "3.8"');
-
-      // Mock implementation - ignoring unused parameter
-      (debugMock as jest.Mock).mockImplementation((_debugMessage: string) => {
-        // No-op
-      });
 
       const extractedServices = getComposeServicesFromFiles(['docker-compose.yml'], []);
 

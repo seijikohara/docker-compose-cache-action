@@ -1,7 +1,7 @@
 import * as core from '@actions/core';
 import * as exec from '@actions/exec';
 
-import { getImageDigest, loadImageFromTar, pullImage, saveImageToTar } from '../src/docker-command';
+import { getImageDigest, getImageSize, loadImageFromTar, pullImage, saveImageToTar } from '../src/docker-command';
 
 // Setup mocks
 jest.mock('@actions/core', () => ({
@@ -192,6 +192,70 @@ describe('Docker Command Module', () => {
       expect(core.warning).toHaveBeenCalledWith(
         expect.stringContaining('Failed to pull image nginx:latest for platform unsupported/platform')
       );
+    });
+  });
+
+  describe('getImageSize', () => {
+    it('should return size in bytes when command succeeds', async () => {
+      // Mock exec.exec to return a size value
+      (exec.exec as jest.Mock).mockImplementation((command, args, options) => {
+        if (options && options.listeners && options.listeners.stdout) {
+          // Return 100MB in bytes
+          options.listeners.stdout(Buffer.from('104857600'));
+        }
+        return Promise.resolve(0);
+      });
+
+      const size = await getImageSize('nginx:latest');
+
+      expect(size).toBe(104857600); // 100MB in bytes
+      expect(exec.exec).toHaveBeenCalledWith(
+        'docker',
+        ['image', 'inspect', '--format', '{{.Size}}', 'nginx:latest'],
+        expect.any(Object)
+      );
+    });
+
+    it('should return undefined when command fails', async () => {
+      // Mock exec.exec with error
+      (exec.exec as jest.Mock).mockImplementation((command, args, options) => {
+        if (options && options.listeners && options.listeners.stderr) {
+          options.listeners.stderr(Buffer.from('Command failed'));
+        }
+        return Promise.resolve(1);
+      });
+
+      const size = await getImageSize('invalid:image');
+
+      expect(size).toBeUndefined();
+      expect(core.warning).toHaveBeenCalledWith(expect.stringContaining('Failed to get size'));
+    });
+
+    it('should handle non-numeric size output', async () => {
+      // Mock exec.exec to return non-numeric data
+      (exec.exec as jest.Mock).mockImplementation((command, args, options) => {
+        if (options && options.listeners && options.listeners.stdout) {
+          options.listeners.stdout(Buffer.from('not-a-number'));
+        }
+        return Promise.resolve(0);
+      });
+
+      const size = await getImageSize('nginx:latest');
+
+      expect(size).toBeUndefined();
+      expect(core.warning).toHaveBeenCalledWith(expect.stringContaining('invalid number'));
+    });
+
+    it('should handle exceptions', async () => {
+      // Mock exec.exec to throw error
+      (exec.exec as jest.Mock).mockImplementation(() => {
+        throw new Error('Unexpected error');
+      });
+
+      const size = await getImageSize('nginx:latest');
+
+      expect(size).toBeUndefined();
+      expect(core.warning).toHaveBeenCalledWith(expect.stringContaining('Error getting size'));
     });
   });
 });
