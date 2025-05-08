@@ -86618,6 +86618,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.getImageDigest = getImageDigest;
+exports.getImageSize = getImageSize;
 exports.saveImageToTar = saveImageToTar;
 exports.loadImageFromTar = loadImageFromTar;
 exports.pullImage = pullImage;
@@ -86665,6 +86666,47 @@ async function getImageDigest(imageName) {
     }
     catch (error) {
         core.warning(`Error getting digest for ${imageName}: ${error}`);
+        return undefined;
+    }
+}
+/**
+ * Gets the image size in bytes
+ *
+ * @param imageName - Docker image name with optional tag
+ * @returns Promise resolving to image size in bytes or undefined on failure
+ */
+async function getImageSize(imageName) {
+    try {
+        // Use accumulators to avoid mutable state
+        let stdoutContent = '';
+        let stderrContent = '';
+        const execOptions = {
+            listeners: {
+                stdout: (data) => {
+                    stdoutContent += data.toString();
+                },
+                stderr: (data) => {
+                    stderrContent += data.toString();
+                },
+            },
+            ignoreReturnCode: true,
+        };
+        // Execute docker image inspect command to get size information
+        const commandExitCode = await exec.exec('docker', ['image', 'inspect', '--format', '{{.Size}}', imageName], execOptions);
+        if (commandExitCode !== 0) {
+            core.warning(`Failed to get size for ${imageName}: ${stderrContent}`);
+            return undefined;
+        }
+        // Parse the output to get size in bytes
+        const size = parseInt(stdoutContent.trim(), 10);
+        if (isNaN(size)) {
+            core.warning(`Failed to parse image size for ${imageName}: invalid number`);
+            return undefined;
+        }
+        return size;
+    }
+    catch (error) {
+        core.warning(`Error getting size for ${imageName}: ${error}`);
         return undefined;
     }
 }
@@ -86841,6 +86883,59 @@ function getComposeServicesFromFiles(composeFilePaths, excludeImageNames) {
 
 /***/ }),
 
+/***/ 16264:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.formatFileSize = formatFileSize;
+exports.formatExecutionTime = formatExecutionTime;
+const date_fns_1 = __nccwpck_require__(94367);
+/**
+ * Formats a file size in bytes to a human-readable string
+ *
+ * @param sizeInBytes - Size in bytes
+ * @returns Human-readable size string (e.g. "10.5 MB")
+ */
+function formatFileSize(sizeInBytes) {
+    if (sizeInBytes === undefined) {
+        return 'N/A';
+    }
+    if (sizeInBytes === 0) {
+        return '0 Bytes';
+    }
+    const units = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB'];
+    const i = Math.floor(Math.log(sizeInBytes) / Math.log(1024));
+    // Ensure we don't exceed the units array bounds
+    const unitIndex = Math.min(i, units.length - 1);
+    // Format with 2 decimal places and trim trailing zeros
+    // Use array access with validation to prevent ESLint warning
+    const unit = units[unitIndex] || units[0];
+    return `${(sizeInBytes / Math.pow(1024, unitIndex)).toFixed(2).replace(/\.0+$|(\.[0-9]*[1-9])0+$/, '$1')} ${unit}`;
+}
+/**
+ * Formats the time difference between start and end timestamps into a human-readable duration string
+ *
+ * @param startTime - Start timestamp in milliseconds
+ * @param endTime - End timestamp in milliseconds
+ * @returns Human-readable duration string (e.g. "1 hour 2 minutes 3 seconds")
+ */
+function formatExecutionTime(startTime, endTime) {
+    const duration = (0, date_fns_1.intervalToDuration)({
+        start: 0,
+        end: endTime - startTime,
+    });
+    return (0, date_fns_1.formatDuration)(duration, {
+        format: ['hours', 'minutes', 'seconds'],
+        zero: false,
+        delimiter: ' ',
+    });
+}
+
+
+/***/ }),
+
 /***/ 41730:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
@@ -86883,11 +86978,11 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = run;
 const cache = __importStar(__nccwpck_require__(5116));
 const core = __importStar(__nccwpck_require__(37484));
-const date_fns_1 = __nccwpck_require__(94367);
 const lodash_1 = __nccwpck_require__(52356);
 const path = __importStar(__nccwpck_require__(16928));
 const docker_command_1 = __nccwpck_require__(44919);
 const docker_compose_file_1 = __nccwpck_require__(54329);
+const format_1 = __nccwpck_require__(16264);
 const path_utils_1 = __nccwpck_require__(66696);
 const platform_1 = __nccwpck_require__(23728);
 /**
@@ -86950,6 +87045,7 @@ async function processService(serviceDefinition, cacheKeyPrefix) {
             digest: undefined,
             platform: serviceDefinition.platform,
             error: `Could not get digest for ${fullImageName}`,
+            imageSize: undefined,
         };
     }
     const serviceCacheKey = generateCacheKey(cacheKeyPrefix, baseImageName, imageTag, imageDigest, serviceDefinition.platform);
@@ -86964,6 +87060,8 @@ async function processService(serviceDefinition, cacheKeyPrefix) {
     if (cacheHitKey) {
         core.info(`Cache hit for ${fullImageName}, loading from cache`);
         const loadSuccess = await (0, docker_command_1.loadImageFromTar)(imageTarPath);
+        // Get image size after loading from cache
+        const imageSize = loadSuccess ? await (0, docker_command_1.getImageSize)(fullImageName) : undefined;
         return {
             success: loadSuccess,
             restoredFromCache: loadSuccess,
@@ -86972,6 +87070,7 @@ async function processService(serviceDefinition, cacheKeyPrefix) {
             digest: imageDigest,
             platform: serviceDefinition.platform,
             error: loadSuccess ? undefined : `Failed to load image from cache: ${fullImageName}`,
+            imageSize,
         };
     }
     // Handle cache miss - pull the image
@@ -86987,6 +87086,7 @@ async function processService(serviceDefinition, cacheKeyPrefix) {
             digest: imageDigest,
             platform: serviceDefinition.platform,
             error: `Failed to pull image: ${fullImageName}`,
+            imageSize: undefined,
         };
     }
     // Verify the digest matches after pull
@@ -87001,6 +87101,7 @@ async function processService(serviceDefinition, cacheKeyPrefix) {
             digest: imageDigest,
             platform: serviceDefinition.platform,
             error: `Digest mismatch for ${fullImageName}: expected ${imageDigest}, got ${newImageDigest}`,
+            imageSize: undefined,
         };
     }
     // Save the image to tar file
@@ -87015,6 +87116,7 @@ async function processService(serviceDefinition, cacheKeyPrefix) {
             digest: imageDigest,
             platform: serviceDefinition.platform,
             error: `Failed to save image to tar: ${fullImageName}`,
+            imageSize: undefined,
         };
     }
     // Save to cache
@@ -87027,6 +87129,8 @@ async function processService(serviceDefinition, cacheKeyPrefix) {
         else {
             core.debug(`Cache was not saved for ${fullImageName} (cache ID: ${cacheResultId})`);
         }
+        // Get image size after pulling
+        const imageSize = await (0, docker_command_1.getImageSize)(fullImageName);
         return {
             success: true,
             restoredFromCache: false,
@@ -87035,6 +87139,7 @@ async function processService(serviceDefinition, cacheKeyPrefix) {
             digest: imageDigest,
             platform: serviceDefinition.platform,
             error: undefined,
+            imageSize,
         };
     }
     catch (cacheError) {
@@ -87053,6 +87158,8 @@ async function processService(serviceDefinition, cacheKeyPrefix) {
         else {
             core.debug(`Unknown error saving cache for ${fullImageName}: ${String(cacheError)}`);
         }
+        // Get image size even if cache saving failed
+        const imageSize = await (0, docker_command_1.getImageSize)(fullImageName);
         return {
             success: true,
             restoredFromCache: false,
@@ -87061,6 +87168,7 @@ async function processService(serviceDefinition, cacheKeyPrefix) {
             digest: imageDigest,
             platform: serviceDefinition.platform,
             error: undefined,
+            imageSize,
         };
     }
 }
@@ -87070,6 +87178,8 @@ async function processService(serviceDefinition, cacheKeyPrefix) {
  * @returns Promise that resolves when the action completes
  */
 async function run() {
+    // Record action start time
+    const actionStartTime = performance.now();
     try {
         // Get action inputs from GitHub Actions environment
         const composeFilePaths = core.getMultilineInput('compose-files');
@@ -87108,17 +87218,9 @@ async function run() {
             const processingStartTime = performance.now(); // Record start time
             const processingResult = await processService(serviceDefinition, cacheKeyPrefix);
             const processingEndTime = performance.now(); // Record end time
-            const processingDuration = (0, date_fns_1.intervalToDuration)({
-                start: 0,
-                end: processingEndTime - processingStartTime,
-            });
             return {
                 ...processingResult,
-                humanReadableDuration: (0, date_fns_1.formatDuration)(processingDuration, {
-                    format: ['hours', 'minutes', 'seconds'],
-                    zero: false,
-                    delimiter: ' ',
-                }),
+                humanReadableDuration: (0, format_1.formatExecutionTime)(processingStartTime, processingEndTime),
             };
         }));
         // Aggregate results for outputs and reporting
@@ -87128,31 +87230,53 @@ async function run() {
         const allServicesFromCache = cachedServiceCount === totalServiceCount && totalServiceCount > 0;
         core.info(`${cachedServiceCount} of ${totalServiceCount} services restored from cache`);
         core.setOutput('cache-hit', allServicesFromCache.toString());
+        // Record action end time and duration
+        const actionEndTime = performance.now();
+        const actionHumanReadableDuration = (0, format_1.formatExecutionTime)(actionStartTime, actionEndTime);
         // Create summary table for better visibility in the GitHub Actions UI
-        const summaryTable = core.summary.addHeading('Docker Compose Cache Results', 2).addTable([
+        core.summary
+            .addHeading('Docker Compose Cache Results', 2)
+            .addTable([
             [
                 { data: 'Image Name', header: true },
                 { data: 'Platform', header: true },
-                { data: 'Cache Hit', header: true },
                 { data: 'Status', header: true },
+                { data: 'Size', header: true },
                 { data: 'Duration', header: true },
                 { data: 'Cache Key', header: true },
             ],
             ...processingResults.map((result) => {
                 return [
-                    result.imageName,
-                    result.platform || 'default',
-                    result.restoredFromCache ? '✅' : '❌',
-                    result.success ? 'Success' : 'Failed',
-                    result.humanReadableDuration,
-                    result.cacheKey || 'N/A',
+                    { data: result.imageName },
+                    { data: result.platform || 'default' },
+                    {
+                        data: result.restoredFromCache
+                            ? '✅ Cached'
+                            : result.success
+                                ? '⬇️ Pulled'
+                                : `❌ Error: ${result.error || 'Unknown'}`,
+                    },
+                    { data: (0, format_1.formatFileSize)(result.imageSize) },
+                    { data: result.humanReadableDuration },
+                    { data: result.cacheKey || 'N/A' },
                 ];
             }),
-        ]);
-        summaryTable
-            .addRaw(`Total Services: ${totalServiceCount}`, true)
-            .addRaw(`Restored from Cache: ${cachedServiceCount}/${totalServiceCount}`, true)
+        ])
+            // Add summary information in a consistent markdown format
+            .addHeading('Action summary', 3)
+            .addTable([
+            [
+                { data: 'Metric', header: true },
+                { data: 'Value', header: true },
+            ],
+            [{ data: 'Total Services' }, { data: `${totalServiceCount}` }],
+            [{ data: 'Restored from Cache' }, { data: `${cachedServiceCount}/${totalServiceCount}` }],
+            [{ data: 'Total Execution Time' }, { data: actionHumanReadableDuration }],
+        ])
+            .addHeading('Referenced Compose Files', 3)
+            .addList(composeFilePaths.map((filePath) => filePath))
             .write();
+        core.info(`Action completed in ${actionHumanReadableDuration}`);
         if (allServicesSuccessful) {
             core.info('Docker Compose Cache action completed successfully');
         }

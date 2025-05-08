@@ -26,6 +26,7 @@ jest.mock('@actions/core', () => {
       addHeading: jest.fn().mockReturnThis(),
       addTable: jest.fn().mockReturnThis(),
       addRaw: jest.fn().mockReturnThis(),
+      addList: jest.fn().mockReturnThis(),
       write: jest.fn().mockResolvedValue(undefined),
     },
   };

@@ -68,6 +68,15 @@ jobs:
           exclude-images: ${{ matrix.exclude }}
           cache-key-prefix: ${{ needs.generate-run-id.outputs.run_id }}-${{ github.run_attempt }}-${{ matrix.scenario }}
 
+      - name: Output Action Results to Summary
+        run: |
+          echo "## Action Outputs for ${{ matrix.scenario }} (First Run)" >> $GITHUB_STEP_SUMMARY
+          echo "| Output | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "| ------ | ----- |" >> $GITHUB_STEP_SUMMARY
+          echo "| Cache Hit | ${{ steps.docker-cache.outputs.cache-hit }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Image List | ${{ steps.docker-cache.outputs.image-list }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
       - name: Assert Cache Miss
         id: validate
         run: |
@@ -126,6 +135,15 @@ jobs:
           exclude-images: ${{ matrix.exclude }}
           cache-key-prefix: ${{ needs.generate-run-id.outputs.run_id }}-${{ github.run_attempt }}-${{ matrix.scenario }}
 
+      - name: Output Action Results to Summary
+        run: |
+          echo "## Action Outputs for ${{ matrix.scenario }} (Second Run)" >> $GITHUB_STEP_SUMMARY
+          echo "| Output | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "| ------ | ----- |" >> $GITHUB_STEP_SUMMARY
+          echo "| Cache Hit | ${{ steps.docker-cache.outputs.cache-hit }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Image List | ${{ steps.docker-cache.outputs.image-list }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
       - name: Assert Cache Hit
         id: validate
         run: |
@@ -165,16 +183,6 @@ jobs:
           for scenario in "Simple Compose" "Override Compose" "Platform Specific" "Multi-File Compose" "Image Exclusion" "No Images Defined" "Empty Compose File"; do
             [[ "${{ needs.test-second-run.result }}" == "success" ]] && append "| $scenario | ✅ Pass |" || append "| $scenario | ❌ Fail |"
           done
-          append ""
-          append "## 📋 Action Outputs"
-          append "| Output | Description |"
-          append "|--------|-------------|"
-          append "| `cache-hit` | true if all images were restored from cache |"
-          append "| `image-list` | Space-separated list of image names |"
-          append ""
-          append "## 🔗 Links"
-          append "- [Run Logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
-          append "- [Artifacts](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts)"
           append ""
           if [[ "${{ needs.test-first-run.result }}" == "success" && "${{ needs.test-second-run.result }}" == "success" ]]; then
             append "## ✅ All tests passed."

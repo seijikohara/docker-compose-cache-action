@@ -1,11 +1,11 @@
 import * as cache from '@actions/cache';
 import * as core from '@actions/core';
-import { formatDuration, intervalToDuration } from 'date-fns';
 import { chain } from 'lodash';
 import * as path from 'path';
 
-import { getImageDigest, loadImageFromTar, pullImage, saveImageToTar } from './docker-command';
+import { getImageDigest, getImageSize, loadImageFromTar, pullImage, saveImageToTar } from './docker-command';
 import { ComposeService, getComposeServicesFromFiles } from './docker-compose-file';
+import { formatExecutionTime, formatFileSize } from './format';
 import { sanitizePathComponent } from './path-utils';
 import { getCurrentPlatformInfo, parsePlatformString } from './platform';
 
@@ -20,6 +20,7 @@ type ServiceProcessingResult = {
   readonly digest: string | undefined;
   readonly platform: string | undefined;
   readonly error: string | undefined;
+  readonly imageSize: number | undefined;
 };
 
 /**
@@ -101,6 +102,7 @@ async function processService(
       digest: undefined,
       platform: serviceDefinition.platform,
       error: `Could not get digest for ${fullImageName}`,
+      imageSize: undefined,
     };
   }
 
@@ -125,6 +127,10 @@ async function processService(
   if (cacheHitKey) {
     core.info(`Cache hit for ${fullImageName}, loading from cache`);
     const loadSuccess = await loadImageFromTar(imageTarPath);
+
+    // Get image size after loading from cache
+    const imageSize = loadSuccess ? await getImageSize(fullImageName) : undefined;
+
     return {
       success: loadSuccess,
       restoredFromCache: loadSuccess,
@@ -133,6 +139,7 @@ async function processService(
       digest: imageDigest,
       platform: serviceDefinition.platform,
       error: loadSuccess ? undefined : `Failed to load image from cache: ${fullImageName}`,
+      imageSize,
     };
   }
 
@@ -149,6 +156,7 @@ async function processService(
       digest: imageDigest,
       platform: serviceDefinition.platform,
       error: `Failed to pull image: ${fullImageName}`,
+      imageSize: undefined,
     };
   }
 
@@ -164,6 +172,7 @@ async function processService(
       digest: imageDigest,
       platform: serviceDefinition.platform,
       error: `Digest mismatch for ${fullImageName}: expected ${imageDigest}, got ${newImageDigest}`,
+      imageSize: undefined,
     };
   }
 
@@ -179,6 +188,7 @@ async function processService(
       digest: imageDigest,
       platform: serviceDefinition.platform,
       error: `Failed to save image to tar: ${fullImageName}`,
+      imageSize: undefined,
     };
   }
 
@@ -193,6 +203,9 @@ async function processService(
       core.debug(`Cache was not saved for ${fullImageName} (cache ID: ${cacheResultId})`);
     }
 
+    // Get image size after pulling
+    const imageSize = await getImageSize(fullImageName);
+
     return {
       success: true,
       restoredFromCache: false,
@@ -201,6 +214,7 @@ async function processService(
       digest: imageDigest,
       platform: serviceDefinition.platform,
       error: undefined,
+      imageSize,
     };
   } catch (cacheError) {
     // Handle known cache saving errors gracefully without failing the operation
@@ -215,6 +229,10 @@ async function processService(
     } else {
       core.debug(`Unknown error saving cache for ${fullImageName}: ${String(cacheError)}`);
     }
+
+    // Get image size even if cache saving failed
+    const imageSize = await getImageSize(fullImageName);
+
     return {
       success: true,
       restoredFromCache: false,
@@ -223,6 +241,7 @@ async function processService(
       digest: imageDigest,
       platform: serviceDefinition.platform,
       error: undefined,
+      imageSize,
     };
   }
 }
@@ -233,6 +252,9 @@ async function processService(
  * @returns Promise that resolves when the action completes
  */
 export async function run(): Promise<void> {
+  // Record action start time
+  const actionStartTime = performance.now();
+
   try {
     // Get action inputs from GitHub Actions environment
     const composeFilePaths: ReadonlyArray<string> = core.getMultilineInput('compose-files');
@@ -281,18 +303,10 @@ export async function run(): Promise<void> {
         const processingStartTime = performance.now(); // Record start time
         const processingResult = await processService(serviceDefinition, cacheKeyPrefix);
         const processingEndTime = performance.now(); // Record end time
-        const processingDuration = intervalToDuration({
-          start: 0,
-          end: processingEndTime - processingStartTime,
-        });
 
         return {
           ...processingResult,
-          humanReadableDuration: formatDuration(processingDuration, {
-            format: ['hours', 'minutes', 'seconds'],
-            zero: false,
-            delimiter: ' ',
-          }),
+          humanReadableDuration: formatExecutionTime(processingStartTime, processingEndTime),
         };
       })
     );
@@ -306,32 +320,55 @@ export async function run(): Promise<void> {
     core.info(`${cachedServiceCount} of ${totalServiceCount} services restored from cache`);
     core.setOutput('cache-hit', allServicesFromCache.toString());
 
-    // Create summary table for better visibility in the GitHub Actions UI
-    const summaryTable = core.summary.addHeading('Docker Compose Cache Results', 2).addTable([
-      [
-        { data: 'Image Name', header: true },
-        { data: 'Platform', header: true },
-        { data: 'Cache Hit', header: true },
-        { data: 'Status', header: true },
-        { data: 'Duration', header: true },
-        { data: 'Cache Key', header: true },
-      ],
-      ...processingResults.map((result) => {
-        return [
-          result.imageName,
-          result.platform || 'default',
-          result.restoredFromCache ? '✅' : '❌',
-          result.success ? 'Success' : 'Failed',
-          result.humanReadableDuration,
-          result.cacheKey || 'N/A',
-        ];
-      }),
-    ]);
+    // Record action end time and duration
+    const actionEndTime = performance.now();
+    const actionHumanReadableDuration = formatExecutionTime(actionStartTime, actionEndTime);
 
-    summaryTable
-      .addRaw(`Total Services: ${totalServiceCount}`, true)
-      .addRaw(`Restored from Cache: ${cachedServiceCount}/${totalServiceCount}`, true)
+    // Create summary table for better visibility in the GitHub Actions UI
+    core.summary
+      .addHeading('Docker Compose Cache Results', 2)
+      .addTable([
+        [
+          { data: 'Image Name', header: true },
+          { data: 'Platform', header: true },
+          { data: 'Status', header: true },
+          { data: 'Size', header: true },
+          { data: 'Duration', header: true },
+          { data: 'Cache Key', header: true },
+        ],
+        ...processingResults.map((result) => {
+          return [
+            { data: result.imageName },
+            { data: result.platform || 'default' },
+            {
+              data: result.restoredFromCache
+                ? '✅ Cached'
+                : result.success
+                  ? '⬇️ Pulled'
+                  : `❌ Error: ${result.error || 'Unknown'}`,
+            },
+            { data: formatFileSize(result.imageSize) },
+            { data: result.humanReadableDuration },
+            { data: result.cacheKey || 'N/A' },
+          ];
+        }),
+      ])
+      // Add summary information in a consistent markdown format
+      .addHeading('Action summary', 3)
+      .addTable([
+        [
+          { data: 'Metric', header: true },
+          { data: 'Value', header: true },
+        ],
+        [{ data: 'Total Services' }, { data: `${totalServiceCount}` }],
+        [{ data: 'Restored from Cache' }, { data: `${cachedServiceCount}/${totalServiceCount}` }],
+        [{ data: 'Total Execution Time' }, { data: actionHumanReadableDuration }],
+      ])
+      .addHeading('Referenced Compose Files', 3)
+      .addList(composeFilePaths.map((filePath) => filePath))
       .write();
+
+    core.info(`Action completed in ${actionHumanReadableDuration}`);
 
     if (allServicesSuccessful) {
       core.info('Docker Compose Cache action completed successfully');

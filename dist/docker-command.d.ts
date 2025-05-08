@@ -8,6 +8,13 @@
  */
 export declare function getImageDigest(imageName: string): Promise<string | undefined>;
 /**
+ * Gets the image size in bytes
+ *
+ * @param imageName - Docker image name with optional tag
+ * @returns Promise resolving to image size in bytes or undefined on failure
+ */
+export declare function getImageSize(imageName: string): Promise<number | undefined>;
+/**
  * Saves Docker image to a tar file
  *
  * @param imageName - Docker image name to save
