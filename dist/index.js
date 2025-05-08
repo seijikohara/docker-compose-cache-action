@@ -87234,7 +87234,7 @@ async function run() {
         const actionEndTime = performance.now();
         const actionHumanReadableDuration = (0, format_1.formatExecutionTime)(actionStartTime, actionEndTime);
         // Create summary table for better visibility in the GitHub Actions UI
-        const summary = core.summary
+        core.summary
             .addHeading('Docker Compose Cache Results', 2)
             .addTable([
             [
@@ -87274,7 +87274,7 @@ async function run() {
             [{ data: 'Total Execution Time' }, { data: actionHumanReadableDuration }],
         ])
             .addHeading('Referenced Compose Files', 3)
-            .addList(composeFilePaths)
+            .addList(composeFilePaths.map((filePath) => filePath))
             .write();
         core.info(`Action completed in ${actionHumanReadableDuration}`);
         if (allServicesSuccessful) {
