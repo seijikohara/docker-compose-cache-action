@@ -344,7 +344,7 @@ export async function run(): Promise<void> {
           { data: 'Platform', header: true },
           { data: 'Status', header: true },
           { data: 'Size', header: true },
-          { data: 'Duration', header: true },
+          { data: 'Processing Time', header: true },
           { data: 'Cache Key', header: true },
         ],
         ...processingResults.map((result) => {
