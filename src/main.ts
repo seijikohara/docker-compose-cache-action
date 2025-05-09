@@ -1,7 +1,6 @@
 import * as cache from '@actions/cache';
 import * as core from '@actions/core';
 import * as fs from 'fs/promises';
-import { chain } from 'lodash';
 import * as path from 'path';
 
 import {
@@ -12,7 +11,7 @@ import {
   pullImage,
   saveImageToTar,
 } from './docker-command';
-import { ComposeService, getComposeServicesFromFiles } from './docker-compose-file';
+import { ComposeService, getComposeFilePathsToProcess, getComposeServicesFromFiles } from './docker-compose-file';
 import { formatExecutionTime, formatFileSize } from './format';
 import { sanitizePathComponent } from './path-utils';
 import { getCurrentPlatformInfo, parseOciPlatformString } from './platform';
@@ -503,31 +502,10 @@ export async function run(): Promise<void> {
     const excludeImageNames: ReadonlyArray<string> = core.getMultilineInput('exclude-images');
     const cacheKeyPrefix = core.getInput('cache-key-prefix') || 'docker-compose-image';
 
-    const serviceDefinitions = chain(getComposeServicesFromFiles(composeFilePaths, excludeImageNames))
-      // Complete undefined platforms with getCurrentPlatformInfo()
-      .map((serviceDefinition) => {
-        if (serviceDefinition.platform !== undefined) {
-          return serviceDefinition;
-        }
-
-        const platformInfo = getCurrentPlatformInfo();
-        if (!platformInfo) {
-          return serviceDefinition;
-        }
-
-        // Create platform string from platform info components
-        const platformString = `${platformInfo.os}/${platformInfo.arch}${
-          platformInfo.variant ? `/${platformInfo.variant}` : ''
-        }`;
-
-        return {
-          ...serviceDefinition,
-          platform: platformString,
-        };
-      })
-      // Filter out duplicates by keeping only the first occurrence of each image+platform combination
-      .uniqBy((serviceDefinition) => `${serviceDefinition.image}|${serviceDefinition.platform || 'default'}`)
-      .value();
+    // Determine compose file paths
+    const referencedComposeFiles = getComposeFilePathsToProcess(composeFilePaths);
+    // Get service definitions (duplicates removed)
+    const serviceDefinitions = getComposeServicesFromFiles(referencedComposeFiles, excludeImageNames);
 
     if (serviceDefinitions.length === 0) {
       core.info('No Docker services found in compose files or all services were excluded');
@@ -617,7 +595,7 @@ export async function run(): Promise<void> {
         [{ data: 'Total Execution Time' }, { data: actionHumanReadableDuration }],
       ])
       .addHeading('Referenced Compose Files', 3)
-      .addList(composeFilePaths.map((filePath) => filePath))
+      .addList(referencedComposeFiles.map((filePath) => filePath))
       .write();
 
     core.info(`Action completed in ${actionHumanReadableDuration}`);

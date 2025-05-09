@@ -41,7 +41,14 @@ jest.mock('@actions/cache', () => {
 
 jest.mock('../src/platform');
 jest.mock('../src/docker-command');
-jest.mock('../src/docker-compose-file');
+jest.mock('../src/docker-compose-file', () => {
+  const original = jest.requireActual('../src/docker-compose-file');
+  return {
+    ...original,
+    getComposeServicesFromFiles: jest.fn(),
+    getComposeFilePathsToProcess: jest.fn(() => ['docker-compose.yml']),
+  };
+});
 
 import { run } from '../src/main';
 
@@ -85,7 +92,13 @@ describe('main', () => {
       dockerCommandMock.saveImageToTar = jest.fn().mockResolvedValue(true);
       dockerCommandMock.loadImageFromTar = jest.fn().mockResolvedValue(true);
 
-      (dockerComposeFile.getComposeServicesFromFiles as jest.Mock).mockReturnValue(mockServiceDefinitions);
+      // Default: return service array
+      (dockerComposeFile.getComposeServicesFromFiles as jest.Mock).mockImplementation((files, _excludes) => {
+        if (Array.isArray(files) && files.length > 0) {
+          return mockServiceDefinitions;
+        }
+        return [];
+      });
 
       mockCoreGetInput.mockImplementation((inputName) => {
         switch (inputName) {
@@ -161,10 +174,8 @@ describe('main', () => {
     });
 
     it('should report no services found when compose file is empty', async () => {
-      (dockerComposeFile.getComposeServicesFromFiles as jest.Mock).mockReturnValue([]);
-
+      (dockerComposeFile.getComposeServicesFromFiles as jest.Mock).mockImplementation(() => []);
       await run();
-
       expect(mockCoreInfo).toHaveBeenCalledWith(expect.stringContaining('No Docker services found'));
       expect(mockCoreSetOutput).toHaveBeenCalledWith('cache-hit', 'false');
       expect(mockCoreSetOutput).toHaveBeenCalledWith('image-list', '[]');
@@ -191,7 +202,12 @@ describe('main', () => {
 
     it('should use platform from service when specified', async () => {
       const platformSpecificService = { image: 'nginx:alpine', platform: 'linux/arm64' };
-      (dockerComposeFile.getComposeServicesFromFiles as jest.Mock).mockReturnValue([platformSpecificService]);
+      (dockerComposeFile.getComposeServicesFromFiles as jest.Mock).mockImplementation((files, _excludes) => {
+        if (Array.isArray(files) && files.length > 0) {
+          return [platformSpecificService];
+        }
+        return [];
+      });
       mockCacheRestore.mockResolvedValue(undefined);
       mockCoreInfo.mockImplementation((logMessage) => {
         if (logMessage === 'Using platform linux/arm64 for nginx:alpine') {
@@ -249,6 +265,7 @@ describe('main', () => {
           return;
         }
       });
+      (dockerComposeFile.getComposeServicesFromFiles as jest.Mock).mockReturnValue([]);
       await run();
       expect(mockCoreSetFailed).not.toHaveBeenCalled();
       // Do not fail even if debug call is missing
@@ -264,6 +281,7 @@ describe('main', () => {
           return;
         }
       });
+      (dockerComposeFile.getComposeServicesFromFiles as jest.Mock).mockReturnValue([]);
       await run();
       expect(mockCoreSetFailed).not.toHaveBeenCalled();
       // Do not fail even if debug call is missing
@@ -272,7 +290,12 @@ describe('main', () => {
     it('should handle digest mismatch after pull', async () => {
       mockCacheRestore.mockResolvedValue(undefined);
       const singleServiceDefinition = { image: 'nginx:latest' };
-      (dockerComposeFile.getComposeServicesFromFiles as jest.Mock).mockReturnValue([singleServiceDefinition]);
+      (dockerComposeFile.getComposeServicesFromFiles as jest.Mock).mockImplementation((files, _excludes) => {
+        if (Array.isArray(files) && files.length > 0) {
+          return [singleServiceDefinition];
+        }
+        return [];
+      });
       const mockDigestFunction = dockerCommandMock.getImageDigest;
       mockDigestFunction.mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined);
       await run();

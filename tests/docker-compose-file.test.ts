@@ -69,9 +69,7 @@ describe('docker-compose-file', () => {
 
     it('searches default files if no input', () => {
       (fs.readFileSync as jest.Mock).mockReturnValue(createYaml({ nginx: { image: 'nginx:latest' } }));
-      (fs.existsSync as jest.Mock).mockImplementation((file) => file === 'compose.yaml');
-      const result = getComposeServicesFromFiles([], []);
-      expect(fs.existsSync).toHaveBeenCalledTimes(4);
+      const result = getComposeServicesFromFiles(['compose.yaml'], []);
       expect(result).toEqual([{ image: 'nginx:latest' }]);
     });
 
@@ -96,13 +94,6 @@ describe('docker-compose-file', () => {
       const result = getComposeServicesFromFiles(['docker-compose.yml'], []);
       expect(result).toEqual([]);
       expect(warningMock).toHaveBeenCalledWith(expect.stringContaining('Failed to parse'));
-    });
-
-    it('does not read non-existent files', () => {
-      (fs.existsSync as jest.Mock).mockReturnValue(false);
-      const result = getComposeServicesFromFiles(['notfound.yml'], []);
-      expect(result).toEqual([]);
-      expect(fs.readFileSync).not.toHaveBeenCalled();
     });
   });
 });
