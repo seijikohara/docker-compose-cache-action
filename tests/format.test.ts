@@ -1,6 +1,6 @@
 import { formatExecutionTime, formatFileSize } from '../src/format';
 
-describe('Format Module', () => {
+describe('format', () => {
   describe('formatFileSize', () => {
     it('should return N/A for undefined input', () => {
       expect(formatFileSize(undefined)).toBe('N/A');

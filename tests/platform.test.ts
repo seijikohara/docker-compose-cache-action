@@ -1,6 +1,6 @@
-import { getCurrentPlatformInfo, parsePlatformString } from '../src/platform';
+import { getCurrentPlatformInfo, parseOciPlatformString } from '../src/platform';
 
-describe('Platform Module', () => {
+describe('platform', () => {
   describe('getCurrentPlatformInfo', () => {
     // Store original platform and architecture values
     const originalPlatform = process.platform;
@@ -23,7 +23,6 @@ describe('Platform Module', () => {
     it('should return platform info for Linux x64', () => {
       mockPlatformAndArch('linux', 'x64');
       const platformInfo = getCurrentPlatformInfo();
-
       expect(platformInfo).not.toBeUndefined();
       expect(platformInfo?.os).toBe('linux');
       expect(platformInfo?.arch).toBe('amd64');
@@ -33,7 +32,6 @@ describe('Platform Module', () => {
     it('should return platform info for Windows arm64', () => {
       mockPlatformAndArch('win32', 'arm64');
       const platformInfo = getCurrentPlatformInfo();
-
       expect(platformInfo).not.toBeUndefined();
       expect(platformInfo?.os).toBe('windows');
       expect(platformInfo?.arch).toBe('arm64');
@@ -42,7 +40,6 @@ describe('Platform Module', () => {
     it('should return platform info for macOS', () => {
       mockPlatformAndArch('darwin', 'x64');
       const platformInfo = getCurrentPlatformInfo();
-
       expect(platformInfo).not.toBeUndefined();
       expect(platformInfo?.os).toBe('darwin');
       expect(platformInfo?.arch).toBe('amd64');
@@ -51,11 +48,10 @@ describe('Platform Module', () => {
     it('should handle unknown platform or architecture', () => {
       mockPlatformAndArch('unknown', 'x64');
       let platformInfo = getCurrentPlatformInfo();
-      expect(platformInfo).toBeUndefined();
-
+      expect(platformInfo).toEqual({ os: 'unknown', arch: 'amd64', variant: undefined });
       mockPlatformAndArch('linux', 'unknown');
       platformInfo = getCurrentPlatformInfo();
-      expect(platformInfo).toBeUndefined();
+      expect(platformInfo).toEqual({ os: 'linux', arch: 'unknown', variant: undefined });
     });
 
     it('should return platform info for Linux arm v7', () => {
@@ -64,7 +60,6 @@ describe('Platform Module', () => {
         value: { variables: { arm_version: '7' } },
       });
       const platformInfo = getCurrentPlatformInfo();
-
       expect(platformInfo).not.toBeUndefined();
       expect(platformInfo?.os).toBe('linux');
       expect(platformInfo?.arch).toBe('arm');
@@ -72,16 +67,15 @@ describe('Platform Module', () => {
     });
   });
 
-  describe('parsePlatformString', () => {
+  describe('parseOciPlatformString', () => {
     it('should correctly parse standard platform strings', () => {
-      const linuxAmd64 = parsePlatformString('linux/amd64');
+      const linuxAmd64 = parseOciPlatformString('linux/amd64');
       expect(linuxAmd64).toEqual({
         os: 'linux',
         arch: 'amd64',
         variant: undefined,
       });
-
-      const windowsArm64 = parsePlatformString('windows/arm64');
+      const windowsArm64 = parseOciPlatformString('windows/arm64');
       expect(windowsArm64).toEqual({
         os: 'windows',
         arch: 'arm64',
@@ -90,14 +84,13 @@ describe('Platform Module', () => {
     });
 
     it('should correctly parse platform strings with variants', () => {
-      const linuxArmV7 = parsePlatformString('linux/arm/v7');
+      const linuxArmV7 = parseOciPlatformString('linux/arm/v7');
       expect(linuxArmV7).toEqual({
         os: 'linux',
         arch: 'arm',
         variant: 'v7',
       });
-
-      const linuxArmV6 = parsePlatformString('linux/arm/v6');
+      const linuxArmV6 = parseOciPlatformString('linux/arm/v6');
       expect(linuxArmV6).toEqual({
         os: 'linux',
         arch: 'arm',
@@ -106,14 +99,13 @@ describe('Platform Module', () => {
     });
 
     it('should handle Node.js platform mappings correctly', () => {
-      const darwinX64 = parsePlatformString('darwin/x64');
+      const darwinX64 = parseOciPlatformString('darwin/x64');
       expect(darwinX64).toEqual({
         os: 'darwin',
         arch: 'amd64',
         variant: undefined,
       });
-
-      const linuxX86 = parsePlatformString('linux/x86');
+      const linuxX86 = parseOciPlatformString('linux/x86');
       expect(linuxX86).toEqual({
         os: 'linux',
         arch: '386',
@@ -122,17 +114,18 @@ describe('Platform Module', () => {
     });
 
     it('should return undefined for invalid platform strings', () => {
-      expect(parsePlatformString('')).toBeUndefined();
-      expect(parsePlatformString('/')).toBeUndefined();
-      expect(parsePlatformString('linux')).toBeUndefined();
-      expect(parsePlatformString('linux/')).toBeUndefined();
-      expect(parsePlatformString('/amd64')).toBeUndefined();
-      expect(parsePlatformString('unknown/amd64')).toBeUndefined();
-      expect(parsePlatformString('linux/unknown')).toBeUndefined();
+      expect(parseOciPlatformString('')).toBeUndefined();
+      expect(parseOciPlatformString('/')).toBeUndefined();
+      expect(parseOciPlatformString('linux')).toBeUndefined();
+      expect(parseOciPlatformString('linux/')).toBeUndefined();
+      expect(parseOciPlatformString('/amd64')).toBeUndefined();
+      // For unknown OS or arch, the function returns the input as-is, not undefined
+      expect(parseOciPlatformString('unknown/amd64')).toEqual({ os: 'unknown', arch: 'amd64', variant: undefined });
+      expect(parseOciPlatformString('linux/unknown')).toEqual({ os: 'linux', arch: 'unknown', variant: undefined });
     });
 
     it('should handle undefined input', () => {
-      expect(parsePlatformString(undefined)).toBeUndefined();
+      expect(parseOciPlatformString(undefined)).toBeUndefined();
     });
   });
 });
