@@ -1,46 +1,59 @@
 import * as cache from '@actions/cache';
 import * as core from '@actions/core';
+import * as fs from 'fs/promises';
 import { chain } from 'lodash';
 import * as path from 'path';
 
-import { getImageDigest, getImageSize, loadImageFromTar, pullImage, saveImageToTar } from './docker-command';
+import {
+  DockerManifest,
+  inspectImageLocal,
+  inspectImageRemote,
+  loadImageFromTar,
+  pullImage,
+  saveImageToTar,
+} from './docker-command';
 import { ComposeService, getComposeServicesFromFiles } from './docker-compose-file';
 import { formatExecutionTime, formatFileSize } from './format';
 import { sanitizePathComponent } from './path-utils';
-import { getCurrentPlatformInfo, parsePlatformString } from './platform';
+import { getCurrentPlatformInfo, parseOciPlatformString } from './platform';
 
 /**
- * Result of processing a single Docker service
+ * Result of processing a single Docker service.
  */
 type ServiceProcessingResult = {
   readonly success: boolean;
   readonly restoredFromCache: boolean;
   readonly imageName: string;
   readonly cacheKey: string;
-  readonly digest: string | undefined;
-  readonly platform: string | undefined;
-  readonly error: string | undefined;
-  readonly imageSize: number | undefined;
+  readonly digest?: string;
+  readonly platform?: string;
+  readonly error?: string;
+  readonly imageSize?: number;
 };
 
 /**
- * Type definition for image list output
+ * Output item for image list summary.
  */
-type ImageListOutput = Array<{
-  name: string;
-  platform: string;
-  status: string;
-  size: number;
-  processingTimeMs: number;
-  cacheKey: string;
-}>;
+type ImageListOutputItem = {
+  readonly name: string;
+  readonly platform: string;
+  readonly status: string;
+  readonly size: number;
+  readonly processingTimeMs: number;
+  readonly cacheKey: string;
+};
 
 /**
- * Sets the standard output values for the action
- * Ensures consistent output formats and proper type handling
+ * Output type for image list summary.
+ */
+type ImageListOutput = ReadonlyArray<ImageListOutputItem>;
+
+/**
+ * Sets the standard output values for the action.
+ * Ensures consistent output formats and proper type handling for GitHub Actions outputs.
  *
- * @param cacheHit - Whether all images were restored from cache
- * @param imageList - List of processed images with their details
+ * @param cacheHit - Indicates if all images were restored from cache.
+ * @param imageList - List of processed images with their details, or undefined if none.
  */
 function setActionOutputs(cacheHit: boolean, imageList: ImageListOutput | undefined): void {
   core.setOutput('cache-hit', cacheHit.toString());
@@ -48,14 +61,15 @@ function setActionOutputs(cacheHit: boolean, imageList: ImageListOutput | undefi
 }
 
 /**
- * Generates a unique cache key for a Docker image
+ * Generates a unique cache key for a Docker image.
+ * The key is based on image name, tag, digest, and platform information.
  *
- * @param cacheKeyPrefix - Prefix to use for the cache key
- * @param imageName - Docker image name (without tag)
- * @param imageTag - Docker image tag
- * @param imageDigest - Image digest
- * @param servicePlatformString - Platform string (e.g. 'linux/amd64') or undefined
- * @returns A unique cache key string
+ * @param cacheKeyPrefix - Prefix to use for the cache key.
+ * @param imageName - Docker image name (without tag).
+ * @param imageTag - Docker image tag.
+ * @param imageDigest - Image digest.
+ * @param servicePlatformString - Platform string (e.g. 'linux/amd64') or undefined.
+ * @returns A unique cache key string for the image.
  */
 function generateCacheKey(
   cacheKeyPrefix: string,
@@ -70,7 +84,7 @@ function generateCacheKey(
   const sanitizedDigest = sanitizePathComponent(imageDigest);
 
   // Use provided platform or get current platform
-  const platformInfo = servicePlatformString ? parsePlatformString(servicePlatformString) : getCurrentPlatformInfo();
+  const platformInfo = servicePlatformString ? parseOciPlatformString(servicePlatformString) : getCurrentPlatformInfo();
   const sanitizedOs = sanitizePathComponent(platformInfo?.os || 'none');
   const sanitizedArch = sanitizePathComponent(platformInfo?.arch || 'none');
   const sanitizedVariant = sanitizePathComponent(platformInfo?.variant || 'none');
@@ -79,13 +93,44 @@ function generateCacheKey(
 }
 
 /**
- * Generates filesystem path for storing Docker image tar file
+ * Generates a manifest cache key for a Docker image.
+ * Appends a manifest suffix to the standard cache key.
  *
- * @param imageName - Docker image name (without tag)
- * @param imageTag - Docker image tag
- * @param imageDigest - Image digest
- * @param servicePlatformString - Platform string (e.g. 'linux/amd64') or undefined
- * @returns Absolute path to the tar file
+ * @param cacheKeyPrefix - Prefix to use for the cache key.
+ * @param imageName - Docker image name (without tag).
+ * @param imageTag - Docker image tag.
+ * @param imageDigest - Image digest.
+ * @param servicePlatformString - Platform string (e.g. 'linux/amd64') or undefined.
+ * @returns A unique cache key string with manifest suffix.
+ */
+function generateManifestCacheKey(
+  cacheKeyPrefix: string,
+  imageName: string,
+  imageTag: string,
+  imageDigest: string,
+  servicePlatformString: string | undefined
+): string {
+  return `${generateCacheKey(cacheKeyPrefix, imageName, imageTag, imageDigest, servicePlatformString)}-manifest`;
+}
+
+/**
+ * Returns the temp directory for storing cache files.
+ * Uses the RUNNER_TEMP environment variable or falls back to '/tmp'.
+ *
+ * @returns The absolute path to the temp directory.
+ */
+function getRunnerTempDir(): string {
+  return process.env.RUNNER_TEMP || '/tmp';
+}
+
+/**
+ * Generates the filesystem path for storing a Docker image tar file.
+ *
+ * @param imageName - Docker image name (without tag).
+ * @param imageTag - Docker image tag.
+ * @param imageDigest - Image digest.
+ * @param servicePlatformString - Platform string (e.g. 'linux/amd64') or undefined.
+ * @returns Absolute path to the tar file.
  */
 function generateTarPath(
   imageName: string,
@@ -94,7 +139,190 @@ function generateTarPath(
   servicePlatformString: string | undefined
 ): string {
   const tarFileName = generateCacheKey('', imageName, imageTag, imageDigest, servicePlatformString);
-  return path.join(process.env.RUNNER_TEMP || '/tmp', `${tarFileName}.tar`);
+  return path.join(getRunnerTempDir(), `${tarFileName}.tar`);
+}
+
+/**
+ * Generates the filesystem path for storing a Docker image manifest file.
+ *
+ * @param imageName - Docker image name (without tag).
+ * @param imageTag - Docker image tag.
+ * @param imageDigest - Image digest.
+ * @param servicePlatformString - Platform string (e.g. 'linux/amd64') or undefined.
+ * @returns Absolute path to the manifest file.
+ */
+function generateManifestPath(
+  imageName: string,
+  imageTag: string,
+  imageDigest: string,
+  servicePlatformString: string | undefined
+): string {
+  const manifestFileName = generateCacheKey('', imageName, imageTag, imageDigest, servicePlatformString);
+  return path.join(getRunnerTempDir(), `${manifestFileName}-manifest.json`);
+}
+
+/**
+ * Compares two Docker manifests for equivalence.
+ * Uses sorted JSON stringification for comparison.
+ *
+ * @param manifest1 - First Docker manifest.
+ * @param manifest2 - Second Docker manifest.
+ * @returns True if manifests are equivalent, false otherwise.
+ */
+function compareManifests(manifest1: DockerManifest, manifest2: DockerManifest): boolean {
+  // Simple string comparison of stringified JSON with consistent ordering for properties
+  const sortedJson1 = JSON.stringify(manifest1, Object.keys(manifest1).sort());
+  const sortedJson2 = JSON.stringify(manifest2, Object.keys(manifest2).sort());
+  return sortedJson1 === sortedJson2;
+}
+
+/**
+ * Saves a Docker manifest to a JSON file.
+ *
+ * @param manifest - Docker manifest to save.
+ * @param manifestPath - Path to save the manifest JSON.
+ * @returns Promise resolving to true if successful, false otherwise.
+ */
+async function saveManifestToJson(manifest: DockerManifest, manifestPath: string): Promise<boolean> {
+  try {
+    await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+    return true;
+  } catch (error) {
+    core.warning(`Failed to save manifest to ${manifestPath}: ${error}`);
+    return false;
+  }
+}
+
+/**
+ * Loads a Docker manifest from a JSON file.
+ *
+ * @param manifestPath - Path to the manifest JSON file.
+ * @returns Promise resolving to DockerManifest if successful, or undefined if loading fails.
+ */
+async function loadManifestFromJson(manifestPath: string): Promise<DockerManifest | undefined> {
+  try {
+    const manifestJson = await fs.readFile(manifestPath, 'utf8');
+    return JSON.parse(manifestJson) as DockerManifest;
+  } catch (error) {
+    core.debug(`Failed to load manifest from ${manifestPath}: ${error}`);
+    return undefined;
+  }
+}
+
+/**
+ * Pulls and caches a Docker image, saving both the image tar and manifest to cache.
+ *
+ * @param fullImageName - Complete image name with tag.
+ * @param platformString - Platform string (e.g. 'linux/amd64') or undefined.
+ * @param serviceCacheKey - Cache key for the image tarball.
+ * @param manifestCacheKey - Cache key for the manifest file.
+ * @param imageTarPath - Path to save the image tarball.
+ * @param manifestPath - Path to save the manifest JSON.
+ * @param imageDigest - Known image digest.
+ * @param manifest - Docker manifest object.
+ * @returns Promise resolving to a ServiceProcessingResult object.
+ */
+async function pullAndCacheImage(
+  fullImageName: string,
+  platformString: string | undefined,
+  serviceCacheKey: string,
+  manifestCacheKey: string,
+  imageTarPath: string,
+  manifestPath: string,
+  imageDigest: string,
+  manifest: DockerManifest
+): Promise<ServiceProcessingResult> {
+  // Pull the image
+  if (!(await pullImage(fullImageName, platformString))) {
+    core.warning(`Failed to pull ${fullImageName}`);
+    return {
+      success: false,
+      restoredFromCache: false,
+      imageName: fullImageName,
+      cacheKey: serviceCacheKey,
+      digest: imageDigest,
+      platform: platformString,
+      error: `Failed to pull image: ${fullImageName}`,
+      imageSize: undefined,
+    };
+  }
+
+  // Verify the digest matches after pull
+  const newManifest = await inspectImageRemote(fullImageName);
+  const newImageDigest = newManifest?.digest;
+  if (newImageDigest !== imageDigest) {
+    core.warning(`Digest mismatch for ${fullImageName}: expected ${imageDigest}, got ${newImageDigest}`);
+    return {
+      success: false,
+      restoredFromCache: false,
+      imageName: fullImageName,
+      cacheKey: serviceCacheKey,
+      digest: imageDigest,
+      platform: platformString,
+      error: `Digest mismatch for ${fullImageName}: expected ${imageDigest}, got ${newImageDigest}`,
+      imageSize: undefined,
+    };
+  }
+
+  // Save the image to tar file
+  if (!(await saveImageToTar(fullImageName, imageTarPath))) {
+    core.warning(`Failed to save image to tar: ${fullImageName}`);
+    return {
+      success: false,
+      restoredFromCache: false,
+      imageName: fullImageName,
+      cacheKey: serviceCacheKey,
+      digest: imageDigest,
+      platform: platformString,
+      error: `Failed to save image to tar: ${fullImageName}`,
+      imageSize: undefined,
+    };
+  }
+
+  // Save manifest to json and cache
+  if (manifest) {
+    try {
+      await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+      await cache.saveCache([manifestPath], manifestCacheKey);
+      core.debug(`Cached manifest for ${fullImageName} with key ${manifestCacheKey}`);
+    } catch (error) {
+      core.debug(
+        `Failed to save manifest for ${fullImageName}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  // Save image tar to cache
+  try {
+    const cacheResultId = await cache.saveCache([imageTarPath], serviceCacheKey);
+    if (cacheResultId !== -1) {
+      core.info(`Cached ${fullImageName} with key ${serviceCacheKey}`);
+    } else {
+      core.debug(`Cache was not saved for ${fullImageName} (cache ID: ${cacheResultId})`);
+    }
+  } catch (error) {
+    // Handle known cache saving errors - log but continue
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage.includes('already exists')) {
+      core.debug(`Cache already exists for ${fullImageName}: ${errorMessage}`);
+    } else {
+      core.debug(`Error saving cache for ${fullImageName}: ${errorMessage}`);
+    }
+  }
+
+  // Get image size
+  const inspectInfo = await inspectImageLocal(fullImageName);
+
+  return {
+    success: true,
+    restoredFromCache: false,
+    imageName: fullImageName,
+    cacheKey: serviceCacheKey,
+    digest: imageDigest,
+    platform: platformString,
+    error: undefined,
+    imageSize: inspectInfo?.Size,
+  };
 }
 
 /**
@@ -103,9 +331,9 @@ function generateTarPath(
  * - If cache miss, pulls and caches the image
  * - Handles various error conditions
  *
- * @param serviceDefinition - The Docker Compose service to process
- * @param cacheKeyPrefix - Prefix to use for the cache key
- * @returns Result object with status and metadata
+ * @param serviceDefinition - The Docker Compose service to process.
+ * @param cacheKeyPrefix - Prefix to use for the cache key.
+ * @returns Promise resolving to a ServiceProcessingResult object with status and metadata.
  */
 async function processService(
   serviceDefinition: ComposeService,
@@ -114,9 +342,9 @@ async function processService(
   const fullImageName = serviceDefinition.image;
   const [baseImageName, imageTag = 'latest'] = fullImageName.split(':');
 
-  // Get image digest for cache key generation
-  const imageDigest = await getImageDigest(fullImageName);
-  if (!imageDigest) {
+  // Get image manifest with digest for cache key generation
+  const manifest = await inspectImageRemote(fullImageName);
+  if (!manifest || !manifest.digest) {
     core.warning(`Could not get digest for ${fullImageName}, skipping cache`);
     return {
       success: false,
@@ -129,6 +357,8 @@ async function processService(
       imageSize: undefined,
     };
   }
+
+  const imageDigest = manifest.digest;
 
   const serviceCacheKey = generateCacheKey(
     cacheKeyPrefix,
@@ -145,135 +375,161 @@ async function processService(
   core.info(`Cache key for ${fullImageName}: ${serviceCacheKey}`);
   core.debug(`Cache path: ${imageTarPath}`);
 
+  // Generate manifest cache key and path
+  const manifestCacheKey = generateManifestCacheKey(
+    cacheKeyPrefix,
+    baseImageName,
+    imageTag,
+    imageDigest,
+    serviceDefinition.platform
+  );
+  const manifestPath = generateManifestPath(baseImageName, imageTag, imageDigest, serviceDefinition.platform);
+
   // Try to restore from cache first
   const cacheHitKey = await cache.restoreCache([imageTarPath], serviceCacheKey);
+  const manifestCacheHitKey = await cache.restoreCache([manifestPath], manifestCacheKey);
 
-  if (cacheHitKey) {
-    core.info(`Cache hit for ${fullImageName}, loading from cache`);
-    const loadSuccess = await loadImageFromTar(imageTarPath);
+  // If no cache hit, proceed to pull the image
+  if (!cacheHitKey) {
+    core.info(`Cache miss for ${fullImageName}, pulling and saving`);
+    return await pullAndCacheImage(
+      fullImageName,
+      serviceDefinition.platform,
+      serviceCacheKey,
+      manifestCacheKey,
+      imageTarPath,
+      manifestPath,
+      imageDigest,
+      manifest
+    );
+  }
 
-    // Get image size after loading from cache
-    const imageSize = loadSuccess ? await getImageSize(fullImageName) : undefined;
+  // Process cache hit
+  core.info(`Cache hit for ${fullImageName}, loading from cache`);
+  // Restore image from cache and fetch remote manifest in parallel
+  const [loadSuccess, remoteManifest] = await Promise.all([
+    loadImageFromTar(imageTarPath),
+    inspectImageRemote(fullImageName),
+  ]);
 
+  // If restoration fails, return immediately
+  if (!loadSuccess) {
     return {
-      success: loadSuccess,
-      restoredFromCache: loadSuccess,
+      success: false,
+      restoredFromCache: false,
       imageName: fullImageName,
       cacheKey: serviceCacheKey,
       digest: imageDigest,
       platform: serviceDefinition.platform,
-      error: loadSuccess ? undefined : `Failed to load image from cache: ${fullImageName}`,
+      error: `Failed to load image from cache: ${fullImageName}`,
+      imageSize: undefined,
+    };
+  }
+
+  // Get image size after successful load from cache
+  const inspectInfo = await inspectImageLocal(fullImageName);
+  const imageSize = inspectInfo?.Size;
+
+  // Skip manifest check if no manifest cache hit
+  if (!manifestCacheHitKey) {
+    core.debug(`No manifest cache for ${fullImageName}`);
+    return {
+      success: true,
+      restoredFromCache: true,
+      imageName: fullImageName,
+      cacheKey: serviceCacheKey,
+      digest: imageDigest,
+      platform: serviceDefinition.platform,
+      error: undefined,
       imageSize,
     };
   }
 
-  // Handle cache miss - pull the image
-  core.info(`Cache miss for ${fullImageName}, pulling and saving`);
+  // Load cached manifest
+  const cachedManifest = await loadManifestFromJson(manifestPath);
+
+  // Skip if manifest can't be loaded or no current manifest
+  if (!cachedManifest || !remoteManifest) {
+    core.debug(`Cannot compare manifests for ${fullImageName}: missing data`);
+    return {
+      success: true,
+      restoredFromCache: true,
+      imageName: fullImageName,
+      cacheKey: serviceCacheKey,
+      digest: imageDigest,
+      platform: serviceDefinition.platform,
+      error: undefined,
+      imageSize,
+    };
+  }
+
+  // If manifests match, return success immediately
+  if (compareManifests(cachedManifest, remoteManifest)) {
+    core.debug(`Manifest match confirmed for ${fullImageName}`);
+    return {
+      success: true,
+      restoredFromCache: true,
+      imageName: fullImageName,
+      cacheKey: serviceCacheKey,
+      digest: imageDigest,
+      platform: serviceDefinition.platform,
+      error: undefined,
+      imageSize,
+    };
+  }
+
+  // Handle manifest mismatch
+  core.info(`Manifest mismatch detected for ${fullImageName}, pulling fresh image`);
+
+  // Pull the image to get the updated version
   const pullSuccess = await pullImage(fullImageName, serviceDefinition.platform);
   if (!pullSuccess) {
-    core.warning(`Failed to pull ${fullImageName}`);
+    core.warning(`Failed to pull updated image ${fullImageName}`);
     return {
-      success: false,
-      restoredFromCache: false,
+      success: true, // Still consider this a success since the cached image is available
+      restoredFromCache: true,
       imageName: fullImageName,
       cacheKey: serviceCacheKey,
       digest: imageDigest,
       platform: serviceDefinition.platform,
-      error: `Failed to pull image: ${fullImageName}`,
-      imageSize: undefined,
+      error: undefined,
+      imageSize,
     };
   }
 
-  // Verify the digest matches after pull
-  const newImageDigest = await getImageDigest(fullImageName);
-  if (newImageDigest !== imageDigest) {
-    core.warning(`Digest mismatch for ${fullImageName}: expected ${imageDigest}, got ${newImageDigest}`);
-    return {
-      success: false,
-      restoredFromCache: false,
-      imageName: fullImageName,
-      cacheKey: serviceCacheKey,
-      digest: imageDigest,
-      platform: serviceDefinition.platform,
-      error: `Digest mismatch for ${fullImageName}: expected ${imageDigest}, got ${newImageDigest}`,
-      imageSize: undefined,
-    };
+  // Save fresh manifest
+  const saveManifestSuccess = await saveManifestToJson(manifest, manifestPath);
+  if (saveManifestSuccess) {
+    await cache.saveCache([manifestPath], manifestCacheKey);
   }
 
-  // Save the image to tar file
+  // Save the updated image to tar file
   const saveSuccess = await saveImageToTar(fullImageName, imageTarPath);
-  if (!saveSuccess) {
-    core.warning(`Failed to save image to tar: ${fullImageName}`);
-    return {
-      success: false,
-      restoredFromCache: false,
-      imageName: fullImageName,
-      cacheKey: serviceCacheKey,
-      digest: imageDigest,
-      platform: serviceDefinition.platform,
-      error: `Failed to save image to tar: ${fullImageName}`,
-      imageSize: undefined,
-    };
+  if (saveSuccess) {
+    await cache.saveCache([imageTarPath], serviceCacheKey);
+    core.info(`Updated cached image for ${fullImageName}`);
   }
 
-  // Save to cache
-  try {
-    const cacheResultId = await cache.saveCache([imageTarPath], serviceCacheKey);
-    const cacheSuccess = cacheResultId !== -1;
+  // Get updated image size
+  const updatedInspectInfo = await inspectImageLocal(fullImageName);
 
-    if (cacheSuccess) {
-      core.info(`Cached ${fullImageName} with key ${serviceCacheKey}`);
-    } else {
-      core.debug(`Cache was not saved for ${fullImageName} (cache ID: ${cacheResultId})`);
-    }
-
-    // Get image size after pulling
-    const imageSize = await getImageSize(fullImageName);
-
-    return {
-      success: true,
-      restoredFromCache: false,
-      imageName: fullImageName,
-      cacheKey: serviceCacheKey,
-      digest: imageDigest,
-      platform: serviceDefinition.platform,
-      error: undefined,
-      imageSize,
-    };
-  } catch (cacheError) {
-    // Handle known cache saving errors gracefully without failing the operation
-    if (cacheError instanceof Error) {
-      if (cacheError.message.includes('already exists')) {
-        core.debug(`Cache already exists for ${fullImageName}: ${cacheError.message}`);
-      } else if (cacheError.message.includes('unable to upload')) {
-        core.debug(`Unable to upload cache for ${fullImageName}: ${cacheError.message}`);
-      } else {
-        core.debug(`Error saving cache for ${fullImageName}: ${cacheError.message}`);
-      }
-    } else {
-      core.debug(`Unknown error saving cache for ${fullImageName}: ${String(cacheError)}`);
-    }
-
-    // Get image size even if cache saving failed
-    const imageSize = await getImageSize(fullImageName);
-
-    return {
-      success: true,
-      restoredFromCache: false,
-      imageName: fullImageName,
-      cacheKey: serviceCacheKey,
-      digest: imageDigest,
-      platform: serviceDefinition.platform,
-      error: undefined,
-      imageSize,
-    };
-  }
+  return {
+    success: true,
+    restoredFromCache: true,
+    imageName: fullImageName,
+    cacheKey: serviceCacheKey,
+    digest: imageDigest,
+    platform: serviceDefinition.platform,
+    error: undefined,
+    imageSize: updatedInspectInfo?.Size,
+  };
 }
 
 /**
- * Main function that runs the GitHub Action
+ * Main function that runs the GitHub Action.
+ * Handles all orchestration, output, and error management for the action.
  *
- * @returns Promise that resolves when the action completes
+ * @returns Promise that resolves when the action completes.
  */
 export async function run(): Promise<void> {
   // Record action start time

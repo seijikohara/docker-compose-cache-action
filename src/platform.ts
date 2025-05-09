@@ -8,129 +8,83 @@
  * Represents the components of an OCI platform identifier (e.g., "linux/amd64", "linux/arm/v7").
  * @see https://github.com/opencontainers/image-spec/blob/main/image-index.md#platform-object
  */
-export type PlatformInfo = {
+export type OciPlatform = {
   /** The normalized OCI operating system identifier (e.g., 'linux', 'windows'). */
   readonly os: string;
   /** The normalized OCI architecture identifier (e.g., 'amd64', 'arm64'). */
   readonly arch: string;
   /** The normalized OCI architecture variant identifier (e.g., 'v7', 'v8'), if applicable. */
-  readonly variant: string | undefined;
+  readonly variant?: string;
 };
 
 /**
  * Maps Node.js architecture identifiers (`process.arch`) to their OCI equivalents.
- * Includes common aliases.
+ * Only includes entries where Node.js and OCI values differ.
  * @see https://nodejs.org/api/process.html#processarch
  */
 const NODE_TO_OCI_ARCH: Readonly<Record<string, string>> = {
-  // Node.js architectures
   x64: 'amd64',
-  arm64: 'arm64',
   ia32: '386',
-  arm: 'arm',
   ppc64: 'ppc64le',
-  s390x: 's390x',
-  mips: 'mips',
   mipsel: 'mipsle',
-  loong64: 'loong64',
-  riscv64: 'riscv64',
-  // Aliases
   aarch64: 'arm64',
   x86_64: 'amd64',
   x86: '386',
-  ppc: 'ppc',
-  s390: 's390',
   mips64el: 'mips64le',
 } as const;
 
-/** A set containing all valid OCI architecture values derived from the map. */
-const VALID_OCI_ARCHS: ReadonlySet<string> = new Set(Object.values(NODE_TO_OCI_ARCH));
-
 /**
  * Maps Node.js platform identifiers (`process.platform`) to their OCI OS equivalents.
+ * Only includes entries where Node.js and OCI values differ.
  * @see https://nodejs.org/api/process.html#processplatform
  */
 const NODE_TO_OCI_OS: Readonly<Record<string, string>> = {
-  linux: 'linux',
   win32: 'windows',
-  darwin: 'darwin',
-  aix: 'aix',
-  freebsd: 'freebsd',
-  openbsd: 'openbsd',
   sunos: 'solaris',
-  android: 'android',
 } as const;
-
-/** A set containing all valid OCI OS values derived from the map. */
-const VALID_OCI_OSS: ReadonlySet<string> = new Set(Object.values(NODE_TO_OCI_OS));
 
 /**
  * Maps Node.js specific ARM version identifiers or explicit variant strings
  * to their canonical OCI variant equivalents.
+ * Only includes entries where Node.js and OCI values differ.
  */
 const NODE_TO_OCI_VARIANT: Readonly<Record<string, string>> = {
-  // Node.js `arm_version` specific values
   '6': 'v6',
   '7': 'v7',
-  // Explicit OCI variants (allow passthrough)
-  v5: 'v5',
-  v6: 'v6',
-  v7: 'v7',
-  v8: 'v8',
 } as const;
 
-/** A set containing all valid OCI variant values derived from the map. */
-const VALID_OCI_VARIANTS: ReadonlySet<string> = new Set(Object.values(NODE_TO_OCI_VARIANT));
-
 /**
- * Internal helper to resolve an OCI architecture identifier.
+ * Converts a Node.js platform identifier to its OCI OS equivalent.
+ * If not found in the mapping, returns the original value.
  *
- * @param arch - The architecture string to map (Node.js or OCI).
- * @returns The canonical OCI architecture string or `undefined`.
+ * @param os - Node.js platform identifier (e.g., 'linux', 'win32').
+ * @returns OCI OS identifier (e.g., 'linux', 'windows').
  */
-function resolveOciArch(arch: string | undefined): string | undefined {
-  if (!arch) return undefined;
-
-  // Safely check existence before accessing the property
-  if (arch in NODE_TO_OCI_ARCH) {
-    return NODE_TO_OCI_ARCH[arch as keyof typeof NODE_TO_OCI_ARCH];
-  }
-
-  return VALID_OCI_ARCHS.has(arch) ? arch : undefined;
+function toOciOs(os: string): string {
+  return NODE_TO_OCI_OS[os as keyof typeof NODE_TO_OCI_OS] ?? os;
 }
 
 /**
- * Internal helper to resolve an OCI OS identifier.
+ * Converts a Node.js architecture identifier to its OCI architecture equivalent.
+ * If not found in the mapping, returns the original value.
  *
- * @param os - The OS string to map (Node.js or OCI).
- * @returns The canonical OCI OS string or `undefined`.
+ * @param arch - Node.js architecture identifier (e.g., 'x64', 'arm64').
+ * @returns OCI architecture identifier (e.g., 'amd64', 'arm64').
  */
-function resolveOciOs(os: string | undefined): string | undefined {
-  if (!os) return undefined;
-
-  // Safely check existence before accessing the property
-  if (os in NODE_TO_OCI_OS) {
-    return NODE_TO_OCI_OS[os as keyof typeof NODE_TO_OCI_OS];
-  }
-
-  return VALID_OCI_OSS.has(os) ? os : undefined;
+function toOciArch(arch: string): string {
+  return NODE_TO_OCI_ARCH[arch as keyof typeof NODE_TO_OCI_ARCH] ?? arch;
 }
 
 /**
- * Internal helper to resolve an OCI variant identifier.
+ * Converts a Node.js ARM variant or explicit variant string to its OCI variant equivalent.
+ * If not found in the mapping, returns the original value.
  *
- * @param variant - The variant string to map (Node.js arm_version or OCI).
- * @returns The canonical OCI variant string or `undefined`.
+ * @param variant - Node.js ARM variant or OCI variant string (e.g., 'v7', 'v8', '6', '7').
+ * @returns OCI variant string or undefined if not provided.
  */
-function resolveOciVariant(variant: string | undefined): string | undefined {
+function toOciVariant(variant: string | undefined): string | undefined {
   if (!variant) return undefined;
-
-  // Safely check existence before accessing the property
-  if (variant in NODE_TO_OCI_VARIANT) {
-    return NODE_TO_OCI_VARIANT[variant as keyof typeof NODE_TO_OCI_VARIANT];
-  }
-
-  return VALID_OCI_VARIANTS.has(variant) ? variant : undefined;
+  return NODE_TO_OCI_VARIANT[variant as keyof typeof NODE_TO_OCI_VARIANT] ?? variant;
 }
 
 /**
@@ -139,22 +93,11 @@ function resolveOciVariant(variant: string | undefined): string | undefined {
  * @returns The OCI platform string (e.g., "linux/amd64", "linux/arm/v7"), or `undefined` if resolution fails.
  */
 export function getCurrentOciPlatformString(): string | undefined {
-  const os = resolveOciOs(process.platform);
-  if (!os) {
-    // Could not resolve OS
-    return undefined;
-  }
-
-  const arch = resolveOciArch(process.arch);
-  if (!arch) {
-    // Could not resolve architecture
-    return undefined;
-  }
-
+  const os = toOciOs(process.platform);
+  const arch = toOciArch(process.arch);
   // Determine variant primarily for 'arm' architecture using Node's specific variable.
   const nodeArmVersion = (process.config?.variables as Record<string, unknown>)?.arm_version as string | undefined;
-  const variant = arch === 'arm' ? resolveOciVariant(nodeArmVersion) : undefined;
-
+  const variant = arch === 'arm' ? toOciVariant(nodeArmVersion) : undefined;
   return variant ? `${os}/${arch}/${variant}` : `${os}/${arch}`;
 }
 
@@ -162,46 +105,30 @@ export function getCurrentOciPlatformString(): string | undefined {
  * Parses an OCI platform string into its components (OS, architecture, variant).
  *
  * @param ociPlatformString - The platform string to parse (e.g., "linux/amd64", "windows/amd64/v8").
- * @returns A `PlatformInfo` object, or `undefined` if the string is invalid.
+ * @returns A `OciPlatform` object, or `undefined` if the string is invalid.
  */
-export function parsePlatformString(ociPlatformString: string | undefined): PlatformInfo | undefined {
+export function parseOciPlatformString(ociPlatformString: string | undefined): OciPlatform | undefined {
   if (!ociPlatformString) {
     return undefined;
   }
-
   const platformComponents = ociPlatformString.split('/');
-  // Must have at least os/arch, and they must not be empty strings
   if (platformComponents.length < 2 || !platformComponents[0] || !platformComponents[1]) {
-    // Invalid format
     return undefined;
   }
-
-  const resolvedOs = resolveOciOs(platformComponents[0]);
-  const resolvedArch = resolveOciArch(platformComponents[1]);
-  const rawVariant = platformComponents.length > 2 && platformComponents[2] ? platformComponents[2] : undefined;
-  const resolvedVariant = resolveOciVariant(rawVariant);
-
-  // OS and Arch are mandatory and must be valid
-  if (!resolvedOs || !resolvedArch) {
-    // Invalid or unrecognized OS or Arch
-    return undefined;
-  }
-
-  // Always include variant property, even if it's undefined
-  const platformInfo: PlatformInfo = {
-    os: resolvedOs,
-    arch: resolvedArch,
-    variant: resolvedVariant,
+  const [os, arch, variant] = platformComponents;
+  return {
+    os: toOciOs(os),
+    arch: toOciArch(arch),
+    variant: toOciVariant(variant),
   };
-  return platformInfo;
 }
 
 /**
- * Retrieves the OCI platform information (`PlatformInfo`) for the current Node.js runtime.
+ * Retrieves the OCI platform information (`OciPlatform`) for the current Node.js runtime.
  *
- * @returns A `PlatformInfo` object for the current environment, or `undefined` if resolution fails.
+ * @returns A `OciPlatform` object for the current environment, or `undefined` if resolution fails.
  */
-export function getCurrentPlatformInfo(): PlatformInfo | undefined {
+export function getCurrentPlatformInfo(): OciPlatform | undefined {
   const currentOciPlatformString = getCurrentOciPlatformString();
-  return parsePlatformString(currentOciPlatformString);
+  return parseOciPlatformString(currentOciPlatformString);
 }

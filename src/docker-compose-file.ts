@@ -3,22 +3,22 @@ import * as fs from 'fs';
 import * as yaml from 'js-yaml';
 
 /**
- * Represents a Docker Compose service definition with an image reference
+ * Represents a Docker Compose service definition with an image reference.
  */
 export type ComposeService = {
   readonly image: string;
-  readonly platform: string | undefined;
+  readonly platform?: string;
 };
 
 /**
- * Represents the structure of a Docker Compose file
+ * Represents the structure of a Docker Compose file.
  */
 type ComposeFile = {
-  readonly services: Record<string, ComposeService> | undefined;
+  readonly services?: Record<string, ComposeService>;
 };
 
 /**
- * Default Docker Compose filenames to look for if none are specified
+ * Default Docker Compose filenames to look for if none are specified.
  */
 const DEFAULT_COMPOSE_FILE_NAMES: ReadonlyArray<string> = [
   'compose.yaml',
@@ -28,12 +28,11 @@ const DEFAULT_COMPOSE_FILE_NAMES: ReadonlyArray<string> = [
 ];
 
 /**
- * Extracts Docker Compose services from specified files and filters them
- * based on exclusion list
+ * Extracts Docker Compose services from specified files and filters them based on exclusion list.
  *
- * @param composeFilePaths - Array of paths to Docker Compose files to parse
- * @param excludeImageNames - Array of image names to exclude from results
- * @returns Array of ComposeService objects from all valid files
+ * @param composeFilePaths - Array of paths to Docker Compose files to parse.
+ * @param excludeImageNames - Array of image names to exclude from results.
+ * @returns Array of ComposeService objects from all valid files.
  */
 export function getComposeServicesFromFiles(
   composeFilePaths: ReadonlyArray<string>,

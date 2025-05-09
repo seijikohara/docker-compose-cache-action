@@ -86617,20 +86617,20 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.getImageDigest = getImageDigest;
-exports.getImageSize = getImageSize;
+exports.pullImage = pullImage;
+exports.inspectImageRemote = inspectImageRemote;
+exports.inspectImageLocal = inspectImageLocal;
 exports.saveImageToTar = saveImageToTar;
 exports.loadImageFromTar = loadImageFromTar;
-exports.pullImage = pullImage;
 const core = __importStar(__nccwpck_require__(37484));
 const exec = __importStar(__nccwpck_require__(95236));
 /**
- * Executes a Docker command and logs execution time
+ * Executes a Docker command and logs execution time.
  *
- * @param command - The command to execute (e.g., 'docker')
- * @param args - Array of command arguments
- * @param options - Execution options
- * @returns Promise resolving to object containing exit code, stdout, and stderr
+ * @param command - The command to execute (e.g., 'docker').
+ * @param args - Array of command arguments.
+ * @param options - Execution options.
+ * @returns Promise resolving to object containing exit code, stdout, and stderr.
  */
 async function executeDockerCommand(command, args, options) {
     // Format command for logging
@@ -86686,120 +86686,11 @@ async function executeDockerCommand(command, args, options) {
     }
 }
 /**
- * Gets the image digest from Docker registry
+ * Pulls a Docker image, optionally for a specific platform.
  *
- * Uses 'docker buildx imagetools inspect' to retrieve the manifest digest
- *
- * @param imageName - Docker image name with optional tag
- * @returns Promise resolving to digest string or undefined on failure
- */
-async function getImageDigest(imageName) {
-    try {
-        const execOptions = {
-            ignoreReturnCode: true,
-        };
-        // Execute docker buildx command to inspect the image manifest
-        const { exitCode, stdout, stderr } = await executeDockerCommand('docker', ['buildx', 'imagetools', 'inspect', '--format', '{{json .Manifest}}', imageName], execOptions);
-        if (exitCode !== 0) {
-            core.warning(`Failed to get digest for ${imageName}: ${stderr}`);
-            return undefined;
-        }
-        try {
-            // Parse the JSON output to extract the digest
-            const manifest = JSON.parse(stdout.trim());
-            return manifest.digest || undefined;
-        }
-        catch (manifestParseError) {
-            core.warning(`Failed to parse manifest JSON for ${imageName}: ${manifestParseError}`);
-            return undefined;
-        }
-    }
-    catch (error) {
-        core.warning(`Error getting digest for ${imageName}: ${error}`);
-        return undefined;
-    }
-}
-/**
- * Gets the image size in bytes
- *
- * @param imageName - Docker image name with optional tag
- * @returns Promise resolving to image size in bytes or undefined on failure
- */
-async function getImageSize(imageName) {
-    try {
-        const execOptions = {
-            ignoreReturnCode: true,
-        };
-        // Execute docker image inspect command to get size information
-        const { exitCode, stdout, stderr } = await executeDockerCommand('docker', ['image', 'inspect', '--format', '{{.Size}}', imageName], execOptions);
-        if (exitCode !== 0) {
-            core.warning(`Failed to get size for ${imageName}: ${stderr}`);
-            return undefined;
-        }
-        // Parse the output to get size in bytes
-        const size = parseInt(stdout.trim(), 10);
-        if (isNaN(size)) {
-            core.warning(`Failed to parse image size for ${imageName}: invalid number`);
-            return undefined;
-        }
-        return size;
-    }
-    catch (error) {
-        core.warning(`Error getting size for ${imageName}: ${error}`);
-        return undefined;
-    }
-}
-/**
- * Saves Docker image to a tar file
- *
- * @param imageName - Docker image name to save
- * @param outputPath - File path where the tar file should be created
- * @returns Promise resolving to boolean indicating success or failure
- */
-async function saveImageToTar(imageName, outputPath) {
-    try {
-        const execOptions = { ignoreReturnCode: true };
-        // Execute docker save command to create a tar archive of the image
-        const { exitCode, stderr } = await executeDockerCommand('docker', ['save', '-o', outputPath, imageName], execOptions);
-        if (exitCode !== 0) {
-            core.warning(`Failed to save image ${imageName} to ${outputPath}: ${stderr}`);
-            return false;
-        }
-        return true;
-    }
-    catch (error) {
-        core.warning(`Failed to save image ${imageName}: ${error}`);
-        return false;
-    }
-}
-/**
- * Loads Docker image from a tar file
- *
- * @param tarPath - Path to the tar file containing the Docker image
- * @returns Promise resolving to boolean indicating success or failure
- */
-async function loadImageFromTar(tarPath) {
-    try {
-        const execOptions = { ignoreReturnCode: true };
-        // Execute docker load command to restore image from tar archive
-        const { exitCode, stderr } = await executeDockerCommand('docker', ['load', '-i', tarPath], execOptions);
-        if (exitCode !== 0) {
-            core.warning(`Failed to load image from ${tarPath}: ${stderr}`);
-            return false;
-        }
-        return true;
-    }
-    catch (error) {
-        core.warning(`Failed to load image from ${tarPath}: ${error}`);
-        return false;
-    }
-}
-/**
- * Pulls a Docker image, optionally for a specific platform
- *
- * @param imageName - Docker image name to pull
- * @param platform - Optional platform string (e.g., 'linux/amd64')
- * @returns Promise resolving to boolean indicating success or failure
+ * @param imageName - Docker image name to pull.
+ * @param platform - Optional platform string (e.g., 'linux/amd64').
+ * @returns Promise resolving to boolean indicating success or failure.
  */
 async function pullImage(imageName, platform) {
     try {
@@ -86819,6 +86710,128 @@ async function pullImage(imageName, platform) {
     }
     catch (error) {
         core.warning(`Failed to pull image ${imageName}${platform ? ` for platform ${platform}` : ''}: ${error}`);
+        return false;
+    }
+}
+/**
+ * Inspects a remote Docker image and returns its manifest information.
+ *
+ * Uses 'docker buildx imagetools inspect' to retrieve detailed manifest information.
+ * The returned manifest can be either a single platform manifest or a multi-platform manifest list.
+ *
+ * @param imageName - Docker image name with optional tag.
+ * @returns Promise resolving to DockerManifest object or undefined on failure.
+ */
+async function inspectImageRemote(imageName) {
+    try {
+        const execOptions = {
+            ignoreReturnCode: true,
+        };
+        // Execute docker buildx command to inspect the image manifest
+        const { exitCode, stdout, stderr } = await executeDockerCommand('docker', ['buildx', 'imagetools', 'inspect', '--format', '{{json .Manifest}}', imageName], execOptions);
+        if (exitCode !== 0) {
+            core.warning(`Failed to inspect manifest for ${imageName}: ${stderr}`);
+            return undefined;
+        }
+        try {
+            // Parse the JSON output to extract the manifest
+            const manifest = JSON.parse(stdout.trim());
+            return manifest;
+        }
+        catch (manifestParseError) {
+            core.warning(`Failed to parse manifest JSON for ${imageName}: ${manifestParseError}`);
+            return undefined;
+        }
+    }
+    catch (error) {
+        core.warning(`Error inspecting manifest for ${imageName}: ${error}`);
+        return undefined;
+    }
+}
+/**
+ * Inspects a local Docker image and returns detailed information.
+ *
+ * Uses 'docker inspect' to retrieve comprehensive information about an image.
+ * Contains details about the image's configuration, layers, size, architecture, etc.
+ *
+ * Note: Images pulled from remote repositories and images loaded via docker load
+ * may have differences in the following information:
+ * - RepoTags: May be empty for loaded images
+ * - RepoDigests: May be empty for loaded images
+ * - Metadata.LastTagTime: May be empty for loaded images
+ * - GraphDriver.Data: May have different paths depending on the environment
+ *
+ * @param imageName - Docker image name with optional tag.
+ * @returns Promise resolving to DockerInspectInfo object or undefined on failure.
+ */
+async function inspectImageLocal(imageName) {
+    try {
+        const execOptions = {
+            ignoreReturnCode: true,
+        };
+        // Execute docker inspect command to get detailed image information
+        const { exitCode, stdout, stderr } = await executeDockerCommand('docker', ['inspect', '--format', '{{json .}}', imageName], execOptions);
+        if (exitCode !== 0) {
+            core.warning(`Failed to inspect image ${imageName}: ${stderr}`);
+            return undefined;
+        }
+        try {
+            // Parse the JSON output to extract the image information
+            const inspectInfo = JSON.parse(stdout.trim());
+            return inspectInfo;
+        }
+        catch (jsonParseError) {
+            core.warning(`Failed to parse inspect JSON for ${imageName}: ${jsonParseError}`);
+            return undefined;
+        }
+    }
+    catch (error) {
+        core.warning(`Error inspecting image ${imageName}: ${error}`);
+        return undefined;
+    }
+}
+/**
+ * Saves Docker image to a tar file.
+ *
+ * @param imageName - Docker image name to save.
+ * @param outputPath - File path where the tar file should be created.
+ * @returns Promise resolving to boolean indicating success or failure.
+ */
+async function saveImageToTar(imageName, outputPath) {
+    try {
+        const execOptions = { ignoreReturnCode: true };
+        // Execute docker save command to create a tar archive of the image
+        const { exitCode, stderr } = await executeDockerCommand('docker', ['save', '-o', outputPath, imageName], execOptions);
+        if (exitCode !== 0) {
+            core.warning(`Failed to save image ${imageName} to ${outputPath}: ${stderr}`);
+            return false;
+        }
+        return true;
+    }
+    catch (error) {
+        core.warning(`Failed to save image ${imageName}: ${error}`);
+        return false;
+    }
+}
+/**
+ * Loads Docker image from a tar file.
+ *
+ * @param tarPath - Path to the tar file containing the Docker image.
+ * @returns Promise resolving to boolean indicating success or failure.
+ */
+async function loadImageFromTar(tarPath) {
+    try {
+        const execOptions = { ignoreReturnCode: true };
+        // Execute docker load command to restore image from tar archive
+        const { exitCode, stderr } = await executeDockerCommand('docker', ['load', '-i', tarPath], execOptions);
+        if (exitCode !== 0) {
+            core.warning(`Failed to load image from ${tarPath}: ${stderr}`);
+            return false;
+        }
+        return true;
+    }
+    catch (error) {
+        core.warning(`Failed to load image from ${tarPath}: ${error}`);
         return false;
     }
 }
@@ -86870,7 +86883,7 @@ const core = __importStar(__nccwpck_require__(37484));
 const fs = __importStar(__nccwpck_require__(79896));
 const yaml = __importStar(__nccwpck_require__(74281));
 /**
- * Default Docker Compose filenames to look for if none are specified
+ * Default Docker Compose filenames to look for if none are specified.
  */
 const DEFAULT_COMPOSE_FILE_NAMES = [
     'compose.yaml',
@@ -86879,12 +86892,11 @@ const DEFAULT_COMPOSE_FILE_NAMES = [
     'docker-compose.yml',
 ];
 /**
- * Extracts Docker Compose services from specified files and filters them
- * based on exclusion list
+ * Extracts Docker Compose services from specified files and filters them based on exclusion list.
  *
- * @param composeFilePaths - Array of paths to Docker Compose files to parse
- * @param excludeImageNames - Array of image names to exclude from results
- * @returns Array of ComposeService objects from all valid files
+ * @param composeFilePaths - Array of paths to Docker Compose files to parse.
+ * @param excludeImageNames - Array of image names to exclude from results.
+ * @returns Array of ComposeService objects from all valid files.
  */
 function getComposeServicesFromFiles(composeFilePaths, excludeImageNames) {
     // Convert exclude list to a Set for O(1) lookups
@@ -86932,10 +86944,10 @@ exports.formatFileSize = formatFileSize;
 exports.formatExecutionTime = formatExecutionTime;
 const date_fns_1 = __nccwpck_require__(94367);
 /**
- * Formats a file size in bytes to a human-readable string
+ * Formats a file size in bytes to a human-readable string.
  *
- * @param sizeInBytes - Size in bytes
- * @returns Human-readable size string (e.g. "10.5 MB")
+ * @param sizeInBytes - Size in bytes.
+ * @returns Human-readable size string (e.g. "10.5 MB").
  */
 function formatFileSize(sizeInBytes) {
     if (sizeInBytes === undefined) {
@@ -86954,11 +86966,11 @@ function formatFileSize(sizeInBytes) {
     return `${(sizeInBytes / Math.pow(1024, unitIndex)).toFixed(2).replace(/\.0+$|(\.[0-9]*[1-9])0+$/, '$1')} ${unit}`;
 }
 /**
- * Formats the time difference between start and end timestamps into a human-readable duration string
+ * Formats the time difference between start and end timestamps into a human-readable duration string.
  *
- * @param startTime - Start timestamp in milliseconds
- * @param endTime - End timestamp in milliseconds
- * @returns Human-readable duration string (e.g. "1 hour 2 minutes 3 seconds")
+ * @param startTime - Start timestamp in milliseconds.
+ * @param endTime - End timestamp in milliseconds.
+ * @returns Human-readable duration string (e.g. "1 hour 2 minutes 3 seconds").
  */
 function formatExecutionTime(startTime, endTime) {
     const duration = (0, date_fns_1.intervalToDuration)({
@@ -87017,6 +87029,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = run;
 const cache = __importStar(__nccwpck_require__(5116));
 const core = __importStar(__nccwpck_require__(37484));
+const fs = __importStar(__nccwpck_require__(91943));
 const lodash_1 = __nccwpck_require__(52356);
 const path = __importStar(__nccwpck_require__(16928));
 const docker_command_1 = __nccwpck_require__(44919);
@@ -87025,25 +87038,26 @@ const format_1 = __nccwpck_require__(16264);
 const path_utils_1 = __nccwpck_require__(66696);
 const platform_1 = __nccwpck_require__(23728);
 /**
- * Sets the standard output values for the action
- * Ensures consistent output formats and proper type handling
+ * Sets the standard output values for the action.
+ * Ensures consistent output formats and proper type handling for GitHub Actions outputs.
  *
- * @param cacheHit - Whether all images were restored from cache
- * @param imageList - List of processed images with their details
+ * @param cacheHit - Indicates if all images were restored from cache.
+ * @param imageList - List of processed images with their details, or undefined if none.
  */
 function setActionOutputs(cacheHit, imageList) {
     core.setOutput('cache-hit', cacheHit.toString());
     core.setOutput('image-list', JSON.stringify(imageList || []));
 }
 /**
- * Generates a unique cache key for a Docker image
+ * Generates a unique cache key for a Docker image.
+ * The key is based on image name, tag, digest, and platform information.
  *
- * @param cacheKeyPrefix - Prefix to use for the cache key
- * @param imageName - Docker image name (without tag)
- * @param imageTag - Docker image tag
- * @param imageDigest - Image digest
- * @param servicePlatformString - Platform string (e.g. 'linux/amd64') or undefined
- * @returns A unique cache key string
+ * @param cacheKeyPrefix - Prefix to use for the cache key.
+ * @param imageName - Docker image name (without tag).
+ * @param imageTag - Docker image tag.
+ * @param imageDigest - Image digest.
+ * @param servicePlatformString - Platform string (e.g. 'linux/amd64') or undefined.
+ * @returns A unique cache key string for the image.
  */
 function generateCacheKey(cacheKeyPrefix, imageName, imageTag, imageDigest, servicePlatformString) {
     // Sanitize components to ensure valid cache key
@@ -87051,24 +87065,209 @@ function generateCacheKey(cacheKeyPrefix, imageName, imageTag, imageDigest, serv
     const sanitizedImageTag = (0, path_utils_1.sanitizePathComponent)(imageTag);
     const sanitizedDigest = (0, path_utils_1.sanitizePathComponent)(imageDigest);
     // Use provided platform or get current platform
-    const platformInfo = servicePlatformString ? (0, platform_1.parsePlatformString)(servicePlatformString) : (0, platform_1.getCurrentPlatformInfo)();
+    const platformInfo = servicePlatformString ? (0, platform_1.parseOciPlatformString)(servicePlatformString) : (0, platform_1.getCurrentPlatformInfo)();
     const sanitizedOs = (0, path_utils_1.sanitizePathComponent)(platformInfo?.os || 'none');
     const sanitizedArch = (0, path_utils_1.sanitizePathComponent)(platformInfo?.arch || 'none');
     const sanitizedVariant = (0, path_utils_1.sanitizePathComponent)(platformInfo?.variant || 'none');
     return `${cacheKeyPrefix}-${sanitizedImageName}-${sanitizedImageTag}-${sanitizedOs}-${sanitizedArch}-${sanitizedVariant}-${sanitizedDigest}`;
 }
 /**
- * Generates filesystem path for storing Docker image tar file
+ * Generates a manifest cache key for a Docker image.
+ * Appends a manifest suffix to the standard cache key.
  *
- * @param imageName - Docker image name (without tag)
- * @param imageTag - Docker image tag
- * @param imageDigest - Image digest
- * @param servicePlatformString - Platform string (e.g. 'linux/amd64') or undefined
- * @returns Absolute path to the tar file
+ * @param cacheKeyPrefix - Prefix to use for the cache key.
+ * @param imageName - Docker image name (without tag).
+ * @param imageTag - Docker image tag.
+ * @param imageDigest - Image digest.
+ * @param servicePlatformString - Platform string (e.g. 'linux/amd64') or undefined.
+ * @returns A unique cache key string with manifest suffix.
+ */
+function generateManifestCacheKey(cacheKeyPrefix, imageName, imageTag, imageDigest, servicePlatformString) {
+    return `${generateCacheKey(cacheKeyPrefix, imageName, imageTag, imageDigest, servicePlatformString)}-manifest`;
+}
+/**
+ * Returns the temp directory for storing cache files.
+ * Uses the RUNNER_TEMP environment variable or falls back to '/tmp'.
+ *
+ * @returns The absolute path to the temp directory.
+ */
+function getRunnerTempDir() {
+    return process.env.RUNNER_TEMP || '/tmp';
+}
+/**
+ * Generates the filesystem path for storing a Docker image tar file.
+ *
+ * @param imageName - Docker image name (without tag).
+ * @param imageTag - Docker image tag.
+ * @param imageDigest - Image digest.
+ * @param servicePlatformString - Platform string (e.g. 'linux/amd64') or undefined.
+ * @returns Absolute path to the tar file.
  */
 function generateTarPath(imageName, imageTag, imageDigest, servicePlatformString) {
     const tarFileName = generateCacheKey('', imageName, imageTag, imageDigest, servicePlatformString);
-    return path.join(process.env.RUNNER_TEMP || '/tmp', `${tarFileName}.tar`);
+    return path.join(getRunnerTempDir(), `${tarFileName}.tar`);
+}
+/**
+ * Generates the filesystem path for storing a Docker image manifest file.
+ *
+ * @param imageName - Docker image name (without tag).
+ * @param imageTag - Docker image tag.
+ * @param imageDigest - Image digest.
+ * @param servicePlatformString - Platform string (e.g. 'linux/amd64') or undefined.
+ * @returns Absolute path to the manifest file.
+ */
+function generateManifestPath(imageName, imageTag, imageDigest, servicePlatformString) {
+    const manifestFileName = generateCacheKey('', imageName, imageTag, imageDigest, servicePlatformString);
+    return path.join(getRunnerTempDir(), `${manifestFileName}-manifest.json`);
+}
+/**
+ * Compares two Docker manifests for equivalence.
+ * Uses sorted JSON stringification for comparison.
+ *
+ * @param manifest1 - First Docker manifest.
+ * @param manifest2 - Second Docker manifest.
+ * @returns True if manifests are equivalent, false otherwise.
+ */
+function compareManifests(manifest1, manifest2) {
+    // Simple string comparison of stringified JSON with consistent ordering for properties
+    const sortedJson1 = JSON.stringify(manifest1, Object.keys(manifest1).sort());
+    const sortedJson2 = JSON.stringify(manifest2, Object.keys(manifest2).sort());
+    return sortedJson1 === sortedJson2;
+}
+/**
+ * Saves a Docker manifest to a JSON file.
+ *
+ * @param manifest - Docker manifest to save.
+ * @param manifestPath - Path to save the manifest JSON.
+ * @returns Promise resolving to true if successful, false otherwise.
+ */
+async function saveManifestToJson(manifest, manifestPath) {
+    try {
+        await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+        return true;
+    }
+    catch (error) {
+        core.warning(`Failed to save manifest to ${manifestPath}: ${error}`);
+        return false;
+    }
+}
+/**
+ * Loads a Docker manifest from a JSON file.
+ *
+ * @param manifestPath - Path to the manifest JSON file.
+ * @returns Promise resolving to DockerManifest if successful, or undefined if loading fails.
+ */
+async function loadManifestFromJson(manifestPath) {
+    try {
+        const manifestJson = await fs.readFile(manifestPath, 'utf8');
+        return JSON.parse(manifestJson);
+    }
+    catch (error) {
+        core.debug(`Failed to load manifest from ${manifestPath}: ${error}`);
+        return undefined;
+    }
+}
+/**
+ * Pulls and caches a Docker image, saving both the image tar and manifest to cache.
+ *
+ * @param fullImageName - Complete image name with tag.
+ * @param platformString - Platform string (e.g. 'linux/amd64') or undefined.
+ * @param serviceCacheKey - Cache key for the image tarball.
+ * @param manifestCacheKey - Cache key for the manifest file.
+ * @param imageTarPath - Path to save the image tarball.
+ * @param manifestPath - Path to save the manifest JSON.
+ * @param imageDigest - Known image digest.
+ * @param manifest - Docker manifest object.
+ * @returns Promise resolving to a ServiceProcessingResult object.
+ */
+async function pullAndCacheImage(fullImageName, platformString, serviceCacheKey, manifestCacheKey, imageTarPath, manifestPath, imageDigest, manifest) {
+    // Pull the image
+    if (!(await (0, docker_command_1.pullImage)(fullImageName, platformString))) {
+        core.warning(`Failed to pull ${fullImageName}`);
+        return {
+            success: false,
+            restoredFromCache: false,
+            imageName: fullImageName,
+            cacheKey: serviceCacheKey,
+            digest: imageDigest,
+            platform: platformString,
+            error: `Failed to pull image: ${fullImageName}`,
+            imageSize: undefined,
+        };
+    }
+    // Verify the digest matches after pull
+    const newManifest = await (0, docker_command_1.inspectImageRemote)(fullImageName);
+    const newImageDigest = newManifest?.digest;
+    if (newImageDigest !== imageDigest) {
+        core.warning(`Digest mismatch for ${fullImageName}: expected ${imageDigest}, got ${newImageDigest}`);
+        return {
+            success: false,
+            restoredFromCache: false,
+            imageName: fullImageName,
+            cacheKey: serviceCacheKey,
+            digest: imageDigest,
+            platform: platformString,
+            error: `Digest mismatch for ${fullImageName}: expected ${imageDigest}, got ${newImageDigest}`,
+            imageSize: undefined,
+        };
+    }
+    // Save the image to tar file
+    if (!(await (0, docker_command_1.saveImageToTar)(fullImageName, imageTarPath))) {
+        core.warning(`Failed to save image to tar: ${fullImageName}`);
+        return {
+            success: false,
+            restoredFromCache: false,
+            imageName: fullImageName,
+            cacheKey: serviceCacheKey,
+            digest: imageDigest,
+            platform: platformString,
+            error: `Failed to save image to tar: ${fullImageName}`,
+            imageSize: undefined,
+        };
+    }
+    // Save manifest to json and cache
+    if (manifest) {
+        try {
+            await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+            await cache.saveCache([manifestPath], manifestCacheKey);
+            core.debug(`Cached manifest for ${fullImageName} with key ${manifestCacheKey}`);
+        }
+        catch (error) {
+            core.debug(`Failed to save manifest for ${fullImageName}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+    // Save image tar to cache
+    try {
+        const cacheResultId = await cache.saveCache([imageTarPath], serviceCacheKey);
+        if (cacheResultId !== -1) {
+            core.info(`Cached ${fullImageName} with key ${serviceCacheKey}`);
+        }
+        else {
+            core.debug(`Cache was not saved for ${fullImageName} (cache ID: ${cacheResultId})`);
+        }
+    }
+    catch (error) {
+        // Handle known cache saving errors - log but continue
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (errorMessage.includes('already exists')) {
+            core.debug(`Cache already exists for ${fullImageName}: ${errorMessage}`);
+        }
+        else {
+            core.debug(`Error saving cache for ${fullImageName}: ${errorMessage}`);
+        }
+    }
+    // Get image size
+    const inspectInfo = await (0, docker_command_1.inspectImageLocal)(fullImageName);
+    return {
+        success: true,
+        restoredFromCache: false,
+        imageName: fullImageName,
+        cacheKey: serviceCacheKey,
+        digest: imageDigest,
+        platform: platformString,
+        error: undefined,
+        imageSize: inspectInfo?.Size,
+    };
 }
 /**
  * Processes a single Docker Compose service:
@@ -87076,16 +87275,16 @@ function generateTarPath(imageName, imageTag, imageDigest, servicePlatformString
  * - If cache miss, pulls and caches the image
  * - Handles various error conditions
  *
- * @param serviceDefinition - The Docker Compose service to process
- * @param cacheKeyPrefix - Prefix to use for the cache key
- * @returns Result object with status and metadata
+ * @param serviceDefinition - The Docker Compose service to process.
+ * @param cacheKeyPrefix - Prefix to use for the cache key.
+ * @returns Promise resolving to a ServiceProcessingResult object with status and metadata.
  */
 async function processService(serviceDefinition, cacheKeyPrefix) {
     const fullImageName = serviceDefinition.image;
     const [baseImageName, imageTag = 'latest'] = fullImageName.split(':');
-    // Get image digest for cache key generation
-    const imageDigest = await (0, docker_command_1.getImageDigest)(fullImageName);
-    if (!imageDigest) {
+    // Get image manifest with digest for cache key generation
+    const manifest = await (0, docker_command_1.inspectImageRemote)(fullImageName);
+    if (!manifest || !manifest.digest) {
         core.warning(`Could not get digest for ${fullImageName}, skipping cache`);
         return {
             success: false,
@@ -87098,6 +87297,7 @@ async function processService(serviceDefinition, cacheKeyPrefix) {
             imageSize: undefined,
         };
     }
+    const imageDigest = manifest.digest;
     const serviceCacheKey = generateCacheKey(cacheKeyPrefix, baseImageName, imageTag, imageDigest, serviceDefinition.platform);
     const imageTarPath = generateTarPath(baseImageName, imageTag, imageDigest, serviceDefinition.platform);
     if (serviceDefinition.platform) {
@@ -87105,127 +87305,130 @@ async function processService(serviceDefinition, cacheKeyPrefix) {
     }
     core.info(`Cache key for ${fullImageName}: ${serviceCacheKey}`);
     core.debug(`Cache path: ${imageTarPath}`);
+    // Generate manifest cache key and path
+    const manifestCacheKey = generateManifestCacheKey(cacheKeyPrefix, baseImageName, imageTag, imageDigest, serviceDefinition.platform);
+    const manifestPath = generateManifestPath(baseImageName, imageTag, imageDigest, serviceDefinition.platform);
     // Try to restore from cache first
     const cacheHitKey = await cache.restoreCache([imageTarPath], serviceCacheKey);
-    if (cacheHitKey) {
-        core.info(`Cache hit for ${fullImageName}, loading from cache`);
-        const loadSuccess = await (0, docker_command_1.loadImageFromTar)(imageTarPath);
-        // Get image size after loading from cache
-        const imageSize = loadSuccess ? await (0, docker_command_1.getImageSize)(fullImageName) : undefined;
+    const manifestCacheHitKey = await cache.restoreCache([manifestPath], manifestCacheKey);
+    // If no cache hit, proceed to pull the image
+    if (!cacheHitKey) {
+        core.info(`Cache miss for ${fullImageName}, pulling and saving`);
+        return await pullAndCacheImage(fullImageName, serviceDefinition.platform, serviceCacheKey, manifestCacheKey, imageTarPath, manifestPath, imageDigest, manifest);
+    }
+    // Process cache hit
+    core.info(`Cache hit for ${fullImageName}, loading from cache`);
+    // Restore image from cache and fetch remote manifest in parallel
+    const [loadSuccess, remoteManifest] = await Promise.all([
+        (0, docker_command_1.loadImageFromTar)(imageTarPath),
+        (0, docker_command_1.inspectImageRemote)(fullImageName),
+    ]);
+    // If restoration fails, return immediately
+    if (!loadSuccess) {
         return {
-            success: loadSuccess,
-            restoredFromCache: loadSuccess,
+            success: false,
+            restoredFromCache: false,
             imageName: fullImageName,
             cacheKey: serviceCacheKey,
             digest: imageDigest,
             platform: serviceDefinition.platform,
-            error: loadSuccess ? undefined : `Failed to load image from cache: ${fullImageName}`,
+            error: `Failed to load image from cache: ${fullImageName}`,
+            imageSize: undefined,
+        };
+    }
+    // Get image size after successful load from cache
+    const inspectInfo = await (0, docker_command_1.inspectImageLocal)(fullImageName);
+    const imageSize = inspectInfo?.Size;
+    // Skip manifest check if no manifest cache hit
+    if (!manifestCacheHitKey) {
+        core.debug(`No manifest cache for ${fullImageName}`);
+        return {
+            success: true,
+            restoredFromCache: true,
+            imageName: fullImageName,
+            cacheKey: serviceCacheKey,
+            digest: imageDigest,
+            platform: serviceDefinition.platform,
+            error: undefined,
             imageSize,
         };
     }
-    // Handle cache miss - pull the image
-    core.info(`Cache miss for ${fullImageName}, pulling and saving`);
+    // Load cached manifest
+    const cachedManifest = await loadManifestFromJson(manifestPath);
+    // Skip if manifest can't be loaded or no current manifest
+    if (!cachedManifest || !remoteManifest) {
+        core.debug(`Cannot compare manifests for ${fullImageName}: missing data`);
+        return {
+            success: true,
+            restoredFromCache: true,
+            imageName: fullImageName,
+            cacheKey: serviceCacheKey,
+            digest: imageDigest,
+            platform: serviceDefinition.platform,
+            error: undefined,
+            imageSize,
+        };
+    }
+    // If manifests match, return success immediately
+    if (compareManifests(cachedManifest, remoteManifest)) {
+        core.debug(`Manifest match confirmed for ${fullImageName}`);
+        return {
+            success: true,
+            restoredFromCache: true,
+            imageName: fullImageName,
+            cacheKey: serviceCacheKey,
+            digest: imageDigest,
+            platform: serviceDefinition.platform,
+            error: undefined,
+            imageSize,
+        };
+    }
+    // Handle manifest mismatch
+    core.info(`Manifest mismatch detected for ${fullImageName}, pulling fresh image`);
+    // Pull the image to get the updated version
     const pullSuccess = await (0, docker_command_1.pullImage)(fullImageName, serviceDefinition.platform);
     if (!pullSuccess) {
-        core.warning(`Failed to pull ${fullImageName}`);
+        core.warning(`Failed to pull updated image ${fullImageName}`);
         return {
-            success: false,
-            restoredFromCache: false,
+            success: true, // Still consider this a success since the cached image is available
+            restoredFromCache: true,
             imageName: fullImageName,
             cacheKey: serviceCacheKey,
             digest: imageDigest,
             platform: serviceDefinition.platform,
-            error: `Failed to pull image: ${fullImageName}`,
-            imageSize: undefined,
+            error: undefined,
+            imageSize,
         };
     }
-    // Verify the digest matches after pull
-    const newImageDigest = await (0, docker_command_1.getImageDigest)(fullImageName);
-    if (newImageDigest !== imageDigest) {
-        core.warning(`Digest mismatch for ${fullImageName}: expected ${imageDigest}, got ${newImageDigest}`);
-        return {
-            success: false,
-            restoredFromCache: false,
-            imageName: fullImageName,
-            cacheKey: serviceCacheKey,
-            digest: imageDigest,
-            platform: serviceDefinition.platform,
-            error: `Digest mismatch for ${fullImageName}: expected ${imageDigest}, got ${newImageDigest}`,
-            imageSize: undefined,
-        };
+    // Save fresh manifest
+    const saveManifestSuccess = await saveManifestToJson(manifest, manifestPath);
+    if (saveManifestSuccess) {
+        await cache.saveCache([manifestPath], manifestCacheKey);
     }
-    // Save the image to tar file
+    // Save the updated image to tar file
     const saveSuccess = await (0, docker_command_1.saveImageToTar)(fullImageName, imageTarPath);
-    if (!saveSuccess) {
-        core.warning(`Failed to save image to tar: ${fullImageName}`);
-        return {
-            success: false,
-            restoredFromCache: false,
-            imageName: fullImageName,
-            cacheKey: serviceCacheKey,
-            digest: imageDigest,
-            platform: serviceDefinition.platform,
-            error: `Failed to save image to tar: ${fullImageName}`,
-            imageSize: undefined,
-        };
+    if (saveSuccess) {
+        await cache.saveCache([imageTarPath], serviceCacheKey);
+        core.info(`Updated cached image for ${fullImageName}`);
     }
-    // Save to cache
-    try {
-        const cacheResultId = await cache.saveCache([imageTarPath], serviceCacheKey);
-        const cacheSuccess = cacheResultId !== -1;
-        if (cacheSuccess) {
-            core.info(`Cached ${fullImageName} with key ${serviceCacheKey}`);
-        }
-        else {
-            core.debug(`Cache was not saved for ${fullImageName} (cache ID: ${cacheResultId})`);
-        }
-        // Get image size after pulling
-        const imageSize = await (0, docker_command_1.getImageSize)(fullImageName);
-        return {
-            success: true,
-            restoredFromCache: false,
-            imageName: fullImageName,
-            cacheKey: serviceCacheKey,
-            digest: imageDigest,
-            platform: serviceDefinition.platform,
-            error: undefined,
-            imageSize,
-        };
-    }
-    catch (cacheError) {
-        // Handle known cache saving errors gracefully without failing the operation
-        if (cacheError instanceof Error) {
-            if (cacheError.message.includes('already exists')) {
-                core.debug(`Cache already exists for ${fullImageName}: ${cacheError.message}`);
-            }
-            else if (cacheError.message.includes('unable to upload')) {
-                core.debug(`Unable to upload cache for ${fullImageName}: ${cacheError.message}`);
-            }
-            else {
-                core.debug(`Error saving cache for ${fullImageName}: ${cacheError.message}`);
-            }
-        }
-        else {
-            core.debug(`Unknown error saving cache for ${fullImageName}: ${String(cacheError)}`);
-        }
-        // Get image size even if cache saving failed
-        const imageSize = await (0, docker_command_1.getImageSize)(fullImageName);
-        return {
-            success: true,
-            restoredFromCache: false,
-            imageName: fullImageName,
-            cacheKey: serviceCacheKey,
-            digest: imageDigest,
-            platform: serviceDefinition.platform,
-            error: undefined,
-            imageSize,
-        };
-    }
+    // Get updated image size
+    const updatedInspectInfo = await (0, docker_command_1.inspectImageLocal)(fullImageName);
+    return {
+        success: true,
+        restoredFromCache: true,
+        imageName: fullImageName,
+        cacheKey: serviceCacheKey,
+        digest: imageDigest,
+        platform: serviceDefinition.platform,
+        error: undefined,
+        imageSize: updatedInspectInfo?.Size,
+    };
 }
 /**
- * Main function that runs the GitHub Action
+ * Main function that runs the GitHub Action.
+ * Handles all orchestration, output, and error management for the action.
  *
- * @returns Promise that resolves when the action completes
+ * @returns Promise that resolves when the action completes.
  */
 async function run() {
     // Record action start time
@@ -87365,10 +87568,10 @@ run();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.sanitizePathComponent = sanitizePathComponent;
 /**
- * Sanitizes a string to make it safe for use in file paths
+ * Sanitizes a string to make it safe for use in file paths.
  *
- * @param value - The string to sanitize
- * @returns A sanitized string safe for use in file paths
+ * @param value - The string to sanitize.
+ * @returns A sanitized string safe for use in file paths.
  */
 function sanitizePathComponent(value) {
     // Replace all characters that are not safe for filenames across platforms
@@ -87391,111 +87594,72 @@ function sanitizePathComponent(value) {
  */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.getCurrentOciPlatformString = getCurrentOciPlatformString;
-exports.parsePlatformString = parsePlatformString;
+exports.parseOciPlatformString = parseOciPlatformString;
 exports.getCurrentPlatformInfo = getCurrentPlatformInfo;
 /**
  * Maps Node.js architecture identifiers (`process.arch`) to their OCI equivalents.
- * Includes common aliases.
+ * Only includes entries where Node.js and OCI values differ.
  * @see https://nodejs.org/api/process.html#processarch
  */
 const NODE_TO_OCI_ARCH = {
-    // Node.js architectures
     x64: 'amd64',
-    arm64: 'arm64',
     ia32: '386',
-    arm: 'arm',
     ppc64: 'ppc64le',
-    s390x: 's390x',
-    mips: 'mips',
     mipsel: 'mipsle',
-    loong64: 'loong64',
-    riscv64: 'riscv64',
-    // Aliases
     aarch64: 'arm64',
     x86_64: 'amd64',
     x86: '386',
-    ppc: 'ppc',
-    s390: 's390',
     mips64el: 'mips64le',
 };
-/** A set containing all valid OCI architecture values derived from the map. */
-const VALID_OCI_ARCHS = new Set(Object.values(NODE_TO_OCI_ARCH));
 /**
  * Maps Node.js platform identifiers (`process.platform`) to their OCI OS equivalents.
+ * Only includes entries where Node.js and OCI values differ.
  * @see https://nodejs.org/api/process.html#processplatform
  */
 const NODE_TO_OCI_OS = {
-    linux: 'linux',
     win32: 'windows',
-    darwin: 'darwin',
-    aix: 'aix',
-    freebsd: 'freebsd',
-    openbsd: 'openbsd',
     sunos: 'solaris',
-    android: 'android',
 };
-/** A set containing all valid OCI OS values derived from the map. */
-const VALID_OCI_OSS = new Set(Object.values(NODE_TO_OCI_OS));
 /**
  * Maps Node.js specific ARM version identifiers or explicit variant strings
  * to their canonical OCI variant equivalents.
+ * Only includes entries where Node.js and OCI values differ.
  */
 const NODE_TO_OCI_VARIANT = {
-    // Node.js `arm_version` specific values
     '6': 'v6',
     '7': 'v7',
-    // Explicit OCI variants (allow passthrough)
-    v5: 'v5',
-    v6: 'v6',
-    v7: 'v7',
-    v8: 'v8',
 };
-/** A set containing all valid OCI variant values derived from the map. */
-const VALID_OCI_VARIANTS = new Set(Object.values(NODE_TO_OCI_VARIANT));
 /**
- * Internal helper to resolve an OCI architecture identifier.
+ * Converts a Node.js platform identifier to its OCI OS equivalent.
+ * If not found in the mapping, returns the original value.
  *
- * @param arch - The architecture string to map (Node.js or OCI).
- * @returns The canonical OCI architecture string or `undefined`.
+ * @param os - Node.js platform identifier (e.g., 'linux', 'win32').
+ * @returns OCI OS identifier (e.g., 'linux', 'windows').
  */
-function resolveOciArch(arch) {
-    if (!arch)
-        return undefined;
-    // Safely check existence before accessing the property
-    if (arch in NODE_TO_OCI_ARCH) {
-        return NODE_TO_OCI_ARCH[arch];
-    }
-    return VALID_OCI_ARCHS.has(arch) ? arch : undefined;
+function toOciOs(os) {
+    return NODE_TO_OCI_OS[os] ?? os;
 }
 /**
- * Internal helper to resolve an OCI OS identifier.
+ * Converts a Node.js architecture identifier to its OCI architecture equivalent.
+ * If not found in the mapping, returns the original value.
  *
- * @param os - The OS string to map (Node.js or OCI).
- * @returns The canonical OCI OS string or `undefined`.
+ * @param arch - Node.js architecture identifier (e.g., 'x64', 'arm64').
+ * @returns OCI architecture identifier (e.g., 'amd64', 'arm64').
  */
-function resolveOciOs(os) {
-    if (!os)
-        return undefined;
-    // Safely check existence before accessing the property
-    if (os in NODE_TO_OCI_OS) {
-        return NODE_TO_OCI_OS[os];
-    }
-    return VALID_OCI_OSS.has(os) ? os : undefined;
+function toOciArch(arch) {
+    return NODE_TO_OCI_ARCH[arch] ?? arch;
 }
 /**
- * Internal helper to resolve an OCI variant identifier.
+ * Converts a Node.js ARM variant or explicit variant string to its OCI variant equivalent.
+ * If not found in the mapping, returns the original value.
  *
- * @param variant - The variant string to map (Node.js arm_version or OCI).
- * @returns The canonical OCI variant string or `undefined`.
+ * @param variant - Node.js ARM variant or OCI variant string (e.g., 'v7', 'v8', '6', '7').
+ * @returns OCI variant string or undefined if not provided.
  */
-function resolveOciVariant(variant) {
+function toOciVariant(variant) {
     if (!variant)
         return undefined;
-    // Safely check existence before accessing the property
-    if (variant in NODE_TO_OCI_VARIANT) {
-        return NODE_TO_OCI_VARIANT[variant];
-    }
-    return VALID_OCI_VARIANTS.has(variant) ? variant : undefined;
+    return NODE_TO_OCI_VARIANT[variant] ?? variant;
 }
 /**
  * Determines the OCI platform string (os/arch[/variant]) for the current Node.js runtime.
@@ -87503,62 +87667,42 @@ function resolveOciVariant(variant) {
  * @returns The OCI platform string (e.g., "linux/amd64", "linux/arm/v7"), or `undefined` if resolution fails.
  */
 function getCurrentOciPlatformString() {
-    const os = resolveOciOs(process.platform);
-    if (!os) {
-        // Could not resolve OS
-        return undefined;
-    }
-    const arch = resolveOciArch(process.arch);
-    if (!arch) {
-        // Could not resolve architecture
-        return undefined;
-    }
+    const os = toOciOs(process.platform);
+    const arch = toOciArch(process.arch);
     // Determine variant primarily for 'arm' architecture using Node's specific variable.
     const nodeArmVersion = process.config?.variables?.arm_version;
-    const variant = arch === 'arm' ? resolveOciVariant(nodeArmVersion) : undefined;
+    const variant = arch === 'arm' ? toOciVariant(nodeArmVersion) : undefined;
     return variant ? `${os}/${arch}/${variant}` : `${os}/${arch}`;
 }
 /**
  * Parses an OCI platform string into its components (OS, architecture, variant).
  *
  * @param ociPlatformString - The platform string to parse (e.g., "linux/amd64", "windows/amd64/v8").
- * @returns A `PlatformInfo` object, or `undefined` if the string is invalid.
+ * @returns A `OciPlatform` object, or `undefined` if the string is invalid.
  */
-function parsePlatformString(ociPlatformString) {
+function parseOciPlatformString(ociPlatformString) {
     if (!ociPlatformString) {
         return undefined;
     }
     const platformComponents = ociPlatformString.split('/');
-    // Must have at least os/arch, and they must not be empty strings
     if (platformComponents.length < 2 || !platformComponents[0] || !platformComponents[1]) {
-        // Invalid format
         return undefined;
     }
-    const resolvedOs = resolveOciOs(platformComponents[0]);
-    const resolvedArch = resolveOciArch(platformComponents[1]);
-    const rawVariant = platformComponents.length > 2 && platformComponents[2] ? platformComponents[2] : undefined;
-    const resolvedVariant = resolveOciVariant(rawVariant);
-    // OS and Arch are mandatory and must be valid
-    if (!resolvedOs || !resolvedArch) {
-        // Invalid or unrecognized OS or Arch
-        return undefined;
-    }
-    // Always include variant property, even if it's undefined
-    const platformInfo = {
-        os: resolvedOs,
-        arch: resolvedArch,
-        variant: resolvedVariant,
+    const [os, arch, variant] = platformComponents;
+    return {
+        os: toOciOs(os),
+        arch: toOciArch(arch),
+        variant: toOciVariant(variant),
     };
-    return platformInfo;
 }
 /**
- * Retrieves the OCI platform information (`PlatformInfo`) for the current Node.js runtime.
+ * Retrieves the OCI platform information (`OciPlatform`) for the current Node.js runtime.
  *
- * @returns A `PlatformInfo` object for the current environment, or `undefined` if resolution fails.
+ * @returns A `OciPlatform` object for the current environment, or `undefined` if resolution fails.
  */
 function getCurrentPlatformInfo() {
     const currentOciPlatformString = getCurrentOciPlatformString();
-    return parsePlatformString(currentOciPlatformString);
+    return parseOciPlatformString(currentOciPlatformString);
 }
 
 
@@ -87633,6 +87777,14 @@ module.exports = require("events");
 
 "use strict";
 module.exports = require("fs");
+
+/***/ }),
+
+/***/ 91943:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("fs/promises");
 
 /***/ }),
 
