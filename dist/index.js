@@ -86878,10 +86878,12 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.getComposeFilePathsToProcess = getComposeFilePathsToProcess;
 exports.getComposeServicesFromFiles = getComposeServicesFromFiles;
 const core = __importStar(__nccwpck_require__(37484));
 const fs = __importStar(__nccwpck_require__(79896));
 const yaml = __importStar(__nccwpck_require__(74281));
+const lodash_1 = __nccwpck_require__(52356);
 /**
  * Default Docker Compose filenames to look for if none are specified.
  */
@@ -86892,24 +86894,30 @@ const DEFAULT_COMPOSE_FILE_NAMES = [
     'docker-compose.yml',
 ];
 /**
- * Extracts Docker Compose services from specified files and filters them based on exclusion list.
+ * Returns the list of Docker Compose file paths to process, based on input or defaults.
  *
- * @param composeFilePaths - Array of paths to Docker Compose files to parse.
- * @param excludeImageNames - Array of image names to exclude from results.
- * @returns Array of ComposeService objects from all valid files.
+ * @param composeFilePaths - Array of paths to Docker Compose files to check. If empty, default file names are used.
+ * @returns Array of existing Docker Compose file paths to process.
  */
-function getComposeServicesFromFiles(composeFilePaths, excludeImageNames) {
-    // Convert exclude list to a Set for O(1) lookups
-    const excludedImageSet = new Set(excludeImageNames);
-    // Use provided paths or default filenames if none provided
-    const composeFilesToProcess = composeFilePaths.length > 0
+function getComposeFilePathsToProcess(composeFilePaths) {
+    return composeFilePaths.length > 0
         ? composeFilePaths.filter((filePath) => fs.existsSync(filePath))
         : DEFAULT_COMPOSE_FILE_NAMES.filter((fileName) => fs.existsSync(fileName));
-    return (composeFilesToProcess
+}
+/**
+ * Extracts Docker Compose services from specified files and filters them based on exclusion list.
+ * Removes duplicate services (same image and platform).
+ *
+ * @param composeFilePaths - Array of paths to Docker Compose files to parse. Each file is read and parsed as YAML.
+ * @param excludeImageNames - Array of image names to exclude from results. Services with these image names are filtered out.
+ * @returns Array of unique ComposeService objects from all valid files (duplicates by image+platform are removed).
+ */
+function getComposeServicesFromFiles(composeFilePaths, excludeImageNames) {
+    const excludedImageSet = new Set(excludeImageNames);
+    return (0, lodash_1.chain)(composeFilePaths)
         .flatMap((composeFilePath) => {
         try {
             const fileContent = fs.readFileSync(composeFilePath, 'utf8');
-            // Parse YAML content into a ComposeFile structure
             const parsedComposeFile = yaml.load(fileContent);
             if (!parsedComposeFile) {
                 core.debug(`Empty or invalid YAML file: ${composeFilePath}`);
@@ -86919,7 +86927,6 @@ function getComposeServicesFromFiles(composeFilePaths, excludeImageNames) {
                 core.debug(`No services section found in ${composeFilePath}`);
                 return [];
             }
-            // Return just the service definitions, discarding service names
             return Object.values(parsedComposeFile.services);
         }
         catch (parsingError) {
@@ -86927,8 +86934,9 @@ function getComposeServicesFromFiles(composeFilePaths, excludeImageNames) {
             return [];
         }
     })
-        // Filter out services with no image property or excluded images
-        .filter((serviceDefinition) => serviceDefinition.image !== undefined && !excludedImageSet.has(serviceDefinition.image)));
+        .filter((composeService) => composeService.image !== undefined && !excludedImageSet.has(composeService.image))
+        .uniqBy((composeService) => `${composeService.image}|${composeService.platform ?? ''}`)
+        .value();
 }
 
 
@@ -87030,7 +87038,6 @@ exports.run = run;
 const cache = __importStar(__nccwpck_require__(5116));
 const core = __importStar(__nccwpck_require__(37484));
 const fs = __importStar(__nccwpck_require__(91943));
-const lodash_1 = __nccwpck_require__(52356);
 const path = __importStar(__nccwpck_require__(16928));
 const docker_command_1 = __nccwpck_require__(44919);
 const docker_compose_file_1 = __nccwpck_require__(54329);
@@ -87419,26 +87426,10 @@ async function run() {
         const composeFilePaths = core.getMultilineInput('compose-files');
         const excludeImageNames = core.getMultilineInput('exclude-images');
         const cacheKeyPrefix = core.getInput('cache-key-prefix') || 'docker-compose-image';
-        const serviceDefinitions = (0, lodash_1.chain)((0, docker_compose_file_1.getComposeServicesFromFiles)(composeFilePaths, excludeImageNames))
-            // Complete undefined platforms with getCurrentPlatformInfo()
-            .map((serviceDefinition) => {
-            if (serviceDefinition.platform !== undefined) {
-                return serviceDefinition;
-            }
-            const platformInfo = (0, platform_1.getCurrentPlatformInfo)();
-            if (!platformInfo) {
-                return serviceDefinition;
-            }
-            // Create platform string from platform info components
-            const platformString = `${platformInfo.os}/${platformInfo.arch}${platformInfo.variant ? `/${platformInfo.variant}` : ''}`;
-            return {
-                ...serviceDefinition,
-                platform: platformString,
-            };
-        })
-            // Filter out duplicates by keeping only the first occurrence of each image+platform combination
-            .uniqBy((serviceDefinition) => `${serviceDefinition.image}|${serviceDefinition.platform || 'default'}`)
-            .value();
+        // Determine compose file paths
+        const referencedComposeFiles = (0, docker_compose_file_1.getComposeFilePathsToProcess)(composeFilePaths);
+        // Get service definitions (duplicates removed)
+        const serviceDefinitions = (0, docker_compose_file_1.getComposeServicesFromFiles)(referencedComposeFiles, excludeImageNames);
         if (serviceDefinitions.length === 0) {
             core.info('No Docker services found in compose files or all services were excluded');
             setActionOutputs(false, []);
@@ -87517,7 +87508,7 @@ async function run() {
             [{ data: 'Total Execution Time' }, { data: actionHumanReadableDuration }],
         ])
             .addHeading('Referenced Compose Files', 3)
-            .addList(composeFilePaths.map((filePath) => filePath))
+            .addList(referencedComposeFiles.map((filePath) => filePath))
             .write();
         core.info(`Action completed in ${actionHumanReadableDuration}`);
         if (allServicesSuccessful) {

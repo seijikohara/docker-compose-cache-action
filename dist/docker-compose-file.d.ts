@@ -6,10 +6,18 @@ export type ComposeService = {
     readonly platform?: string;
 };
 /**
- * Extracts Docker Compose services from specified files and filters them based on exclusion list.
+ * Returns the list of Docker Compose file paths to process, based on input or defaults.
  *
- * @param composeFilePaths - Array of paths to Docker Compose files to parse.
- * @param excludeImageNames - Array of image names to exclude from results.
- * @returns Array of ComposeService objects from all valid files.
+ * @param composeFilePaths - Array of paths to Docker Compose files to check. If empty, default file names are used.
+ * @returns Array of existing Docker Compose file paths to process.
+ */
+export declare function getComposeFilePathsToProcess(composeFilePaths: ReadonlyArray<string>): ReadonlyArray<string>;
+/**
+ * Extracts Docker Compose services from specified files and filters them based on exclusion list.
+ * Removes duplicate services (same image and platform).
+ *
+ * @param composeFilePaths - Array of paths to Docker Compose files to parse. Each file is read and parsed as YAML.
+ * @param excludeImageNames - Array of image names to exclude from results. Services with these image names are filtered out.
+ * @returns Array of unique ComposeService objects from all valid files (duplicates by image+platform are removed).
  */
 export declare function getComposeServicesFromFiles(composeFilePaths: ReadonlyArray<string>, excludeImageNames: ReadonlyArray<string>): ReadonlyArray<ComposeService>;
