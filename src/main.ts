@@ -39,6 +39,7 @@ type ImageListOutputItem = {
   readonly platform: string;
   readonly status: string;
   readonly size: number;
+  readonly digest: string;
   readonly processingTimeMs: number;
   readonly cacheKey: string;
 };
@@ -62,12 +63,11 @@ function setActionOutputs(cacheHit: boolean, imageList: ImageListOutput | undefi
 
 /**
  * Generates a unique cache key for a Docker image.
- * The key is based on image name, tag, digest, and platform information.
+ * The key is based on image name, tag, and platform information.
  *
  * @param cacheKeyPrefix - Prefix to use for the cache key.
  * @param imageName - Docker image name (without tag).
  * @param imageTag - Docker image tag.
- * @param imageDigest - Image digest.
  * @param servicePlatformString - Platform string (e.g. 'linux/amd64') or undefined.
  * @returns A unique cache key string for the image.
  */
@@ -75,13 +75,11 @@ function generateCacheKey(
   cacheKeyPrefix: string,
   imageName: string,
   imageTag: string,
-  imageDigest: string,
   servicePlatformString: string | undefined
 ): string {
   // Sanitize components to ensure valid cache key
   const sanitizedImageName = sanitizePathComponent(imageName);
   const sanitizedImageTag = sanitizePathComponent(imageTag);
-  const sanitizedDigest = sanitizePathComponent(imageDigest);
 
   // Use provided platform or get current platform
   const platformInfo = servicePlatformString ? parseOciPlatformString(servicePlatformString) : getCurrentPlatformInfo();
@@ -89,7 +87,7 @@ function generateCacheKey(
   const sanitizedArch = sanitizePathComponent(platformInfo?.arch || 'none');
   const sanitizedVariant = sanitizePathComponent(platformInfo?.variant || 'none');
 
-  return `${cacheKeyPrefix}-${sanitizedImageName}-${sanitizedImageTag}-${sanitizedOs}-${sanitizedArch}-${sanitizedVariant}-${sanitizedDigest}`;
+  return `${cacheKeyPrefix}-${sanitizedImageName}-${sanitizedImageTag}-${sanitizedOs}-${sanitizedArch}-${sanitizedVariant}`;
 }
 
 /**
@@ -99,7 +97,6 @@ function generateCacheKey(
  * @param cacheKeyPrefix - Prefix to use for the cache key.
  * @param imageName - Docker image name (without tag).
  * @param imageTag - Docker image tag.
- * @param imageDigest - Image digest.
  * @param servicePlatformString - Platform string (e.g. 'linux/amd64') or undefined.
  * @returns A unique cache key string with manifest suffix.
  */
@@ -107,10 +104,9 @@ function generateManifestCacheKey(
   cacheKeyPrefix: string,
   imageName: string,
   imageTag: string,
-  imageDigest: string,
   servicePlatformString: string | undefined
 ): string {
-  return `${generateCacheKey(cacheKeyPrefix, imageName, imageTag, imageDigest, servicePlatformString)}-manifest`;
+  return `${generateCacheKey(cacheKeyPrefix, imageName, imageTag, servicePlatformString)}-manifest`;
 }
 
 /**
@@ -128,17 +124,11 @@ function getRunnerTempDir(): string {
  *
  * @param imageName - Docker image name (without tag).
  * @param imageTag - Docker image tag.
- * @param imageDigest - Image digest.
  * @param servicePlatformString - Platform string (e.g. 'linux/amd64') or undefined.
  * @returns Absolute path to the tar file.
  */
-function generateTarPath(
-  imageName: string,
-  imageTag: string,
-  imageDigest: string,
-  servicePlatformString: string | undefined
-): string {
-  const tarFileName = generateCacheKey('', imageName, imageTag, imageDigest, servicePlatformString);
+function generateTarPath(imageName: string, imageTag: string, servicePlatformString: string | undefined): string {
+  const tarFileName = generateCacheKey('', imageName, imageTag, servicePlatformString);
   return path.join(getRunnerTempDir(), `${tarFileName}.tar`);
 }
 
@@ -147,33 +137,12 @@ function generateTarPath(
  *
  * @param imageName - Docker image name (without tag).
  * @param imageTag - Docker image tag.
- * @param imageDigest - Image digest.
  * @param servicePlatformString - Platform string (e.g. 'linux/amd64') or undefined.
  * @returns Absolute path to the manifest file.
  */
-function generateManifestPath(
-  imageName: string,
-  imageTag: string,
-  imageDigest: string,
-  servicePlatformString: string | undefined
-): string {
-  const manifestFileName = generateCacheKey('', imageName, imageTag, imageDigest, servicePlatformString);
+function generateManifestPath(imageName: string, imageTag: string, servicePlatformString: string | undefined): string {
+  const manifestFileName = generateCacheKey('', imageName, imageTag, servicePlatformString);
   return path.join(getRunnerTempDir(), `${manifestFileName}-manifest.json`);
-}
-
-/**
- * Compares two Docker manifests for equivalence.
- * Uses sorted JSON stringification for comparison.
- *
- * @param manifest1 - First Docker manifest.
- * @param manifest2 - Second Docker manifest.
- * @returns True if manifests are equivalent, false otherwise.
- */
-function compareManifests(manifest1: DockerManifest, manifest2: DockerManifest): boolean {
-  // Simple string comparison of stringified JSON with consistent ordering for properties
-  const sortedJson1 = JSON.stringify(manifest1, Object.keys(manifest1).sort());
-  const sortedJson2 = JSON.stringify(manifest2, Object.keys(manifest2).sort());
-  return sortedJson1 === sortedJson2;
 }
 
 /**
@@ -360,14 +329,8 @@ async function processService(
 
   const imageDigest = manifest.digest;
 
-  const serviceCacheKey = generateCacheKey(
-    cacheKeyPrefix,
-    baseImageName,
-    imageTag,
-    imageDigest,
-    serviceDefinition.platform
-  );
-  const imageTarPath = generateTarPath(baseImageName, imageTag, imageDigest, serviceDefinition.platform);
+  const serviceCacheKey = generateCacheKey(cacheKeyPrefix, baseImageName, imageTag, serviceDefinition.platform);
+  const imageTarPath = generateTarPath(baseImageName, imageTag, serviceDefinition.platform);
 
   if (serviceDefinition.platform) {
     core.info(`Using platform ${serviceDefinition.platform} for ${fullImageName}`);
@@ -380,10 +343,9 @@ async function processService(
     cacheKeyPrefix,
     baseImageName,
     imageTag,
-    imageDigest,
     serviceDefinition.platform
   );
-  const manifestPath = generateManifestPath(baseImageName, imageTag, imageDigest, serviceDefinition.platform);
+  const manifestPath = generateManifestPath(baseImageName, imageTag, serviceDefinition.platform);
 
   // Try to restore from cache first
   const cacheHitKey = await cache.restoreCache([imageTarPath], serviceCacheKey);
@@ -464,7 +426,7 @@ async function processService(
   }
 
   // If manifests match, return success immediately
-  if (compareManifests(cachedManifest, remoteManifest)) {
+  if (cachedManifest.digest === remoteManifest.digest) {
     core.debug(`Manifest match confirmed for ${fullImageName}`);
     return {
       success: true,
@@ -602,6 +564,7 @@ export async function run(): Promise<void> {
       platform: result.platform || 'default',
       status: result.restoredFromCache ? 'Cached' : result.success ? 'Pulled' : 'Error',
       size: result.imageSize || 0,
+      digest: result.digest || '',
       processingTimeMs: result.processingDuration || 0,
       cacheKey: result.cacheKey || '',
     }));
