@@ -27,34 +27,37 @@ sequenceDiagram
     participant Docker as Docker CLI
     participant Registry as Docker Registry
 
-    Workflow->>Action: Start Action (inputs)
-    Action->>Action: Parse compose-files
-    loop For each Docker image (executed in parallel)
-        Action->>Docker: Get image digest
-        Docker->>Registry: Request image digest
-        Registry-->>Docker: Return image digest
-        Docker-->>Action: Return image digest
-        Action->>Action: Generate cache key
-        Action->>Cache: Restore from cache
+    Workflow->>Action: Start Action
+    Action->>Action: Parse Compose files
+    par For each service image (in parallel)
+        Action->>Cache: Restore image tar & manifest by cache key
         alt Cache hit
-            Cache-->>Action: Return cached image tar
-            Action->>Docker: Load image from tar
-            Docker-->>Action: Image loaded
+            par Restore & Remote Digest in parallel
+                Action->>Docker: docker load (from tar)
+                Action->>Docker: docker inspect (local)
+                and
+                Action->>Registry: docker buildx imagetools inspect (remote)
+            end
+            Action->>Action: Compare digests
+            alt Digest match
+                Action->>Action: Mark as Cached
+            else Digest mismatch
+                Action->>Docker: docker pull (with platform)
+                Action->>Docker: docker save (to tar)
+                Action->>Docker: docker buildx imagetools inspect (remote)
+                Action->>Cache: Save new tar & manifest
+                Action->>Action: Mark as Pulled
+            end
         else Cache miss
-            Action->>Registry: Pull image
-            Registry-->>Docker: Download image
-            Docker-->>Action: Image pulled
-            Action->>Docker: Save image to tar
-            Docker-->>Action: Tar file created
-            Action->>Cache: Save to cache
-            Cache-->>Action: Cache saved
+            Action->>Docker: docker pull (with platform)
+            Action->>Docker: docker save (to tar)
+            Action->>Docker: docker buildx imagetools inspect (remote)
+            Action->>Cache: Save new tar & manifest
+            Action->>Action: Mark as Pulled
         end
-        Action->>Docker: Get image size
-        Docker-->>Action: Return image size
     end
-    Action->>Action: Aggregate results
-    Action->>Workflow: Return outputs (cache-hit, image-list)
-    Action->>Workflow: Create GitHub summary
+    Action->>Workflow: Set outputs (cache-hit, image-list)
+    Action->>Workflow: Write summary
 ```
 
 ## Usage
@@ -150,10 +153,10 @@ This action also handles platform-specific images automatically. When a platform
 
 ### Outputs
 
-| Output       | Description                                                                                                                                                                                                                                                                                                                                                        | Example Value                                       |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------- |
-| `cache-hit`  | Boolean value (`'true'` or `'false'`) indicating if all images were restored from cache.                                                                                                                                                                                                                                                                           | `'true'`                                            |
-| `image-list` | JSON array of image details with information about each image. Each image object contains: <br>- `name`: Image name with tag<br>- `platform`: Platform the image was pulled for<br>- `status`: Either 'Cached', 'Pulled', or 'Error'<br>- `size`: Size in bytes (numeric)<br>- `processingTimeMs`: Processing time in milliseconds<br>- `cacheKey`: Used cache key | See [image-list example](#image-list-example) below |
+| Output       | Description                                                                                                                                                                                                                                                                                                                                                                                                                         | Example Value                                       |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `cache-hit`  | Boolean value (`'true'` or `'false'`) indicating if all images were restored from cache.                                                                                                                                                                                                                                                                                                                                            | `'true'`                                            |
+| `image-list` | JSON array of image details with information about each image. Each image object contains: <br>- `name`: Image name with tag<br>- `platform`: Platform the image was pulled for<br>- `status`: Either 'Cached', 'Pulled', or 'Error'<br>- `size`: Size in bytes (numeric)<br>- `digest`: Image digest string (may be empty if unavailable)<br>- `processingTimeMs`: Processing time in milliseconds<br>- `cacheKey`: Used cache key | See [image-list example](#image-list-example) below |
 
 #### image-list Example
 
@@ -164,24 +167,27 @@ This action also handles platform-specific images automatically. When a platform
     "platform": "linux/amd64",
     "status": "Cached",
     "size": 524288000,
+    "digest": "sha256:abc123...",
     "processingTimeMs": 1200.5,
-    "cacheKey": "docker-compose-image-mysql-8.0-linux-amd64-none-sha256:digest"
+    "cacheKey": "docker-compose-image-mysql-8.0-linux-amd64-none"
   },
   {
     "name": "redis:alpine",
     "platform": "linux/amd64",
     "status": "Pulled",
     "size": 32768000,
+    "digest": "sha256:def456...",
     "processingTimeMs": 3500.2,
-    "cacheKey": "docker-compose-image-redis-alpine-linux-amd64-none-sha256:digest"
+    "cacheKey": "docker-compose-image-redis-alpine-linux-amd64-none"
   },
   {
     "name": "node:18",
     "platform": "linux/amd64",
     "status": "Cached",
     "size": 128456789,
+    "digest": "sha256:789abc...",
     "processingTimeMs": 950.8,
-    "cacheKey": "docker-compose-image-node-18-linux-amd64-none-sha256:digest"
+    "cacheKey": "docker-compose-image-node-18-linux-amd64-none"
   }
 ]
 ```
