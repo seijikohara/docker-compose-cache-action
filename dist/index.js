@@ -86627,14 +86627,13 @@ const exec = __importStar(__nccwpck_require__(95236));
 /**
  * Executes a Docker command and logs execution time.
  *
- * @param command - The command to execute (e.g., 'docker').
  * @param args - Array of command arguments.
  * @param options - Execution options.
  * @returns Promise resolving to object containing exit code, stdout, and stderr.
  */
-async function executeDockerCommand(command, args, options) {
+async function executeDockerCommand(args, options) {
     // Format command for logging
-    const fullCommand = `${command} ${args.join(' ')}`;
+    const fullCommand = `docker ${args.join(' ')}`;
     // Log command execution
     core.info(`Executing: ${fullCommand}`);
     // Record start time
@@ -86667,7 +86666,7 @@ async function executeDockerCommand(command, args, options) {
     };
     try {
         // Execute the command
-        const exitCode = await exec.exec(command, args, execOptionsWithCapture);
+        const exitCode = await exec.exec('docker', args, execOptionsWithCapture);
         // Calculate and log execution time
         const endTime = performance.now();
         const executionTimeMs = Math.round(endTime - startTime);
@@ -86701,7 +86700,7 @@ async function pullImage(imageName, platform) {
             core.info(`Pulling image ${imageName} for platform ${platform}`);
         }
         // Execute docker pull command
-        const { exitCode, stderr } = await executeDockerCommand('docker', dockerCommandArguments, execOptions);
+        const { exitCode, stderr } = await executeDockerCommand(dockerCommandArguments, execOptions);
         if (exitCode !== 0) {
             core.warning(`Failed to pull image ${imageName}${platform ? ` for platform ${platform}` : ''}: ${stderr}`);
             return false;
@@ -86728,7 +86727,7 @@ async function inspectImageRemote(imageName) {
             ignoreReturnCode: true,
         };
         // Execute docker buildx command to inspect the image manifest
-        const { exitCode, stdout, stderr } = await executeDockerCommand('docker', ['buildx', 'imagetools', 'inspect', '--format', '{{json .Manifest}}', imageName], execOptions);
+        const { exitCode, stdout, stderr } = await executeDockerCommand(['buildx', 'imagetools', 'inspect', '--format', '{{json .Manifest}}', imageName], execOptions);
         if (exitCode !== 0) {
             core.warning(`Failed to inspect manifest for ${imageName}: ${stderr}`);
             return undefined;
@@ -86770,7 +86769,7 @@ async function inspectImageLocal(imageName) {
             ignoreReturnCode: true,
         };
         // Execute docker inspect command to get detailed image information
-        const { exitCode, stdout, stderr } = await executeDockerCommand('docker', ['inspect', '--format', '{{json .}}', imageName], execOptions);
+        const { exitCode, stdout, stderr } = await executeDockerCommand(['inspect', '--format', '{{json .}}', imageName], execOptions);
         if (exitCode !== 0) {
             core.warning(`Failed to inspect image ${imageName}: ${stderr}`);
             return undefined;
@@ -86801,7 +86800,7 @@ async function saveImageToTar(imageName, outputPath) {
     try {
         const execOptions = { ignoreReturnCode: true };
         // Execute docker save command to create a tar archive of the image
-        const { exitCode, stderr } = await executeDockerCommand('docker', ['save', '-o', outputPath, imageName], execOptions);
+        const { exitCode, stderr } = await executeDockerCommand(['save', '-o', outputPath, imageName], execOptions);
         if (exitCode !== 0) {
             core.warning(`Failed to save image ${imageName} to ${outputPath}: ${stderr}`);
             return false;
@@ -86823,7 +86822,7 @@ async function loadImageFromTar(tarPath) {
     try {
         const execOptions = { ignoreReturnCode: true };
         // Execute docker load command to restore image from tar archive
-        const { exitCode, stderr } = await executeDockerCommand('docker', ['load', '-i', tarPath], execOptions);
+        const { exitCode, stderr } = await executeDockerCommand(['load', '-i', tarPath], execOptions);
         if (exitCode !== 0) {
             core.warning(`Failed to load image from ${tarPath}: ${stderr}`);
             return false;
