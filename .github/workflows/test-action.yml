@@ -2,11 +2,12 @@ name: Docker Compose Cache Action Test Suite
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
     paths:
-      - '.github/workflows/test-action.yml'
+      - '.github/workflows/**'
       - 'action.yml'
-      - 'dist/index.js'
+      - 'dist/**'
       - 'examples/**'
   pull_request:
   workflow_dispatch:
