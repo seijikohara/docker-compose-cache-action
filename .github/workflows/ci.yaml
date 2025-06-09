@@ -6,7 +6,7 @@ on:
   pull_request:
   workflow_dispatch:
   workflow_run:
-    workflows: ["auto-merge-dependabot"]
+    workflows: ['auto-merge-dependabot']
     types:
       - completed
 
