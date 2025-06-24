@@ -17,6 +17,7 @@ jest.mock('@actions/core', () => {
   return {
     getInput: jest.fn(),
     getMultilineInput: jest.fn(),
+    getBooleanInput: jest.fn(),
     setOutput: jest.fn(),
     info: jest.fn(),
     warning: jest.fn(),
@@ -65,6 +66,7 @@ describe('main', () => {
   describe('run', () => {
     const mockCoreGetInput = core.getInput as jest.Mock;
     const mockCoreGetMultilineInput = core.getMultilineInput as jest.Mock;
+    const mockCoreGetBooleanInput = core.getBooleanInput as jest.Mock;
     const mockCoreSetOutput = core.setOutput as jest.Mock;
     const mockCoreInfo = core.info as jest.Mock;
     const mockCoreWarning = core.warning as jest.Mock;
@@ -91,6 +93,15 @@ describe('main', () => {
       dockerCommandMock.pullImage = jest.fn().mockResolvedValue(true);
       dockerCommandMock.saveImageToTar = jest.fn().mockResolvedValue(true);
       dockerCommandMock.loadImageFromTar = jest.fn().mockResolvedValue(true);
+      dockerCommandMock.inspectImageRemote = jest.fn().mockResolvedValue({
+        digest: 'sha256:digest',
+        schemaVersion: 2,
+        mediaType: 'application/vnd.docker.distribution.manifest.v2+json',
+      });
+      dockerCommandMock.inspectImageLocal = jest.fn().mockResolvedValue({
+        Id: 'sha256:image123',
+        Size: 1024000,
+      });
 
       // Default: return service array
       (dockerComposeFile.getComposeServicesFromFiles as jest.Mock).mockImplementation((files, _excludes) => {
@@ -117,6 +128,15 @@ describe('main', () => {
             return [];
           default:
             return [];
+        }
+      });
+
+      mockCoreGetBooleanInput.mockImplementation((inputName) => {
+        switch (inputName) {
+          case 'skip-latest-check':
+            return false;
+          default:
+            return false;
         }
       });
 
@@ -169,7 +189,7 @@ describe('main', () => {
       });
       await run();
       // Adjust expectations to match actual output
-      expect(mockCoreInfo).toHaveBeenCalledWith(expect.stringContaining('0 of 3 services restored from cache'));
+      expect(mockCoreInfo).toHaveBeenCalledWith(expect.stringContaining('3 of 3 services restored from cache'));
       // loadImageFromTar, pullImage calls are not guaranteed
     });
 
@@ -182,7 +202,7 @@ describe('main', () => {
     });
 
     it('should handle errors in Docker commands', async () => {
-      dockerCommandMock.getImageDigest = jest.fn().mockResolvedValue(undefined);
+      dockerCommandMock.inspectImageRemote = jest.fn().mockResolvedValue(undefined);
 
       await run();
 
@@ -296,8 +316,8 @@ describe('main', () => {
         }
         return [];
       });
-      const mockDigestFunction = dockerCommandMock.getImageDigest;
-      mockDigestFunction.mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined);
+      const mockInspectFunction = dockerCommandMock.inspectImageRemote;
+      mockInspectFunction.mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined);
       await run();
       // Expect message for digest retrieval failure instead of mismatch
       expect(mockCoreWarning).toHaveBeenCalledWith(expect.stringContaining('Could not get digest'));
@@ -335,9 +355,163 @@ describe('main', () => {
         }
       });
       await run();
-      // Adjust expectations to match actual output
-      expect(mockCoreSetOutput).toHaveBeenCalledWith('cache-hit', 'false');
-      // Exclude "3 of 3 services restored from cache" output as it is not currently present
+      // Adjust expectations to match actual output - when all services are cached, cache-hit should be true
+      expect(mockCoreSetOutput).toHaveBeenCalledWith('cache-hit', 'true');
+    });
+
+    describe('skip-latest-check option', () => {
+      beforeEach(() => {
+        // Setup single service for cleaner test
+        const singleServiceDefinition = [{ image: 'nginx:latest' }];
+        (dockerComposeFile.getComposeServicesFromFiles as jest.Mock).mockImplementation((files, _excludes) => {
+          if (Array.isArray(files) && files.length > 0) {
+            return singleServiceDefinition;
+          }
+          return [];
+        });
+      });
+
+      it('should skip registry checks when skip-latest-check is true', async () => {
+        // Mock cache hit
+        mockCacheRestore.mockResolvedValue('cache-key');
+
+        // Enable skip-latest-check
+        mockCoreGetBooleanInput.mockImplementation((inputName) => {
+          switch (inputName) {
+            case 'skip-latest-check':
+              return true;
+            default:
+              return false;
+          }
+        });
+
+        await run();
+
+        // Verify that inspectImageRemote was called only once (for cache key generation, not for digest comparison)
+        expect(dockerCommandMock.inspectImageRemote).toHaveBeenCalledTimes(1);
+        expect(dockerCommandMock.inspectImageRemote).toHaveBeenCalledWith('nginx:latest');
+
+        // Verify that loadImageFromTar was called (cache restoration)
+        expect(dockerCommandMock.loadImageFromTar).toHaveBeenCalled();
+
+        // Verify info message about skipping latest check
+        expect(mockCoreInfo).toHaveBeenCalledWith(expect.stringContaining('Skipped latest check for nginx:latest'));
+      });
+
+      it('should perform registry checks when skip-latest-check is false (default)', async () => {
+        // Mock cache hit
+        mockCacheRestore.mockResolvedValue('cache-key');
+
+        // Disable skip-latest-check (default behavior)
+        mockCoreGetBooleanInput.mockImplementation((inputName) => {
+          switch (inputName) {
+            case 'skip-latest-check':
+              return false;
+            default:
+              return false;
+          }
+        });
+
+        await run();
+
+        // Verify that inspectImageRemote was called twice when skip-latest-check is false
+        // (once for cache key generation, once for digest comparison)
+        expect(dockerCommandMock.inspectImageRemote).toHaveBeenCalledTimes(2);
+        expect(dockerCommandMock.inspectImageRemote).toHaveBeenCalledWith('nginx:latest');
+
+        // Verify that loadImageFromTar was called (cache restoration)
+        expect(dockerCommandMock.loadImageFromTar).toHaveBeenCalled();
+      });
+
+      it('should handle digest mismatch when skip-latest-check is false', async () => {
+        // Mock cache hit for both image and manifest
+        mockCacheRestore.mockResolvedValue('cache-key');
+
+        // Mock different digests to simulate mismatch
+        dockerCommandMock.inspectImageRemote
+          .mockResolvedValueOnce({ digest: 'sha256:digest' }) // Initial digest for processService
+          .mockResolvedValueOnce({ digest: 'sha256:different-digest' }); // Different digest in cache hit check
+
+        // Disable skip-latest-check
+        mockCoreGetBooleanInput.mockImplementation((inputName) => {
+          switch (inputName) {
+            case 'skip-latest-check':
+              return false;
+            default:
+              return false;
+          }
+        });
+
+        await run();
+
+        // Verify that inspectImageRemote was called multiple times for digest comparison
+        expect(dockerCommandMock.inspectImageRemote).toHaveBeenCalledTimes(2);
+
+        // Verify that pullImage was called due to digest mismatch
+        expect(dockerCommandMock.pullImage).toHaveBeenCalledWith('nginx:latest', undefined);
+
+        // Verify info message about manifest mismatch
+        expect(mockCoreInfo).toHaveBeenCalledWith(
+          expect.stringContaining('Manifest mismatch detected for nginx:latest')
+        );
+      });
+
+      it('should use cached image without registry call when skip-latest-check is true and cache hit', async () => {
+        // Mock cache hit
+        mockCacheRestore.mockResolvedValue('cache-key');
+
+        // Enable skip-latest-check
+        mockCoreGetBooleanInput.mockImplementation((inputName) => {
+          switch (inputName) {
+            case 'skip-latest-check':
+              return true;
+            default:
+              return false;
+          }
+        });
+
+        await run();
+
+        // Verify that inspectImageRemote was called only once (for cache key generation)
+        expect(dockerCommandMock.inspectImageRemote).toHaveBeenCalledTimes(1);
+        expect(dockerCommandMock.pullImage).not.toHaveBeenCalled();
+
+        // Verify that only cache restoration was performed
+        expect(dockerCommandMock.loadImageFromTar).toHaveBeenCalled();
+        expect(dockerCommandMock.inspectImageLocal).toHaveBeenCalled();
+
+        // Verify that image list contains cached status
+        const imageListCall = mockCoreSetOutput.mock.calls.find((call) => call[0] === 'image-list');
+        expect(imageListCall).toBeDefined();
+        const imageList = JSON.parse(imageListCall[1]);
+        expect(imageList[0].status).toBe('Cached');
+      });
+
+      it('should still pull images on cache miss regardless of skip-latest-check setting', async () => {
+        // Mock cache miss
+        mockCacheRestore.mockResolvedValue(undefined);
+
+        // Enable skip-latest-check
+        mockCoreGetBooleanInput.mockImplementation((inputName) => {
+          switch (inputName) {
+            case 'skip-latest-check':
+              return true;
+            default:
+              return false;
+          }
+        });
+
+        await run();
+
+        // Verify that registry calls were made for cache miss (initial manifest retrieval)
+        expect(dockerCommandMock.inspectImageRemote).toHaveBeenCalledWith('nginx:latest');
+
+        // Verify that pullImage was called due to cache miss
+        expect(dockerCommandMock.pullImage).toHaveBeenCalledWith('nginx:latest', undefined);
+
+        // Verify that image was saved to cache
+        expect(dockerCommandMock.saveImageToTar).toHaveBeenCalled();
+      });
     });
   });
 });

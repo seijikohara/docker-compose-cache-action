@@ -87264,9 +87264,10 @@ async function pullAndCacheImage(fullImageName, platformString, serviceCacheKey,
  *
  * @param serviceDefinition - The Docker Compose service to process.
  * @param cacheKeyPrefix - Prefix to use for the cache key.
+ * @param skipLatestCheck - Whether to skip checking for latest versions from registry.
  * @returns Promise resolving to a ServiceProcessingResult object with status and metadata.
  */
-async function processService(serviceDefinition, cacheKeyPrefix) {
+async function processService(serviceDefinition, cacheKeyPrefix, skipLatestCheck) {
     const fullImageName = serviceDefinition.image;
     const [baseImageName, imageTag = 'latest'] = fullImageName.split(':');
     // Get image manifest with digest for cache key generation
@@ -87305,6 +87306,35 @@ async function processService(serviceDefinition, cacheKeyPrefix) {
     }
     // Process cache hit
     core.info(`Cache hit for ${fullImageName}, loading from cache`);
+    // If skip latest check is enabled, only restore from cache without checking registry
+    if (skipLatestCheck) {
+        const loadSuccess = await (0, docker_command_1.loadImageFromTar)(imageTarPath);
+        if (!loadSuccess) {
+            return {
+                success: false,
+                restoredFromCache: false,
+                imageName: fullImageName,
+                cacheKey: serviceCacheKey,
+                digest: imageDigest,
+                platform: serviceDefinition.platform,
+                error: `Failed to load image from cache: ${fullImageName}`,
+                imageSize: undefined,
+            };
+        }
+        // Get image size after successful load from cache
+        const inspectInfo = await (0, docker_command_1.inspectImageLocal)(fullImageName);
+        core.info(`Skipped latest check for ${fullImageName}, using cached version`);
+        return {
+            success: true,
+            restoredFromCache: true,
+            imageName: fullImageName,
+            cacheKey: serviceCacheKey,
+            digest: imageDigest,
+            platform: serviceDefinition.platform,
+            error: undefined,
+            imageSize: inspectInfo?.Size,
+        };
+    }
     // Restore image from cache and fetch remote manifest in parallel
     const [loadSuccess, remoteManifest] = await Promise.all([
         (0, docker_command_1.loadImageFromTar)(imageTarPath),
@@ -87425,6 +87455,7 @@ async function run() {
         const composeFilePaths = core.getMultilineInput('compose-files');
         const excludeImageNames = core.getMultilineInput('exclude-images');
         const cacheKeyPrefix = core.getInput('cache-key-prefix') || 'docker-compose-image';
+        const skipLatestCheck = core.getBooleanInput('skip-latest-check');
         // Determine compose file paths
         const referencedComposeFiles = (0, docker_compose_file_1.getComposeFilePathsToProcess)(composeFilePaths);
         // Get service definitions (duplicates removed)
@@ -87438,7 +87469,7 @@ async function run() {
         // Process all services concurrently for efficiency
         const processingResults = await Promise.all(serviceDefinitions.map(async (serviceDefinition) => {
             const processingStartTime = performance.now(); // Record start time
-            const processingResult = await processService(serviceDefinition, cacheKeyPrefix);
+            const processingResult = await processService(serviceDefinition, cacheKeyPrefix, skipLatestCheck);
             const processingEndTime = performance.now(); // Record end time
             return {
                 ...processingResult,
@@ -87504,6 +87535,7 @@ async function run() {
             ],
             [{ data: 'Total Services' }, { data: `${totalServiceCount}` }],
             [{ data: 'Restored from Cache' }, { data: `${cachedServiceCount}/${totalServiceCount}` }],
+            [{ data: 'Skip Latest Check' }, { data: skipLatestCheck ? '⏭️ Yes' : '🔍 No' }],
             [{ data: 'Total Execution Time' }, { data: actionHumanReadableDuration }],
         ])
             .addHeading('Referenced Compose Files', 3)

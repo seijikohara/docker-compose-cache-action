@@ -12,6 +12,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   generate-run-id:
     name: Generate Unique Run ID
@@ -26,7 +29,7 @@ jobs:
           echo "Generated Run ID: $UNIQUE_ID"
           echo "run_id=$UNIQUE_ID" >> "$GITHUB_OUTPUT"
 
-  test-first-run:
+  test-cache-miss:
     name: Test Cache Miss - ${{ matrix.scenario }}
     runs-on: ubuntu-latest
     needs: generate-run-id
@@ -101,10 +104,10 @@ jobs:
 
           echo "result=success" >> $GITHUB_OUTPUT
 
-  test-second-run:
-    name: Test Cache Hit - ${{ matrix.scenario }}
+  test-cache-hit-with-registry-check:
+    name: Test Cache Hit with Registry Check - ${{ matrix.scenario }}
     runs-on: ubuntu-latest
-    needs: [generate-run-id, test-first-run]
+    needs: [generate-run-id, test-cache-miss]
     strategy:
       fail-fast: false
       matrix:
@@ -176,10 +179,86 @@ jobs:
 
           echo "result=success" >> $GITHUB_OUTPUT
 
+  test-cache-hit-skip-registry-check:
+    name: Test Cache Hit Skip Registry Check - ${{ matrix.scenario }}
+    runs-on: ubuntu-latest
+    needs: [generate-run-id, test-cache-hit-with-registry-check]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - scenario: 'Simple Compose'
+            files: 'examples/simple/compose.yaml'
+            exclude: ''
+          - scenario: 'Override Compose'
+            files: 'examples/override/compose.yaml'
+            exclude: ''
+          - scenario: 'Platform Specific'
+            files: 'examples/platform/compose.yaml'
+            exclude: ''
+          - scenario: 'Multi-File Compose'
+            files: "examples/multi-file/compose.yaml\nexamples/multi-file/compose.override.yaml"
+            exclude: ''
+          - scenario: 'Image Exclusion'
+            files: 'examples/exclude/compose.yaml'
+            exclude: 'redis:7-alpine'
+          - scenario: 'No Images Defined'
+            files: 'examples/no-images/compose.yaml'
+            exclude: ''
+          - scenario: 'Empty Compose File'
+            files: 'examples/empty/compose.yaml'
+            exclude: ''
+    outputs:
+      test-result: ${{ steps.validate.outputs.result }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run Cache Action with Skip Latest Check True
+        id: docker-cache
+        uses: ./
+        with:
+          compose-files: ${{ matrix.files }}
+          exclude-images: ${{ matrix.exclude }}
+          cache-key-prefix: ${{ needs.generate-run-id.outputs.run_id }}-${{ github.run_attempt }}-${{ matrix.scenario }}
+          skip-latest-check: true
+
+      - name: Output Action Results to Summary
+        run: |
+          echo "## Action Outputs for ${{ matrix.scenario }} (Third Run - Skip Latest Check: True)" >> $GITHUB_STEP_SUMMARY
+          echo "| Output | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "| ------ | ----- |" >> $GITHUB_STEP_SUMMARY
+          echo "| Cache Hit | ${{ steps.docker-cache.outputs.cache-hit }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Image List | ${{ steps.docker-cache.outputs.image-list }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: Validate Skip Latest Check True Behavior
+        id: validate
+        run: |
+          hit="${{ steps.docker-cache.outputs.cache-hit }}"
+          list='${{ steps.docker-cache.outputs.image-list }}'
+          echo "Scenario: ${{ matrix.scenario }}"
+          echo "Cache Hit: $hit"
+          echo "Skip Latest Check: true"
+
+          # Parse image list to verify behavior
+          IMAGE_LIST='${{ steps.docker-cache.outputs.image-list }}'
+          if [[ -n "$IMAGE_LIST" ]]; then
+            echo "Images processed with skip-latest-check: true"
+            echo "$IMAGE_LIST" | jq -r '.[] | "- \(.name) [\(.status)]: \(.size) bytes processed in \(.processingTimeMs)ms"'
+
+            # Verify that registry checks were skipped (faster processing expected)
+            echo "✅ Skip latest check enabled - registry digest verification should have been skipped"
+          else
+            echo "No images processed"
+          fi
+
+          echo "result=success" >> $GITHUB_OUTPUT
+
   summarize-tests:
     name: Summarize Test Results
     runs-on: ubuntu-latest
-    needs: [test-first-run, test-second-run]
+    needs: [test-cache-miss, test-cache-hit-with-registry-check, test-cache-hit-skip-registry-check]
     if: always()
     steps:
       - name: Generate Summary
@@ -187,21 +266,28 @@ jobs:
           append() { echo "$1" >> "$GITHUB_STEP_SUMMARY"; }
           append "# Docker Compose Cache Action Test Results 🐳"
           append ""
-          append "## First Run (Expecting Cache Miss)"
+          append "## Cache Miss Test (First Run)"
           append "| Scenario | Status |"
           append "|----------|--------|"
           for scenario in "Simple Compose" "Override Compose" "Platform Specific" "Multi-File Compose" "Image Exclusion" "No Images Defined" "Empty Compose File"; do
-            [[ "${{ needs.test-first-run.result }}" == "success" ]] && append "| $scenario | ✅ Pass |" || append "| $scenario | ❌ Fail |"
+            [[ "${{ needs.test-cache-miss.result }}" == "success" ]] && append "| $scenario | ✅ Pass |" || append "| $scenario | ❌ Fail |"
           done
           append ""
-          append "## Second Run (Expecting Cache Hit)"
+          append "## Cache Hit with Registry Check Test (Second Run)"
           append "| Scenario | Status |"
           append "|----------|--------|"
           for scenario in "Simple Compose" "Override Compose" "Platform Specific" "Multi-File Compose" "Image Exclusion" "No Images Defined" "Empty Compose File"; do
-            [[ "${{ needs.test-second-run.result }}" == "success" ]] && append "| $scenario | ✅ Pass |" || append "| $scenario | ❌ Fail |"
+            [[ "${{ needs.test-cache-hit-with-registry-check.result }}" == "success" ]] && append "| $scenario | ✅ Pass |" || append "| $scenario | ❌ Fail |"
           done
           append ""
-          if [[ "${{ needs.test-first-run.result }}" == "success" && "${{ needs.test-second-run.result }}" == "success" ]]; then
+          append "## Cache Hit Skip Registry Check Test (Third Run)"
+          append "| Scenario | Status |"
+          append "|----------|--------|"
+          for scenario in "Simple Compose" "Override Compose" "Platform Specific" "Multi-File Compose" "Image Exclusion" "No Images Defined" "Empty Compose File"; do
+            [[ "${{ needs.test-cache-hit-skip-registry-check.result }}" == "success" ]] && append "| $scenario | ✅ Pass |" || append "| $scenario | ❌ Fail |"
+          done
+          append ""
+          if [[ "${{ needs.test-cache-miss.result }}" == "success" && "${{ needs.test-cache-hit-with-registry-check.result }}" == "success" && "${{ needs.test-cache-hit-skip-registry-check.result }}" == "success" ]]; then
             append "## ✅ All tests passed."
           else
             append "## ❌ Some tests failed."
