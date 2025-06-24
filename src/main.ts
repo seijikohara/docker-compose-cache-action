@@ -301,11 +301,13 @@ async function pullAndCacheImage(
  *
  * @param serviceDefinition - The Docker Compose service to process.
  * @param cacheKeyPrefix - Prefix to use for the cache key.
+ * @param skipLatestCheck - Whether to skip checking for latest versions from registry.
  * @returns Promise resolving to a ServiceProcessingResult object with status and metadata.
  */
 async function processService(
   serviceDefinition: ComposeService,
-  cacheKeyPrefix: string
+  cacheKeyPrefix: string,
+  skipLatestCheck: boolean
 ): Promise<ServiceProcessingResult> {
   const fullImageName = serviceDefinition.image;
   const [baseImageName, imageTag = 'latest'] = fullImageName.split(':');
@@ -367,6 +369,40 @@ async function processService(
 
   // Process cache hit
   core.info(`Cache hit for ${fullImageName}, loading from cache`);
+
+  // If skip latest check is enabled, only restore from cache without checking registry
+  if (skipLatestCheck) {
+    const loadSuccess = await loadImageFromTar(imageTarPath);
+
+    if (!loadSuccess) {
+      return {
+        success: false,
+        restoredFromCache: false,
+        imageName: fullImageName,
+        cacheKey: serviceCacheKey,
+        digest: imageDigest,
+        platform: serviceDefinition.platform,
+        error: `Failed to load image from cache: ${fullImageName}`,
+        imageSize: undefined,
+      };
+    }
+
+    // Get image size after successful load from cache
+    const inspectInfo = await inspectImageLocal(fullImageName);
+    core.info(`Skipped latest check for ${fullImageName}, using cached version`);
+
+    return {
+      success: true,
+      restoredFromCache: true,
+      imageName: fullImageName,
+      cacheKey: serviceCacheKey,
+      digest: imageDigest,
+      platform: serviceDefinition.platform,
+      error: undefined,
+      imageSize: inspectInfo?.Size,
+    };
+  }
+
   // Restore image from cache and fetch remote manifest in parallel
   const [loadSuccess, remoteManifest] = await Promise.all([
     loadImageFromTar(imageTarPath),
@@ -501,6 +537,7 @@ export async function run(): Promise<void> {
     const composeFilePaths: ReadonlyArray<string> = core.getMultilineInput('compose-files');
     const excludeImageNames: ReadonlyArray<string> = core.getMultilineInput('exclude-images');
     const cacheKeyPrefix = core.getInput('cache-key-prefix') || 'docker-compose-image';
+    const skipLatestCheck = core.getBooleanInput('skip-latest-check');
 
     // Determine compose file paths
     const referencedComposeFiles = getComposeFilePathsToProcess(composeFilePaths);
@@ -519,7 +556,7 @@ export async function run(): Promise<void> {
     const processingResults = await Promise.all(
       serviceDefinitions.map(async (serviceDefinition) => {
         const processingStartTime = performance.now(); // Record start time
-        const processingResult = await processService(serviceDefinition, cacheKeyPrefix);
+        const processingResult = await processService(serviceDefinition, cacheKeyPrefix, skipLatestCheck);
         const processingEndTime = performance.now(); // Record end time
 
         return {

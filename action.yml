@@ -26,6 +26,10 @@ inputs:
     description: 'Prefix for the generated cache key.'
     required: false
     default: 'docker-compose-image'
+  skip-latest-check:
+    description: 'Skip checking the latest version of Docker images from the registry. When enabled, cached images will be used without verifying if newer versions are available.'
+    required: false
+    default: 'false'
 outputs:
   cache-hit:
     description: "Boolean value ('true' or 'false') indicating if *all* required images were restored from cache (and digests matched). Example: 'true'"
