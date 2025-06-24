@@ -193,6 +193,21 @@ jobs:
           - scenario: 'Override Compose'
             files: 'examples/override/compose.yaml'
             exclude: ''
+          - scenario: 'Platform Specific'
+            files: 'examples/platform/compose.yaml'
+            exclude: ''
+          - scenario: 'Multi-File Compose'
+            files: "examples/multi-file/compose.yaml\nexamples/multi-file/compose.override.yaml"
+            exclude: ''
+          - scenario: 'Image Exclusion'
+            files: 'examples/exclude/compose.yaml'
+            exclude: 'redis:7-alpine'
+          - scenario: 'No Images Defined'
+            files: 'examples/no-images/compose.yaml'
+            exclude: ''
+          - scenario: 'Empty Compose File'
+            files: 'examples/empty/compose.yaml'
+            exclude: ''
     outputs:
       test-result: ${{ steps.validate.outputs.result }}
     steps:
@@ -268,7 +283,7 @@ jobs:
           append "## Cache Hit Skip Registry Check Test (Third Run)"
           append "| Scenario | Status |"
           append "|----------|--------|"
-          for scenario in "Simple Compose" "Override Compose"; do
+          for scenario in "Simple Compose" "Override Compose" "Platform Specific" "Multi-File Compose" "Image Exclusion" "No Images Defined" "Empty Compose File"; do
             [[ "${{ needs.test-cache-hit-skip-registry-check.result }}" == "success" ]] && append "| $scenario | ✅ Pass |" || append "| $scenario | ❌ Fail |"
           done
           append ""
