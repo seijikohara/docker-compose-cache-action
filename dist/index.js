@@ -87539,15 +87539,18 @@ async function run() {
             [{ data: 'Total Execution Time' }, { data: actionHumanReadableDuration }],
         ])
             .addHeading('Referenced Compose Files', 3)
-            .addList(referencedComposeFiles.map((filePath) => {
+            .addRaw(referencedComposeFiles
+            .map((filePath) => {
             const githubServerUrl = process.env.GITHUB_SERVER_URL || 'https://github.com';
             const githubRepository = process.env.GITHUB_REPOSITORY;
             const githubSha = process.env.GITHUB_SHA;
             if (githubRepository && githubSha) {
-                return `[${filePath}](${githubServerUrl}/${githubRepository}/blob/${githubSha}/${filePath})`;
+                return `- [${filePath}](${githubServerUrl}/${githubRepository}/blob/${githubSha}/${filePath})`;
             }
-            return filePath;
-        }))
+            return `- ${filePath}`;
+        })
+            .join('\n'))
+            .addEOL()
             .write();
         core.info(`Action completed in ${actionHumanReadableDuration}`);
         if (allServicesSuccessful) {
