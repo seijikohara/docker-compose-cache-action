@@ -1,3 +1,8 @@
+/**
+ * @fileoverview Docker Compose file parsing and service extraction utilities.
+ * Handles reading, parsing, and filtering of Docker Compose services.
+ */
+
 import * as core from '@actions/core';
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';

@@ -1,4 +1,8 @@
 /**
+ * @fileoverview Docker Compose file parsing and service extraction utilities.
+ * Handles reading, parsing, and filtering of Docker Compose services.
+ */
+/**
  * Represents a Docker Compose service definition with an image reference.
  */
 export type ComposeService = {

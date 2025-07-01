@@ -1,129 +1,31 @@
 /**
- * Output information from Docker inspect command.
- *
- * This type maps the output of the docker inspect command.
- * Note that images pulled from remote repositories and images loaded via docker load
- * may have different values for RepoTags, RepoDigests, and Metadata.LastTagTime.
+ * @fileoverview Docker command execution utilities.
+ * Provides functions for Docker image operations including pull, inspect, save, and load.
  */
-type DockerInspectInfo = {
+/**
+ * Docker image metadata from inspect command.
+ * Contains essential information about a Docker image.
+ */
+export type DockerImageMetadata = {
     readonly Id: string;
+    readonly Size: number;
+    readonly Architecture: string;
+    readonly Os: string;
+    readonly Variant?: string;
     readonly RepoTags: readonly string[];
     readonly RepoDigests: readonly string[];
-    readonly Parent: string;
-    readonly Comment: string;
     readonly Created: string;
-    readonly Container: string;
-    readonly DockerVersion: string;
-    readonly Author: string;
-    readonly Architecture: string;
-    readonly Variant?: string;
-    readonly Os: string;
-    readonly Size: number;
-    readonly VirtualSize: number;
-    readonly ContainerConfig: {
-        readonly Hostname: string;
-        readonly Domainname: string;
-        readonly User: string;
-        readonly AttachStdin: boolean;
-        readonly AttachStdout: boolean;
-        readonly AttachStderr: boolean;
-        readonly Tty: boolean;
-        readonly OpenStdin: boolean;
-        readonly StdinOnce: boolean;
-        readonly Env?: readonly string[];
-        readonly Cmd?: readonly string[];
-        readonly ArgsEscaped?: boolean;
-        readonly Image: string;
-        readonly Volumes?: Record<string, object>;
-        readonly WorkingDir: string;
-        readonly Entrypoint?: readonly string[];
-        readonly OnBuild?: readonly string[];
-        readonly Labels?: Record<string, string>;
-    };
-    readonly Config: {
-        readonly Hostname: string;
-        readonly Domainname: string;
-        readonly User: string;
-        readonly AttachStdin: boolean;
-        readonly AttachStdout: boolean;
-        readonly AttachStderr: boolean;
-        readonly Tty: boolean;
-        readonly OpenStdin: boolean;
-        readonly StdinOnce: boolean;
-        readonly Env?: readonly string[];
-        readonly Cmd?: readonly string[];
-        readonly ArgsEscaped?: boolean;
-        readonly Image: string;
-        readonly Volumes?: Record<string, object>;
-        readonly WorkingDir: string;
-        readonly Entrypoint?: readonly string[];
-        readonly OnBuild?: readonly string[];
-        readonly Labels?: Record<string, string>;
-    };
-    readonly GraphDriver: {
-        readonly Data: {
-            readonly MergedDir?: string;
-            readonly UpperDir?: string;
-            readonly WorkDir?: string;
-            readonly LowerDir?: string;
-        };
-        readonly Name: string;
-    };
-    readonly RootFS: {
-        readonly Type: string;
-        readonly Layers: readonly string[];
-    };
-    readonly Metadata: {
-        readonly LastTagTime: string;
-    };
 };
 /**
- * Single platform Docker image manifest.
- *
- * Represents a manifest for a single-platform Docker image.
+ * Docker image manifest information.
+ * Contains essential manifest data for an image.
  */
-type DockerSinglePlatformManifest = {
-    readonly schemaVersion: number;
-    readonly mediaType: string;
-    readonly config: {
-        readonly mediaType: string;
-        readonly digest: string;
-        readonly size: number;
-    };
-    readonly layers: readonly {
-        readonly mediaType: string;
-        readonly digest: string;
-        readonly size: number;
-    }[];
+export type DockerImageManifest = {
     readonly digest?: string;
+    readonly schemaVersion?: number;
+    readonly mediaType?: string;
+    readonly [key: string]: unknown;
 };
-/**
- * Multi platform Docker image manifest list.
- *
- * Represents a manifest list for a multi-platform Docker image.
- */
-type DockerMultiPlatformManifest = {
-    readonly schemaVersion: number;
-    readonly mediaType: string;
-    readonly digest: string;
-    readonly size: number;
-    readonly manifests: readonly {
-        readonly mediaType: string;
-        readonly digest: string;
-        readonly size: number;
-        readonly platform?: {
-            readonly architecture: string;
-            readonly os: string;
-            readonly variant?: string;
-            readonly 'os.version'?: string;
-        };
-        readonly annotations?: Record<string, string>;
-    }[];
-};
-/**
- * Union type representing either a single platform or multi platform Docker image manifest.
- */
-export type DockerManifest = DockerSinglePlatformManifest | DockerMultiPlatformManifest;
 /**
  * Pulls a Docker image, optionally for a specific platform.
  *
@@ -141,7 +43,7 @@ export declare function pullImage(imageName: string, platform: string | undefine
  * @param imageName - Docker image name with optional tag.
  * @returns Promise resolving to DockerManifest object or undefined on failure.
  */
-export declare function inspectImageRemote(imageName: string): Promise<DockerManifest | undefined>;
+export declare function inspectImageRemote(imageName: string): Promise<DockerImageManifest | undefined>;
 /**
  * Inspects a local Docker image and returns detailed information.
  *
@@ -158,7 +60,7 @@ export declare function inspectImageRemote(imageName: string): Promise<DockerMan
  * @param imageName - Docker image name with optional tag.
  * @returns Promise resolving to DockerInspectInfo object or undefined on failure.
  */
-export declare function inspectImageLocal(imageName: string): Promise<DockerInspectInfo | undefined>;
+export declare function inspectImageLocal(imageName: string): Promise<DockerImageMetadata | undefined>;
 /**
  * Saves Docker image to a tar file.
  *
@@ -174,4 +76,3 @@ export declare function saveImageToTar(imageName: string, outputPath: string): P
  * @returns Promise resolving to boolean indicating success or failure.
  */
 export declare function loadImageFromTar(tarPath: string): Promise<boolean>;
-export {};
