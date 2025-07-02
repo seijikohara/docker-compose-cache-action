@@ -14,82 +14,12 @@ jobs:
     runs-on: ubuntu-latest
     if: github.actor == 'dependabot[bot]' && github.event.pull_request.draft == false
     permissions:
-      contents: write
+      contents: read
       pull-requests: write
 
     steps:
-      - name: Check GitHub CLI availability
-        run: gh --version
-
-      - name: Checkout PR branch
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
-
-      - name: Configure Git identity
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run linter
-        run: npm run lint
-
-      - name: Compile TypeScript
-        run: npm run build
-
-      - name: Build package
-        run: npm run package
-
-      - name: Run tests
-        run: npm test
-
-      - name: Check if rebase is needed
-        id: check-rebase
-        run: |
-          git fetch origin ${{ github.event.pull_request.base.ref }}
-          BASE_SHA=$(git rev-parse origin/${{ github.event.pull_request.base.ref }})
-          PR_BASE_SHA=$(git merge-base HEAD origin/${{ github.event.pull_request.base.ref }})
-          if [ "$BASE_SHA" != "$PR_BASE_SHA" ]; then
-            echo "rebase_needed=true" >> $GITHUB_OUTPUT
-          else
-            echo "rebase_needed=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Rebase PR branch
-        if: steps.check-rebase.outputs.rebase_needed == 'true'
-        run: git rebase origin/${{ github.event.pull_request.base.ref }}
-
-      - name: Commit build artifacts
-        run: |
-          git add -A
-          git commit -m "chore: update package with latest dependency changes" || echo "No package changes to commit"
-
-      - name: Push changes
-        run: git push --force-with-lease
-
-      - name: Approve and enable auto-merge
+      - name: Merge Dependabot PR
         env:
-          PR_URL: ${{ github.event.pull_request.html_url }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh pr merge "$PR_URL" --auto --merge
-
-      - name: Summarize workflow outcome
-        run: |
-          echo "### ✅ Dependency Update PR Processed Successfully" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- PR: [${{ github.event.pull_request.title }}](${{ github.event.pull_request.html_url }})" >> $GITHUB_STEP_SUMMARY
-          echo "- Lint, build, test, and package steps completed." >> $GITHUB_STEP_SUMMARY
-          echo "- Rebase required: \`${{ steps.check-rebase.outputs.rebase_needed }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- PR approved and auto-merge enabled." >> $GITHUB_STEP_SUMMARY
+          gh pr comment ${{ github.event.pull_request.number }} --body "@dependabot merge"
