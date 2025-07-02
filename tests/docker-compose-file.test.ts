@@ -1,7 +1,7 @@
 import * as core from '@actions/core';
 import * as fs from 'fs';
 
-import { getComposeServicesFromFiles } from '../src/docker-compose-file';
+import { getComposeFilePathsToProcess, getComposeServicesFromFiles } from '../src/docker-compose-file';
 
 jest.mock('@actions/core', () => ({
   debug: jest.fn(),
@@ -94,6 +94,57 @@ describe('docker-compose-file', () => {
       const result = getComposeServicesFromFiles(['docker-compose.yml'], []);
       expect(result).toEqual([]);
       expect(warningMock).toHaveBeenCalledWith(expect.stringContaining('Failed to parse'));
+    });
+  });
+
+  describe('getComposeFilePathsToProcess', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('should return provided file paths when they exist', () => {
+      (fs.existsSync as jest.Mock).mockImplementation((filePath) => {
+        return filePath === 'docker-compose.yml' || filePath === 'docker-compose.override.yml';
+      });
+
+      const result = getComposeFilePathsToProcess([
+        'docker-compose.yml',
+        'docker-compose.override.yml',
+        'nonexistent.yml',
+      ]);
+      expect(result).toEqual(['docker-compose.yml', 'docker-compose.override.yml']);
+    });
+
+    it('should return empty array when no provided files exist', () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(false);
+
+      const result = getComposeFilePathsToProcess(['nonexistent1.yml', 'nonexistent2.yml']);
+      expect(result).toEqual([]);
+    });
+
+    it('should return default compose files when no paths provided and defaults exist', () => {
+      (fs.existsSync as jest.Mock).mockImplementation((filePath) => {
+        return filePath === 'docker-compose.yml';
+      });
+
+      const result = getComposeFilePathsToProcess([]);
+      expect(result).toEqual(['docker-compose.yml']);
+    });
+
+    it('should return empty array when no paths provided and no defaults exist', () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(false);
+
+      const result = getComposeFilePathsToProcess([]);
+      expect(result).toEqual([]);
+    });
+
+    it('should handle mixed existing and non-existing default files', () => {
+      (fs.existsSync as jest.Mock).mockImplementation((filePath) => {
+        return filePath === 'docker-compose.yaml'; // Only .yaml exists, not .yml
+      });
+
+      const result = getComposeFilePathsToProcess([]);
+      expect(result).toEqual(['docker-compose.yaml']);
     });
   });
 });

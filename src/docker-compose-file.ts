@@ -1,3 +1,8 @@
+/**
+ * @fileoverview Docker Compose file parsing and service extraction utilities.
+ * Handles reading, parsing, and filtering of Docker Compose services.
+ */
+
 import * as core from '@actions/core';
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';
@@ -31,12 +36,12 @@ const DEFAULT_COMPOSE_FILE_NAMES: ReadonlyArray<string> = [
 /**
  * Returns the list of Docker Compose file paths to process, based on input or defaults.
  *
- * @param composeFilePaths - Array of paths to Docker Compose files to check. If empty, default file names are used.
+ * @param candidateComposeFilePaths - Array of paths to Docker Compose files to check. If empty, default file names are used.
  * @returns Array of existing Docker Compose file paths to process.
  */
-export function getComposeFilePathsToProcess(composeFilePaths: ReadonlyArray<string>): ReadonlyArray<string> {
-  return composeFilePaths.length > 0
-    ? composeFilePaths.filter((filePath) => fs.existsSync(filePath))
+export function getComposeFilePathsToProcess(candidateComposeFilePaths: ReadonlyArray<string>): ReadonlyArray<string> {
+  return candidateComposeFilePaths.length > 0
+    ? candidateComposeFilePaths.filter((filePath) => fs.existsSync(filePath))
     : DEFAULT_COMPOSE_FILE_NAMES.filter((fileName) => fs.existsSync(fileName));
 }
 
@@ -45,38 +50,38 @@ export function getComposeFilePathsToProcess(composeFilePaths: ReadonlyArray<str
  * Removes duplicate services (same image and platform).
  *
  * @param composeFilePaths - Array of paths to Docker Compose files to parse. Each file is read and parsed as YAML.
- * @param excludeImageNames - Array of image names to exclude from results. Services with these image names are filtered out.
+ * @param excludedImageNames - Array of image names to exclude from results. Services with these image names are filtered out.
  * @returns Array of unique ComposeService objects from all valid files (duplicates by image+platform are removed).
  */
 export function getComposeServicesFromFiles(
   composeFilePaths: ReadonlyArray<string>,
-  excludeImageNames: ReadonlyArray<string>
+  excludedImageNames: ReadonlyArray<string>
 ): ReadonlyArray<ComposeService> {
-  const excludedImageSet: ReadonlySet<string> = new Set(excludeImageNames);
+  const excludedImageLookup: ReadonlySet<string> = new Set(excludedImageNames);
 
   return chain(composeFilePaths)
-    .flatMap((composeFilePath) => {
+    .flatMap((currentComposeFile) => {
       try {
-        const fileContent = fs.readFileSync(composeFilePath, 'utf8');
-        const parsedComposeFile = yaml.load(fileContent) as ComposeFile | undefined;
+        const yamlContent = fs.readFileSync(currentComposeFile, 'utf8');
+        const composeDefinition = yaml.load(yamlContent) as ComposeFile | undefined;
 
-        if (!parsedComposeFile) {
-          core.debug(`Empty or invalid YAML file: ${composeFilePath}`);
+        if (!composeDefinition) {
+          core.debug(`Empty or invalid YAML file: ${currentComposeFile}`);
           return [];
         }
 
-        if (!parsedComposeFile.services) {
-          core.debug(`No services section found in ${composeFilePath}`);
+        if (!composeDefinition.services) {
+          core.debug(`No services section found in ${currentComposeFile}`);
           return [];
         }
 
-        return Object.values(parsedComposeFile.services);
-      } catch (parsingError) {
-        core.warning(`Failed to parse ${composeFilePath}: ${parsingError}`);
+        return Object.values(composeDefinition.services);
+      } catch (yamlParsingError) {
+        core.warning(`Failed to parse ${currentComposeFile}: ${yamlParsingError}`);
         return [];
       }
     })
-    .filter((composeService) => composeService.image !== undefined && !excludedImageSet.has(composeService.image))
+    .filter((composeService) => composeService.image !== undefined && !excludedImageLookup.has(composeService.image))
     .uniqBy((composeService) => `${composeService.image}|${composeService.platform ?? ''}`)
     .value();
 }

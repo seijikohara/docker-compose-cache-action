@@ -3,7 +3,7 @@ import * as core from '@actions/core';
 
 import * as dockerCommand from '../src/docker-command';
 import * as dockerComposeFile from '../src/docker-compose-file';
-import * as platform from '../src/platform';
+import * as platform from '../src/oci-platform';
 
 jest.mock('../src/main', () => {
   const originalModule = jest.requireActual('../src/main');
@@ -40,7 +40,7 @@ jest.mock('@actions/cache', () => {
   };
 });
 
-jest.mock('../src/platform');
+jest.mock('../src/oci-platform');
 jest.mock('../src/docker-command');
 jest.mock('../src/docker-compose-file', () => {
   const original = jest.requireActual('../src/docker-compose-file');
@@ -53,7 +53,16 @@ jest.mock('../src/docker-compose-file', () => {
 
 import { run } from '../src/main';
 
-jest.mock('../src/path-utils', () => {
+jest.mock('../src/action-outputs', () => {
+  const original = jest.requireActual('../src/action-outputs');
+  return {
+    ...original,
+    logActionCompletion: jest.fn(),
+    createActionSummary: jest.fn(),
+  };
+});
+
+jest.mock('../src/file-utils', () => {
   return {
     sanitizePathComponent: jest.fn((inputString) => inputString),
   };
@@ -188,8 +197,9 @@ describe('main', () => {
         }
       });
       await run();
-      // Adjust expectations to match actual output
-      expect(mockCoreInfo).toHaveBeenCalledWith(expect.stringContaining('3 of 3 services restored from cache'));
+
+      // Check that setOutput was called with cache-hit true (all from cache)
+      expect(mockCoreSetOutput).toHaveBeenCalledWith('cache-hit', 'true');
       // loadImageFromTar, pullImage calls are not guaranteed
     });
 
@@ -220,6 +230,16 @@ describe('main', () => {
       expect(mockCoreSetFailed).toHaveBeenCalledWith('Unexpected error');
     });
 
+    it('should handle unknown error types', async () => {
+      (dockerComposeFile.getComposeServicesFromFiles as jest.Mock).mockImplementation(() => {
+        throw 'non-error object';
+      });
+
+      await run();
+
+      expect(mockCoreSetFailed).toHaveBeenCalledWith('Unknown error occurred');
+    });
+
     it('should use platform from service when specified', async () => {
       const platformSpecificService = { image: 'nginx:alpine', platform: 'linux/arm64' };
       (dockerComposeFile.getComposeServicesFromFiles as jest.Mock).mockImplementation((files, _excludes) => {
@@ -235,8 +255,9 @@ describe('main', () => {
         }
       });
       await run();
-      // Adjust expectations to match actual output
-      expect(mockCoreInfo).toHaveBeenCalledWith(expect.stringContaining('0 of 1 services restored from cache'));
+
+      // Check that platform info was logged
+      expect(mockCoreInfo).toHaveBeenCalledWith('Using platform linux/arm64 for nginx:alpine');
       // pullImage calls are not guaranteed
     });
 
@@ -251,8 +272,9 @@ describe('main', () => {
         }
       });
       await run();
-      // Adjust expectations to match actual output
-      expect(mockCoreInfo).toHaveBeenCalledWith(expect.stringContaining('0 of 3 services restored from cache'));
+
+      // Check that default cache key prefix is used
+      expect(mockCoreInfo).toHaveBeenCalledWith(expect.stringMatching(/Cache key for .* docker-compose-image-/));
     });
 
     it('should exclude specified images from processing', async () => {
@@ -337,8 +359,9 @@ describe('main', () => {
         }
       });
       await run();
+
+      // Check that cache-hit is false (not all services from cache)
       expect(mockCoreSetOutput).toHaveBeenCalledWith('cache-hit', 'false');
-      expect(mockCoreInfo).toHaveBeenCalledWith(expect.stringMatching(/\d+ of 3 services restored from cache/));
       // loadImageFromTar, pullImage calls are not guaranteed
     });
 
