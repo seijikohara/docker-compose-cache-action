@@ -13,7 +13,7 @@ import {
   setActionOutputs,
   TimedServiceResult,
 } from './action-outputs';
-import { formatExecutionTime } from './date-utils';
+import { formatTimeBetween } from './date-utils';
 import { getComposeFilePathsToProcess, getComposeServicesFromFiles } from './docker-compose-file';
 import { processService } from './docker-compose-service-processing';
 
@@ -52,30 +52,34 @@ export async function run(): Promise<void> {
   const actionStartTime = performance.now();
 
   try {
-    const config = getActionConfig();
+    const actionConfig = getActionConfig();
 
-    const referencedComposeFiles = getComposeFilePathsToProcess(config.composeFilePaths);
-    const serviceDefinitions = getComposeServicesFromFiles(referencedComposeFiles, config.excludeImageNames);
+    const discoveredComposeFiles = getComposeFilePathsToProcess(actionConfig.composeFilePaths);
+    const targetServices = getComposeServicesFromFiles(discoveredComposeFiles, actionConfig.excludeImageNames);
 
-    if (serviceDefinitions.length === 0) {
+    if (targetServices.length === 0) {
       core.info('No Docker services found in compose files or all services were excluded');
       setActionOutputs(false, []);
       return;
     }
 
-    core.info(`Found ${serviceDefinitions.length} services to cache`);
+    core.info(`Found ${targetServices.length} services to cache`);
 
     // Process all services concurrently
-    const processingResults: readonly TimedServiceResult[] = await Promise.all(
-      serviceDefinitions.map(async (serviceDefinition) => {
-        const processingStartTime = performance.now();
-        const processingResult = await processService(serviceDefinition, config.cacheKeyPrefix, config.skipLatestCheck);
-        const processingEndTime = performance.now();
+    const serviceProcessingResults: readonly TimedServiceResult[] = await Promise.all(
+      targetServices.map(async (currentService) => {
+        const serviceStartTime = performance.now();
+        const serviceResult = await processService(
+          currentService,
+          actionConfig.cacheKeyPrefix,
+          actionConfig.skipLatestCheck
+        );
+        const serviceEndTime = performance.now();
 
         return {
-          ...processingResult,
-          processingDuration: processingEndTime - processingStartTime,
-          humanReadableDuration: formatExecutionTime(processingStartTime, processingEndTime),
+          ...serviceResult,
+          processingDuration: serviceEndTime - serviceStartTime,
+          humanReadableDuration: formatTimeBetween(serviceStartTime, serviceEndTime),
         };
       })
     );
@@ -83,15 +87,15 @@ export async function run(): Promise<void> {
     const actionEndTime = performance.now();
     const executionTimeMs = actionEndTime - actionStartTime;
 
-    const summary = calculateActionSummary(processingResults, executionTimeMs);
-    const imageListOutput = buildProcessedImageList(processingResults);
+    const summary = calculateActionSummary(serviceProcessingResults, executionTimeMs);
+    const imageListOutput = buildProcessedImageList(serviceProcessingResults);
 
     setActionOutputs(summary.allServicesFromCache, imageListOutput);
-    createActionSummary(processingResults, summary, referencedComposeFiles, config.skipLatestCheck);
+    createActionSummary(serviceProcessingResults, summary, discoveredComposeFiles, actionConfig.skipLatestCheck);
     logActionCompletion(summary);
-  } catch (actionError) {
-    if (actionError instanceof Error) {
-      core.setFailed(actionError.message);
+  } catch (executionError) {
+    if (executionError instanceof Error) {
+      core.setFailed(executionError.message);
     } else {
       core.setFailed('Unknown error occurred');
     }

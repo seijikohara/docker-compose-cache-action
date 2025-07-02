@@ -5,7 +5,7 @@
 
 import * as core from '@actions/core';
 
-import { formatExecutionTime } from './date-utils';
+import { formatTimeBetween } from './date-utils';
 import { formatFileSize } from './file-utils';
 
 /**
@@ -77,23 +77,23 @@ export type TimedServiceResult = {
  * Sets the standard output values for the action.
  * Ensures consistent output formats and proper type handling for GitHub Actions outputs.
  *
- * @param cacheHit - Whether all services were restored from cache
- * @param imageList - Complete list of processed services with metadata
+ * @param allServicesFromCache - Whether all services were restored from cache
+ * @param processedImageList - Complete list of processed services with metadata
  */
-export function setActionOutputs(cacheHit: boolean, imageList: ProcessedImageList): void {
-  core.setOutput('cache-hit', cacheHit.toString());
-  core.setOutput('image-list', JSON.stringify(imageList));
+export function setActionOutputs(allServicesFromCache: boolean, processedImageList: ProcessedImageList): void {
+  core.setOutput('cache-hit', allServicesFromCache.toString());
+  core.setOutput('image-list', JSON.stringify(processedImageList));
 }
 
 /**
  * Builds a processed image list from service results.
  * Transforms internal processing results into the format expected by GitHub Actions.
  *
- * @param results - Array of service processing results with timing information
+ * @param serviceResults - Array of service processing results with timing information
  * @returns Formatted image list suitable for action output
  */
-export function buildProcessedImageList(results: readonly TimedServiceResult[]): ProcessedImageList {
-  return results.map((result) => ({
+export function buildProcessedImageList(serviceResults: readonly TimedServiceResult[]): ProcessedImageList {
+  return serviceResults.map((result) => ({
     name: result.imageName,
     platform: result.platform || DEFAULT_PLATFORM_VALUES.PLATFORM,
     status: result.restoredFromCache
@@ -112,14 +112,17 @@ export function buildProcessedImageList(results: readonly TimedServiceResult[]):
  * Calculates action summary metrics from processing results.
  * Aggregates statistics across all processed services.
  *
- * @param results - Array of service processing results
+ * @param serviceResults - Array of service processing results
  * @param executionTimeMs - Total action execution time in milliseconds
  * @returns Summary statistics for the action run
  */
-export function calculateActionSummary(results: readonly TimedServiceResult[], executionTimeMs: number): ActionSummary {
-  const totalServiceCount = results.length;
-  const cachedServiceCount = results.filter((result) => result.restoredFromCache).length;
-  const allServicesSuccessful = results.every((result) => result.success);
+export function calculateActionSummary(
+  serviceResults: readonly TimedServiceResult[],
+  executionTimeMs: number
+): ActionSummary {
+  const totalServiceCount = serviceResults.length;
+  const cachedServiceCount = serviceResults.filter((result) => result.restoredFromCache).length;
+  const allServicesSuccessful = serviceResults.every((result) => result.success);
   const allServicesFromCache = cachedServiceCount === totalServiceCount && totalServiceCount > 0;
 
   return {
@@ -136,18 +139,18 @@ export function calculateActionSummary(results: readonly TimedServiceResult[], e
  * Generates a detailed markdown table showing service processing results,
  * action summary, and referenced Compose files.
  *
- * @param results - Array of service processing results with timing
+ * @param serviceResults - Array of service processing results with timing
  * @param summary - Aggregated action summary statistics
  * @param referencedComposeFiles - List of Docker Compose files that were processed
  * @param skipLatestCheck - Whether latest version checking was disabled
  */
 export function createActionSummary(
-  results: readonly TimedServiceResult[],
+  serviceResults: readonly TimedServiceResult[],
   summary: ActionSummary,
   referencedComposeFiles: ReadonlyArray<string>,
   skipLatestCheck: boolean
 ): void {
-  const actionHumanReadableDuration = formatExecutionTime(0, summary.executionTimeMs);
+  const actionHumanReadableDuration = formatTimeBetween(0, summary.executionTimeMs);
 
   core.summary
     .addHeading('Docker Compose Cache Results', 2)
@@ -160,7 +163,7 @@ export function createActionSummary(
         { data: 'Processing Time', header: true },
         { data: 'Cache Key', header: true },
       ],
-      ...results.map((result) => [
+      ...serviceResults.map((result) => [
         { data: result.imageName },
         { data: result.platform || DEFAULT_PLATFORM_VALUES.PLATFORM },
         {
@@ -198,7 +201,7 @@ export function createActionSummary(
  * @param summary - Action summary containing completion statistics
  */
 export function logActionCompletion(summary: ActionSummary): void {
-  const actionHumanReadableDuration = formatExecutionTime(0, summary.executionTimeMs);
+  const actionHumanReadableDuration = formatTimeBetween(0, summary.executionTimeMs);
 
   core.info(`${summary.cachedServiceCount} of ${summary.totalServiceCount} services restored from cache`);
   core.info(`Action completed in ${actionHumanReadableDuration}`);

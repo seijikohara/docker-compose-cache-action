@@ -55,19 +55,19 @@ export function getTempDirectory(): string {
  * @param cacheKeyPrefix - Prefix for the cache key (from action input)
  * @param imageName - Docker image name (e.g., 'nginx')
  * @param imageTag - Docker image tag (e.g., 'latest')
- * @param servicePlatformString - Optional platform string (e.g., 'linux/amd64')
+ * @param targetPlatformString - Optional platform string (e.g., 'linux/amd64')
  * @returns Unique cache key string
  */
 export function generateCacheKey(
   cacheKeyPrefix: string,
   imageName: string,
   imageTag: string,
-  servicePlatformString: string | undefined
+  targetPlatformString: string | undefined
 ): string {
   const sanitizedImageName = sanitizePathComponent(imageName);
   const sanitizedImageTag = sanitizePathComponent(imageTag);
 
-  const platformInfo = servicePlatformString ? parseOciPlatformString(servicePlatformString) : getCurrentPlatformInfo();
+  const platformInfo = targetPlatformString ? parseOciPlatformString(targetPlatformString) : getCurrentPlatformInfo();
 
   const sanitizedOs = sanitizePathComponent(platformInfo?.os || 'none');
   const sanitizedArch = sanitizePathComponent(platformInfo?.arch || 'none');
@@ -83,16 +83,16 @@ export function generateCacheKey(
  * @param cacheKeyPrefix - Prefix for the cache key
  * @param imageName - Docker image name
  * @param imageTag - Docker image tag
- * @param servicePlatformString - Optional platform string
+ * @param targetPlatformString - Optional platform string
  * @returns Manifest-specific cache key string
  */
 export function generateManifestCacheKey(
   cacheKeyPrefix: string,
   imageName: string,
   imageTag: string,
-  servicePlatformString: string | undefined
+  targetPlatformString: string | undefined
 ): string {
-  return `${generateCacheKey(cacheKeyPrefix, imageName, imageTag, servicePlatformString)}-manifest`;
+  return `${generateCacheKey(cacheKeyPrefix, imageName, imageTag, targetPlatformString)}-manifest`;
 }
 
 /**
@@ -100,15 +100,11 @@ export function generateManifestCacheKey(
  *
  * @param imageName - Docker image name
  * @param imageTag - Docker image tag
- * @param servicePlatformString - Optional platform string
+ * @param targetPlatformString - Optional platform string
  * @returns Full filesystem path for the tar file
  */
-export function generateTarPath(
-  imageName: string,
-  imageTag: string,
-  servicePlatformString: string | undefined
-): string {
-  const tarFileName = generateCacheKey('', imageName, imageTag, servicePlatformString);
+export function generateTarPath(imageName: string, imageTag: string, targetPlatformString: string | undefined): string {
+  const tarFileName = generateCacheKey('', imageName, imageTag, targetPlatformString);
   return path.join(getTempDirectory(), `${tarFileName}${CACHE_FILE_EXTENSIONS.TAR}`);
 }
 
@@ -117,15 +113,15 @@ export function generateTarPath(
  *
  * @param imageName - Docker image name
  * @param imageTag - Docker image tag
- * @param servicePlatformString - Optional platform string
+ * @param targetPlatformString - Optional platform string
  * @returns Full filesystem path for the manifest file
  */
 export function generateManifestPath(
   imageName: string,
   imageTag: string,
-  servicePlatformString: string | undefined
+  targetPlatformString: string | undefined
 ): string {
-  const manifestFileName = generateCacheKey('', imageName, imageTag, servicePlatformString);
+  const manifestFileName = generateCacheKey('', imageName, imageTag, targetPlatformString);
   return path.join(getTempDirectory(), `${manifestFileName}${CACHE_FILE_EXTENSIONS.MANIFEST}`);
 }
 
@@ -165,16 +161,19 @@ export async function readManifestFromFile(manifestPath: string): Promise<Docker
 /**
  * Attempts to restore files from cache.
  *
- * @param filePaths - Array of file paths to restore from cache
+ * @param targetFilePaths - Array of file paths to restore from cache
  * @param cacheKey - Cache key to search for
  * @returns Promise resolving to cache operation result
  */
-export async function restoreFromCache(filePaths: readonly string[], cacheKey: string): Promise<CacheOperationResult> {
+export async function restoreFromCache(
+  targetFilePaths: readonly string[],
+  cacheKey: string
+): Promise<CacheOperationResult> {
   try {
-    const cacheHitKey = await cache.restoreCache([...filePaths], cacheKey);
+    const restoredCacheKey = await cache.restoreCache([...targetFilePaths], cacheKey);
     return {
-      success: !!cacheHitKey,
-      cacheKey: cacheHitKey || undefined,
+      success: !!restoredCacheKey,
+      cacheKey: restoredCacheKey || undefined,
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -189,18 +188,18 @@ export async function restoreFromCache(filePaths: readonly string[], cacheKey: s
 /**
  * Attempts to save files to cache.
  *
- * @param filePaths - Array of file paths to save to cache
+ * @param targetFilePaths - Array of file paths to save to cache
  * @param cacheKey - Cache key for the saved files
  * @returns Promise resolving to cache operation result
  */
-export async function saveToCache(filePaths: readonly string[], cacheKey: string): Promise<CacheOperationResult> {
+export async function saveToCache(targetFilePaths: readonly string[], cacheKey: string): Promise<CacheOperationResult> {
   try {
-    const cacheResultId = await cache.saveCache([...filePaths], cacheKey);
-    if (cacheResultId !== -1) {
+    const savedCacheId = await cache.saveCache([...targetFilePaths], cacheKey);
+    if (savedCacheId !== -1) {
       core.debug(`Successfully cached with key ${cacheKey}`);
       return { success: true, cacheKey };
     } else {
-      core.debug(`Cache was not saved (cache ID: ${cacheResultId})`);
+      core.debug(`Cache was not saved (cache ID: ${savedCacheId})`);
       return { success: false, error: 'Cache save returned invalid ID' };
     }
   } catch (error) {

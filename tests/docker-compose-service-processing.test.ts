@@ -35,6 +35,7 @@ jest.mock('../src/docker-command', () => ({
 describe('docker-compose-service-processing', () => {
   const mockCoreInfo = core.info as jest.Mock;
   const mockCoreWarning = core.warning as jest.Mock;
+  const mockCoreDebug = core.debug as jest.Mock;
 
   const mockCacheRestore = cache.restoreFromCache as jest.Mock;
   const mockCacheSave = cache.saveToCache as jest.Mock;
@@ -231,6 +232,57 @@ describe('docker-compose-service-processing', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('Failed to pull image');
+    });
+
+    it('should handle manifest loading failure for cached image', async () => {
+      mockInspectImageRemote
+        .mockResolvedValueOnce(mockManifest) // First call succeeds (for initial manifest)
+        .mockResolvedValueOnce(mockManifest); // Second call succeeds (during manifest comparison)
+      mockCacheRestore
+        .mockResolvedValueOnce({ success: true, cacheKey: 'cache-key' }) // Image cache hit
+        .mockResolvedValueOnce({ success: true, cacheKey: 'manifest-cache-key' }); // Manifest cache hit
+      mockLoadImageFromTar.mockResolvedValue(true);
+      mockReadManifestFromFile.mockResolvedValue(undefined); // No cached manifest
+
+      const result = await processService(serviceDefinition, 'test-cache', false);
+
+      expect(result.success).toBe(true);
+      expect(result.restoredFromCache).toBe(true);
+      expect(mockCoreDebug).toHaveBeenCalledWith('Cannot compare manifests for nginx:latest: missing data');
+    });
+
+    it('should handle manifest loading failure for remote image', async () => {
+      mockInspectImageRemote
+        .mockResolvedValueOnce(mockManifest) // First call succeeds (for initial manifest)
+        .mockResolvedValueOnce(undefined); // Second call fails (during manifest comparison)
+      mockCacheRestore
+        .mockResolvedValueOnce({ success: true, cacheKey: 'cache-key' }) // Image cache hit
+        .mockResolvedValueOnce({ success: true, cacheKey: 'manifest-cache-key' }); // Manifest cache hit
+      mockLoadImageFromTar.mockResolvedValue(true);
+      mockReadManifestFromFile.mockResolvedValue(mockManifest);
+
+      const result = await processService(serviceDefinition, 'test-cache', false);
+
+      expect(result.success).toBe(true);
+      expect(result.restoredFromCache).toBe(true);
+      expect(mockCoreDebug).toHaveBeenCalledWith('Cannot compare manifests for nginx:latest: missing data');
+    });
+
+    it('should handle pull failure after manifest mismatch', async () => {
+      const cachedManifest = { digest: 'sha256:cacheddigest' };
+      const remoteManifest = { digest: 'sha256:remotedigest' };
+
+      mockInspectImageRemote.mockResolvedValue(remoteManifest);
+      mockCacheRestore.mockResolvedValue({ success: true, cacheKey: 'cache-key' });
+      mockLoadImageFromTar.mockResolvedValue(true);
+      mockReadManifestFromFile.mockResolvedValue(cachedManifest);
+      mockPullImage.mockResolvedValue(false); // Pull fails
+
+      const result = await processService(serviceDefinition, 'test-cache', false);
+
+      expect(result.success).toBe(true);
+      expect(result.restoredFromCache).toBe(true);
+      expect(mockCoreWarning).toHaveBeenCalledWith('Failed to pull updated image nginx:latest');
     });
 
     it('should handle save image to tar failure', async () => {

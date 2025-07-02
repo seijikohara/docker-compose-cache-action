@@ -230,6 +230,16 @@ describe('main', () => {
       expect(mockCoreSetFailed).toHaveBeenCalledWith('Unexpected error');
     });
 
+    it('should handle unknown error types', async () => {
+      (dockerComposeFile.getComposeServicesFromFiles as jest.Mock).mockImplementation(() => {
+        throw 'non-error object';
+      });
+
+      await run();
+
+      expect(mockCoreSetFailed).toHaveBeenCalledWith('Unknown error occurred');
+    });
+
     it('should use platform from service when specified', async () => {
       const platformSpecificService = { image: 'nginx:alpine', platform: 'linux/arm64' };
       (dockerComposeFile.getComposeServicesFromFiles as jest.Mock).mockImplementation((files, _excludes) => {

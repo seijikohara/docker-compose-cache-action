@@ -29,10 +29,10 @@ export declare function getTempDirectory(): string;
  * @param cacheKeyPrefix - Prefix for the cache key (from action input)
  * @param imageName - Docker image name (e.g., 'nginx')
  * @param imageTag - Docker image tag (e.g., 'latest')
- * @param servicePlatformString - Optional platform string (e.g., 'linux/amd64')
+ * @param targetPlatformString - Optional platform string (e.g., 'linux/amd64')
  * @returns Unique cache key string
  */
-export declare function generateCacheKey(cacheKeyPrefix: string, imageName: string, imageTag: string, servicePlatformString: string | undefined): string;
+export declare function generateCacheKey(cacheKeyPrefix: string, imageName: string, imageTag: string, targetPlatformString: string | undefined): string;
 /**
  * Generates a manifest cache key for a Docker image.
  * Appends a manifest suffix to the standard cache key.
@@ -40,28 +40,28 @@ export declare function generateCacheKey(cacheKeyPrefix: string, imageName: stri
  * @param cacheKeyPrefix - Prefix for the cache key
  * @param imageName - Docker image name
  * @param imageTag - Docker image tag
- * @param servicePlatformString - Optional platform string
+ * @param targetPlatformString - Optional platform string
  * @returns Manifest-specific cache key string
  */
-export declare function generateManifestCacheKey(cacheKeyPrefix: string, imageName: string, imageTag: string, servicePlatformString: string | undefined): string;
+export declare function generateManifestCacheKey(cacheKeyPrefix: string, imageName: string, imageTag: string, targetPlatformString: string | undefined): string;
 /**
  * Generates the filesystem path for storing a Docker image tar file.
  *
  * @param imageName - Docker image name
  * @param imageTag - Docker image tag
- * @param servicePlatformString - Optional platform string
+ * @param targetPlatformString - Optional platform string
  * @returns Full filesystem path for the tar file
  */
-export declare function generateTarPath(imageName: string, imageTag: string, servicePlatformString: string | undefined): string;
+export declare function generateTarPath(imageName: string, imageTag: string, targetPlatformString: string | undefined): string;
 /**
  * Generates the filesystem path for storing a Docker image manifest file.
  *
  * @param imageName - Docker image name
  * @param imageTag - Docker image tag
- * @param servicePlatformString - Optional platform string
+ * @param targetPlatformString - Optional platform string
  * @returns Full filesystem path for the manifest file
  */
-export declare function generateManifestPath(imageName: string, imageTag: string, servicePlatformString: string | undefined): string;
+export declare function generateManifestPath(imageName: string, imageTag: string, targetPlatformString: string | undefined): string;
 /**
  * Writes a Docker manifest to a JSON file.
  *
@@ -80,19 +80,19 @@ export declare function readManifestFromFile(manifestPath: string): Promise<Dock
 /**
  * Attempts to restore files from cache.
  *
- * @param filePaths - Array of file paths to restore from cache
+ * @param targetFilePaths - Array of file paths to restore from cache
  * @param cacheKey - Cache key to search for
  * @returns Promise resolving to cache operation result
  */
-export declare function restoreFromCache(filePaths: readonly string[], cacheKey: string): Promise<CacheOperationResult>;
+export declare function restoreFromCache(targetFilePaths: readonly string[], cacheKey: string): Promise<CacheOperationResult>;
 /**
  * Attempts to save files to cache.
  *
- * @param filePaths - Array of file paths to save to cache
+ * @param targetFilePaths - Array of file paths to save to cache
  * @param cacheKey - Cache key for the saved files
  * @returns Promise resolving to cache operation result
  */
-export declare function saveToCache(filePaths: readonly string[], cacheKey: string): Promise<CacheOperationResult>;
+export declare function saveToCache(targetFilePaths: readonly string[], cacheKey: string): Promise<CacheOperationResult>;
 /**
  * Saves manifest to file and cache.
  * Combines manifest file writing with cache storage.

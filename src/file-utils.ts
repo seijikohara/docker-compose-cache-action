@@ -28,21 +28,21 @@ export function sanitizePathComponent(value: string): string {
 /**
  * Formats a file size in bytes to a human-readable string.
  *
- * @param sizeInBytes - Size in bytes.
+ * @param fileSizeBytes - Size in bytes.
  * @returns Human-readable size string (e.g. "10.5 MB").
  */
-export function formatFileSize(sizeInBytes: number | undefined): string {
-  if (sizeInBytes === undefined) {
+export function formatFileSize(fileSizeBytes: number | undefined): string {
+  if (fileSizeBytes === undefined) {
     return 'N/A';
   }
 
-  if (sizeInBytes === 0) {
+  if (fileSizeBytes === 0) {
     return '0 Bytes';
   }
 
-  const i = Math.floor(Math.log(sizeInBytes) / Math.log(FILE_SIZE_BASE));
-  const unitIndex = Math.min(i, FILE_SIZE_UNITS.length - 1);
-  const unit = FILE_SIZE_UNITS[unitIndex as keyof typeof FILE_SIZE_UNITS] || FILE_SIZE_UNITS[0];
+  const rawUnitIndex = Math.floor(Math.log(fileSizeBytes) / Math.log(FILE_SIZE_BASE));
+  const safeUnitIndex = Math.min(rawUnitIndex, FILE_SIZE_UNITS.length - 1);
+  const sizeUnit = FILE_SIZE_UNITS[safeUnitIndex as keyof typeof FILE_SIZE_UNITS] || FILE_SIZE_UNITS[0];
 
-  return `${(sizeInBytes / Math.pow(FILE_SIZE_BASE, unitIndex)).toFixed(2).replace(/\.0+$|(\.[0-9]*[1-9])0+$/, '$1')} ${unit}`;
+  return `${(fileSizeBytes / Math.pow(FILE_SIZE_BASE, safeUnitIndex)).toFixed(2).replace(/\.0+$|(\.[0-9]*[1-9])0+$/, '$1')} ${sizeUnit}`;
 }

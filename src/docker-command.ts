@@ -35,26 +35,26 @@ export type DockerImageManifest = {
 /**
  * Executes a Docker command and logs execution time.
  *
- * @param args - Array of command arguments.
+ * @param dockerArgs - Array of command arguments.
  * @param options - Execution options.
  * @returns Promise resolving to object containing exit code, stdout, and stderr.
  */
 async function executeDockerCommand(
-  args: readonly string[],
+  dockerArgs: readonly string[],
   options: exec.ExecOptions
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
   // Format command for logging
-  const fullCommand = `docker ${args.join(' ')}`;
+  const fullCommand = `docker ${dockerArgs.join(' ')}`;
 
   // Log command execution
   core.info(`Executing: ${fullCommand}`);
 
   // Record start time
-  const startTime = performance.now();
+  const executionStartTime = performance.now();
 
   // Note: This function requires controlled mutation for stream collection
   // The mutation is localized to this function and the arrays are treated as immutable elsewhere
-  const outputState: {
+  const commandOutputBuffer: {
     stdout: readonly string[];
     stderr: readonly string[];
   } = {
@@ -68,18 +68,18 @@ async function executeDockerCommand(
     listeners: {
       ...options.listeners,
       stdout: (data: Buffer) => {
-        const text = data.toString();
+        const outputChunk = data.toString();
         // Controlled mutation: creating new immutable array each time
-        outputState.stdout = [...outputState.stdout, text] as const;
+        commandOutputBuffer.stdout = [...commandOutputBuffer.stdout, outputChunk] as const;
         // If the original options had a stdout listener, call it
         if (options.listeners?.stdout) {
           options.listeners.stdout(data);
         }
       },
       stderr: (data: Buffer) => {
-        const text = data.toString();
+        const outputChunk = data.toString();
         // Controlled mutation: creating new immutable array each time
-        outputState.stderr = [...outputState.stderr, text] as const;
+        commandOutputBuffer.stderr = [...commandOutputBuffer.stderr, outputChunk] as const;
         // If the original options had a stderr listener, call it
         if (options.listeners?.stderr) {
           options.listeners.stderr(data);
@@ -90,22 +90,22 @@ async function executeDockerCommand(
 
   try {
     // Execute the command
-    const exitCode = await exec.exec('docker', [...args], execOptionsWithCapture);
+    const exitCode = await exec.exec('docker', [...dockerArgs], execOptionsWithCapture);
 
     // Calculate and log execution time
-    const endTime = performance.now();
-    const executionTimeMs = Math.round(endTime - startTime);
+    const executionEndTime = performance.now();
+    const executionTimeMs = Math.round(executionEndTime - executionStartTime);
     core.info(`Command completed in ${executionTimeMs}ms: ${fullCommand}`);
 
     // Join all chunks to create the complete output strings
-    const stdout = outputState.stdout.join('');
-    const stderr = outputState.stderr.join('');
+    const stdout = commandOutputBuffer.stdout.join('');
+    const stderr = commandOutputBuffer.stderr.join('');
 
     return { exitCode, stdout, stderr };
   } catch (error) {
     // Log execution failure
-    const endTime = performance.now();
-    const executionTimeMs = Math.round(endTime - startTime);
+    const executionEndTime = performance.now();
+    const executionTimeMs = Math.round(executionEndTime - executionStartTime);
     core.error(`Command failed after ${executionTimeMs}ms: ${fullCommand}`);
     throw error;
   }
@@ -122,14 +122,14 @@ export async function pullImage(imageName: string, platform: string | undefined)
   try {
     const execOptions = { ignoreReturnCode: true } as const;
     // Construct args array conditionally including platform flag if specified
-    const dockerCommandArguments = platform ? ['pull', '--platform', platform, imageName] : ['pull', imageName];
+    const pullCommandArgs = platform ? ['pull', '--platform', platform, imageName] : ['pull', imageName];
 
     if (platform) {
       core.info(`Pulling image ${imageName} for platform ${platform}`);
     }
 
     // Execute docker pull command
-    const { exitCode, stderr } = await executeDockerCommand(dockerCommandArguments, execOptions);
+    const { exitCode, stderr } = await executeDockerCommand(pullCommandArgs, execOptions);
 
     if (exitCode !== 0) {
       core.warning(`Failed to pull image ${imageName}${platform ? ` for platform ${platform}` : ''}: ${stderr}`);
@@ -173,8 +173,8 @@ export async function inspectImageRemote(imageName: string): Promise<DockerImage
       // Parse the JSON output to extract the manifest
       const manifest = JSON.parse(stdout.trim()) as DockerImageManifest;
       return manifest;
-    } catch (manifestParseError) {
-      core.warning(`Failed to parse manifest JSON for ${imageName}: ${manifestParseError}`);
+    } catch (manifestJsonParseError) {
+      core.warning(`Failed to parse manifest JSON for ${imageName}: ${manifestJsonParseError}`);
       return undefined;
     }
   } catch (error) {
@@ -218,10 +218,10 @@ export async function inspectImageLocal(imageName: string): Promise<DockerImageM
 
     try {
       // Parse the JSON output to extract the image information
-      const inspectInfo = JSON.parse(stdout.trim()) as DockerImageMetadata;
-      return inspectInfo;
-    } catch (jsonParseError) {
-      core.warning(`Failed to parse inspect JSON for ${imageName}: ${jsonParseError}`);
+      const imageMetadata = JSON.parse(stdout.trim()) as DockerImageMetadata;
+      return imageMetadata;
+    } catch (inspectJsonParseError) {
+      core.warning(`Failed to parse inspect JSON for ${imageName}: ${inspectJsonParseError}`);
       return undefined;
     }
   } catch (error) {

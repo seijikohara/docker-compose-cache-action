@@ -12,7 +12,7 @@ export declare function sanitizePathComponent(value: string): string;
 /**
  * Formats a file size in bytes to a human-readable string.
  *
- * @param sizeInBytes - Size in bytes.
+ * @param fileSizeBytes - Size in bytes.
  * @returns Human-readable size string (e.g. "10.5 MB").
  */
-export declare function formatFileSize(sizeInBytes: number | undefined): string;
+export declare function formatFileSize(fileSizeBytes: number | undefined): string;

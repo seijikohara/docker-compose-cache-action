@@ -52,9 +52,9 @@ type ImageOperationResult = {
  * Pulls an image and saves it to cache.
  */
 async function pullAndCacheImage(
-  fullImageName: string,
+  completeImageName: string,
   platformString: string | undefined,
-  serviceCacheKey: string,
+  imageCacheKey: string,
   manifestCacheKey: string,
   imageTarPath: string,
   manifestPath: string,
@@ -62,28 +62,28 @@ async function pullAndCacheImage(
   manifest: DockerImageManifest
 ): Promise<ImageOperationResult> {
   // Pull the image
-  if (!(await pullImage(fullImageName, platformString))) {
+  if (!(await pullImage(completeImageName, platformString))) {
     return {
       success: false,
-      error: `Failed to pull image: ${fullImageName}`,
+      error: `Failed to pull image: ${completeImageName}`,
     };
   }
 
   // Verify the digest matches after pull
-  const newManifest = await inspectImageRemote(fullImageName);
+  const newManifest = await inspectImageRemote(completeImageName);
   const newImageDigest = newManifest?.digest;
   if (newImageDigest !== imageDigest) {
     return {
       success: false,
-      error: `Digest mismatch for ${fullImageName}: expected ${imageDigest}, got ${newImageDigest}`,
+      error: `Digest mismatch for ${completeImageName}: expected ${imageDigest}, got ${newImageDigest}`,
     };
   }
 
   // Save the image to tar file
-  if (!(await saveImageToTar(fullImageName, imageTarPath))) {
+  if (!(await saveImageToTar(completeImageName, imageTarPath))) {
     return {
       success: false,
-      error: `Failed to save image to tar: ${fullImageName}`,
+      error: `Failed to save image to tar: ${completeImageName}`,
     };
   }
 
@@ -91,13 +91,13 @@ async function pullAndCacheImage(
   await saveManifestToCache(manifest, manifestPath, manifestCacheKey);
 
   // Save image tar to cache
-  const cacheResult = await saveToCache([imageTarPath], serviceCacheKey);
+  const cacheResult = await saveToCache([imageTarPath], imageCacheKey);
   if (cacheResult.success) {
-    core.info(`Cached ${fullImageName} with key ${serviceCacheKey}`);
+    core.info(`Cached ${completeImageName} with key ${imageCacheKey}`);
   }
 
   // Get image size
-  const inspectInfo = await inspectImageLocal(fullImageName);
+  const inspectInfo = await inspectImageLocal(completeImageName);
 
   return {
     success: true,
@@ -109,7 +109,7 @@ async function pullAndCacheImage(
  * Processes cache hit scenario with optional manifest validation.
  */
 async function processCacheHit(
-  fullImageName: string,
+  completeImageName: string,
   imageTarPath: string,
   manifestPath: string,
   manifestCacheHitKey: string | undefined,
@@ -123,25 +123,25 @@ async function processCacheHit(
     return {
       success: false,
       restoredFromCache: false,
-      imageName: fullImageName,
+      imageName: completeImageName,
       cacheKey: '',
       digest: imageDigest,
       platform,
-      error: `Failed to load image from cache: ${fullImageName}`,
+      error: `Failed to load image from cache: ${completeImageName}`,
     };
   }
 
   // Get image size after successful load
-  const inspectInfo = await inspectImageLocal(fullImageName);
+  const inspectInfo = await inspectImageLocal(completeImageName);
   const imageSize = inspectInfo?.Size;
 
   // If skip latest check is enabled, return immediately
   if (skipLatestCheck) {
-    core.info(`Skipped latest check for ${fullImageName}, using cached version`);
+    core.info(`Skipped latest check for ${completeImageName}, using cached version`);
     return {
       success: true,
       restoredFromCache: true,
-      imageName: fullImageName,
+      imageName: completeImageName,
       cacheKey: '',
       digest: imageDigest,
       platform,
@@ -151,11 +151,11 @@ async function processCacheHit(
 
   // Skip manifest check if no manifest cache hit
   if (!manifestCacheHitKey) {
-    core.debug(`No manifest cache for ${fullImageName}`);
+    core.debug(`No manifest cache for ${completeImageName}`);
     return {
       success: true,
       restoredFromCache: true,
-      imageName: fullImageName,
+      imageName: completeImageName,
       cacheKey: '',
       digest: imageDigest,
       platform,
@@ -166,16 +166,16 @@ async function processCacheHit(
   // Perform manifest validation
   const [cachedManifest, remoteManifest] = await Promise.all([
     readManifestFromFile(manifestPath),
-    inspectImageRemote(fullImageName),
+    inspectImageRemote(completeImageName),
   ]);
 
   // Skip if manifest can't be loaded or no current manifest
   if (!cachedManifest || !remoteManifest) {
-    core.debug(`Cannot compare manifests for ${fullImageName}: missing data`);
+    core.debug(`Cannot compare manifests for ${completeImageName}: missing data`);
     return {
       success: true,
       restoredFromCache: true,
-      imageName: fullImageName,
+      imageName: completeImageName,
       cacheKey: '',
       digest: imageDigest,
       platform,
@@ -185,11 +185,11 @@ async function processCacheHit(
 
   // If manifests match, return success
   if (cachedManifest.digest === remoteManifest.digest) {
-    core.debug(`Manifest match confirmed for ${fullImageName}`);
+    core.debug(`Manifest match confirmed for ${completeImageName}`);
     return {
       success: true,
       restoredFromCache: true,
-      imageName: fullImageName,
+      imageName: completeImageName,
       cacheKey: '',
       digest: imageDigest,
       platform,
@@ -198,16 +198,16 @@ async function processCacheHit(
   }
 
   // Handle manifest mismatch - pull fresh image
-  core.info(`Manifest mismatch detected for ${fullImageName}, pulling fresh image`);
-  const pullSuccess = await pullImage(fullImageName, platform);
+  core.info(`Manifest mismatch detected for ${completeImageName}, pulling fresh image`);
+  const pullSuccess = await pullImage(completeImageName, platform);
   if (!pullSuccess) {
-    core.warning(`Failed to pull updated image ${fullImageName}`);
+    core.warning(`Failed to pull updated image ${completeImageName}`);
   }
 
   return {
     success: true,
     restoredFromCache: true,
-    imageName: fullImageName,
+    imageName: completeImageName,
     cacheKey: '',
     digest: imageDigest,
     platform,
@@ -224,54 +224,59 @@ export async function processService(
   cacheKeyPrefix: string,
   skipLatestCheck: boolean
 ): Promise<ServiceResult> {
-  const fullImageName = serviceDefinition.image;
-  const [baseImageName, imageTag = 'latest'] = fullImageName.split(':');
+  const completeImageName = serviceDefinition.image;
+  const [imageNameWithoutTag, imageTagOrLatest = 'latest'] = completeImageName.split(':');
 
   // Get image manifest with digest for cache key generation
-  const manifest = await inspectImageRemote(fullImageName);
+  const manifest = await inspectImageRemote(completeImageName);
   if (!manifest || !manifest.digest) {
-    core.warning(`Could not get digest for ${fullImageName}, skipping cache`);
+    core.warning(`Could not get digest for ${completeImageName}, skipping cache`);
     return {
       success: false,
       restoredFromCache: false,
-      imageName: fullImageName,
+      imageName: completeImageName,
       cacheKey: '',
       digest: undefined,
       platform: serviceDefinition.platform,
-      error: `Could not get digest for ${fullImageName}`,
+      error: `Could not get digest for ${completeImageName}`,
     };
   }
 
   const imageDigest = manifest.digest;
-  const serviceCacheKey = generateCacheKey(cacheKeyPrefix, baseImageName, imageTag, serviceDefinition.platform);
-  const imageTarPath = generateTarPath(baseImageName, imageTag, serviceDefinition.platform);
-  const manifestCacheKey = generateManifestCacheKey(
+  const imageCacheKey = generateCacheKey(
     cacheKeyPrefix,
-    baseImageName,
-    imageTag,
+    imageNameWithoutTag,
+    imageTagOrLatest,
     serviceDefinition.platform
   );
-  const manifestPath = generateManifestPath(baseImageName, imageTag, serviceDefinition.platform);
+  const imageTarPath = generateTarPath(imageNameWithoutTag, imageTagOrLatest, serviceDefinition.platform);
+  const manifestCacheKey = generateManifestCacheKey(
+    cacheKeyPrefix,
+    imageNameWithoutTag,
+    imageTagOrLatest,
+    serviceDefinition.platform
+  );
+  const manifestPath = generateManifestPath(imageNameWithoutTag, imageTagOrLatest, serviceDefinition.platform);
 
   if (serviceDefinition.platform) {
-    core.info(`Using platform ${serviceDefinition.platform} for ${fullImageName}`);
+    core.info(`Using platform ${serviceDefinition.platform} for ${completeImageName}`);
   }
-  core.info(`Cache key for ${fullImageName}: ${serviceCacheKey}`);
+  core.info(`Cache key for ${completeImageName}: ${imageCacheKey}`);
   core.debug(`Cache path: ${imageTarPath}`);
 
   // Try to restore from cache first
   const [cacheResult, manifestCacheResult] = await Promise.all([
-    restoreFromCache([imageTarPath], serviceCacheKey),
+    restoreFromCache([imageTarPath], imageCacheKey),
     restoreFromCache([manifestPath], manifestCacheKey),
   ]);
 
   // If no cache hit, proceed to pull the image
   if (!cacheResult.success) {
-    core.info(`Cache miss for ${fullImageName}, pulling and saving`);
+    core.info(`Cache miss for ${completeImageName}, pulling and saving`);
     const pullResult = await pullAndCacheImage(
-      fullImageName,
+      completeImageName,
       serviceDefinition.platform,
-      serviceCacheKey,
+      imageCacheKey,
       manifestCacheKey,
       imageTarPath,
       manifestPath,
@@ -282,8 +287,8 @@ export async function processService(
     return {
       success: pullResult.success,
       restoredFromCache: false,
-      imageName: fullImageName,
-      cacheKey: serviceCacheKey,
+      imageName: completeImageName,
+      cacheKey: imageCacheKey,
       digest: imageDigest,
       platform: serviceDefinition.platform,
       error: pullResult.error,
@@ -292,9 +297,9 @@ export async function processService(
   }
 
   // Process cache hit
-  core.info(`Cache hit for ${fullImageName}, loading from cache`);
+  core.info(`Cache hit for ${completeImageName}, loading from cache`);
   const result = await processCacheHit(
-    fullImageName,
+    completeImageName,
     imageTarPath,
     manifestPath,
     manifestCacheResult.cacheKey,
@@ -305,6 +310,6 @@ export async function processService(
 
   return {
     ...result,
-    cacheKey: serviceCacheKey,
+    cacheKey: imageCacheKey,
   };
 }

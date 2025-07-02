@@ -86647,22 +86647,22 @@ const DEFAULT_PLATFORM_VALUES = {
  * Sets the standard output values for the action.
  * Ensures consistent output formats and proper type handling for GitHub Actions outputs.
  *
- * @param cacheHit - Whether all services were restored from cache
- * @param imageList - Complete list of processed services with metadata
+ * @param allServicesFromCache - Whether all services were restored from cache
+ * @param processedImageList - Complete list of processed services with metadata
  */
-function setActionOutputs(cacheHit, imageList) {
-    core.setOutput('cache-hit', cacheHit.toString());
-    core.setOutput('image-list', JSON.stringify(imageList));
+function setActionOutputs(allServicesFromCache, processedImageList) {
+    core.setOutput('cache-hit', allServicesFromCache.toString());
+    core.setOutput('image-list', JSON.stringify(processedImageList));
 }
 /**
  * Builds a processed image list from service results.
  * Transforms internal processing results into the format expected by GitHub Actions.
  *
- * @param results - Array of service processing results with timing information
+ * @param serviceResults - Array of service processing results with timing information
  * @returns Formatted image list suitable for action output
  */
-function buildProcessedImageList(results) {
-    return results.map((result) => ({
+function buildProcessedImageList(serviceResults) {
+    return serviceResults.map((result) => ({
         name: result.imageName,
         platform: result.platform || DEFAULT_PLATFORM_VALUES.PLATFORM,
         status: result.restoredFromCache
@@ -86680,14 +86680,14 @@ function buildProcessedImageList(results) {
  * Calculates action summary metrics from processing results.
  * Aggregates statistics across all processed services.
  *
- * @param results - Array of service processing results
+ * @param serviceResults - Array of service processing results
  * @param executionTimeMs - Total action execution time in milliseconds
  * @returns Summary statistics for the action run
  */
-function calculateActionSummary(results, executionTimeMs) {
-    const totalServiceCount = results.length;
-    const cachedServiceCount = results.filter((result) => result.restoredFromCache).length;
-    const allServicesSuccessful = results.every((result) => result.success);
+function calculateActionSummary(serviceResults, executionTimeMs) {
+    const totalServiceCount = serviceResults.length;
+    const cachedServiceCount = serviceResults.filter((result) => result.restoredFromCache).length;
+    const allServicesSuccessful = serviceResults.every((result) => result.success);
     const allServicesFromCache = cachedServiceCount === totalServiceCount && totalServiceCount > 0;
     return {
         totalServiceCount,
@@ -86702,13 +86702,13 @@ function calculateActionSummary(results, executionTimeMs) {
  * Generates a detailed markdown table showing service processing results,
  * action summary, and referenced Compose files.
  *
- * @param results - Array of service processing results with timing
+ * @param serviceResults - Array of service processing results with timing
  * @param summary - Aggregated action summary statistics
  * @param referencedComposeFiles - List of Docker Compose files that were processed
  * @param skipLatestCheck - Whether latest version checking was disabled
  */
-function createActionSummary(results, summary, referencedComposeFiles, skipLatestCheck) {
-    const actionHumanReadableDuration = (0, date_utils_1.formatExecutionTime)(0, summary.executionTimeMs);
+function createActionSummary(serviceResults, summary, referencedComposeFiles, skipLatestCheck) {
+    const actionHumanReadableDuration = (0, date_utils_1.formatTimeBetween)(0, summary.executionTimeMs);
     core.summary
         .addHeading('Docker Compose Cache Results', 2)
         .addTable([
@@ -86720,7 +86720,7 @@ function createActionSummary(results, summary, referencedComposeFiles, skipLates
             { data: 'Processing Time', header: true },
             { data: 'Cache Key', header: true },
         ],
-        ...results.map((result) => [
+        ...serviceResults.map((result) => [
             { data: result.imageName },
             { data: result.platform || DEFAULT_PLATFORM_VALUES.PLATFORM },
             {
@@ -86757,7 +86757,7 @@ function createActionSummary(results, summary, referencedComposeFiles, skipLates
  * @param summary - Action summary containing completion statistics
  */
 function logActionCompletion(summary) {
-    const actionHumanReadableDuration = (0, date_utils_1.formatExecutionTime)(0, summary.executionTimeMs);
+    const actionHumanReadableDuration = (0, date_utils_1.formatTimeBetween)(0, summary.executionTimeMs);
     core.info(`${summary.cachedServiceCount} of ${summary.totalServiceCount} services restored from cache`);
     core.info(`Action completed in ${actionHumanReadableDuration}`);
     if (summary.allServicesSuccessful) {
@@ -86860,13 +86860,13 @@ function getTempDirectory() {
  * @param cacheKeyPrefix - Prefix for the cache key (from action input)
  * @param imageName - Docker image name (e.g., 'nginx')
  * @param imageTag - Docker image tag (e.g., 'latest')
- * @param servicePlatformString - Optional platform string (e.g., 'linux/amd64')
+ * @param targetPlatformString - Optional platform string (e.g., 'linux/amd64')
  * @returns Unique cache key string
  */
-function generateCacheKey(cacheKeyPrefix, imageName, imageTag, servicePlatformString) {
+function generateCacheKey(cacheKeyPrefix, imageName, imageTag, targetPlatformString) {
     const sanitizedImageName = (0, file_utils_1.sanitizePathComponent)(imageName);
     const sanitizedImageTag = (0, file_utils_1.sanitizePathComponent)(imageTag);
-    const platformInfo = servicePlatformString ? (0, oci_platform_1.parseOciPlatformString)(servicePlatformString) : (0, oci_platform_1.getCurrentPlatformInfo)();
+    const platformInfo = targetPlatformString ? (0, oci_platform_1.parseOciPlatformString)(targetPlatformString) : (0, oci_platform_1.getCurrentPlatformInfo)();
     const sanitizedOs = (0, file_utils_1.sanitizePathComponent)(platformInfo?.os || 'none');
     const sanitizedArch = (0, file_utils_1.sanitizePathComponent)(platformInfo?.arch || 'none');
     const sanitizedVariant = (0, file_utils_1.sanitizePathComponent)(platformInfo?.variant || 'none');
@@ -86879,22 +86879,22 @@ function generateCacheKey(cacheKeyPrefix, imageName, imageTag, servicePlatformSt
  * @param cacheKeyPrefix - Prefix for the cache key
  * @param imageName - Docker image name
  * @param imageTag - Docker image tag
- * @param servicePlatformString - Optional platform string
+ * @param targetPlatformString - Optional platform string
  * @returns Manifest-specific cache key string
  */
-function generateManifestCacheKey(cacheKeyPrefix, imageName, imageTag, servicePlatformString) {
-    return `${generateCacheKey(cacheKeyPrefix, imageName, imageTag, servicePlatformString)}-manifest`;
+function generateManifestCacheKey(cacheKeyPrefix, imageName, imageTag, targetPlatformString) {
+    return `${generateCacheKey(cacheKeyPrefix, imageName, imageTag, targetPlatformString)}-manifest`;
 }
 /**
  * Generates the filesystem path for storing a Docker image tar file.
  *
  * @param imageName - Docker image name
  * @param imageTag - Docker image tag
- * @param servicePlatformString - Optional platform string
+ * @param targetPlatformString - Optional platform string
  * @returns Full filesystem path for the tar file
  */
-function generateTarPath(imageName, imageTag, servicePlatformString) {
-    const tarFileName = generateCacheKey('', imageName, imageTag, servicePlatformString);
+function generateTarPath(imageName, imageTag, targetPlatformString) {
+    const tarFileName = generateCacheKey('', imageName, imageTag, targetPlatformString);
     return path.join(getTempDirectory(), `${tarFileName}${CACHE_FILE_EXTENSIONS.TAR}`);
 }
 /**
@@ -86902,11 +86902,11 @@ function generateTarPath(imageName, imageTag, servicePlatformString) {
  *
  * @param imageName - Docker image name
  * @param imageTag - Docker image tag
- * @param servicePlatformString - Optional platform string
+ * @param targetPlatformString - Optional platform string
  * @returns Full filesystem path for the manifest file
  */
-function generateManifestPath(imageName, imageTag, servicePlatformString) {
-    const manifestFileName = generateCacheKey('', imageName, imageTag, servicePlatformString);
+function generateManifestPath(imageName, imageTag, targetPlatformString) {
+    const manifestFileName = generateCacheKey('', imageName, imageTag, targetPlatformString);
     return path.join(getTempDirectory(), `${manifestFileName}${CACHE_FILE_EXTENSIONS.MANIFEST}`);
 }
 /**
@@ -86945,16 +86945,16 @@ async function readManifestFromFile(manifestPath) {
 /**
  * Attempts to restore files from cache.
  *
- * @param filePaths - Array of file paths to restore from cache
+ * @param targetFilePaths - Array of file paths to restore from cache
  * @param cacheKey - Cache key to search for
  * @returns Promise resolving to cache operation result
  */
-async function restoreFromCache(filePaths, cacheKey) {
+async function restoreFromCache(targetFilePaths, cacheKey) {
     try {
-        const cacheHitKey = await cache.restoreCache([...filePaths], cacheKey);
+        const restoredCacheKey = await cache.restoreCache([...targetFilePaths], cacheKey);
         return {
-            success: !!cacheHitKey,
-            cacheKey: cacheHitKey || undefined,
+            success: !!restoredCacheKey,
+            cacheKey: restoredCacheKey || undefined,
         };
     }
     catch (error) {
@@ -86969,19 +86969,19 @@ async function restoreFromCache(filePaths, cacheKey) {
 /**
  * Attempts to save files to cache.
  *
- * @param filePaths - Array of file paths to save to cache
+ * @param targetFilePaths - Array of file paths to save to cache
  * @param cacheKey - Cache key for the saved files
  * @returns Promise resolving to cache operation result
  */
-async function saveToCache(filePaths, cacheKey) {
+async function saveToCache(targetFilePaths, cacheKey) {
     try {
-        const cacheResultId = await cache.saveCache([...filePaths], cacheKey);
-        if (cacheResultId !== -1) {
+        const savedCacheId = await cache.saveCache([...targetFilePaths], cacheKey);
+        if (savedCacheId !== -1) {
             core.debug(`Successfully cached with key ${cacheKey}`);
             return { success: true, cacheKey };
         }
         else {
-            core.debug(`Cache was not saved (cache ID: ${cacheResultId})`);
+            core.debug(`Cache was not saved (cache ID: ${savedCacheId})`);
             return { success: false, error: 'Cache save returned invalid ID' };
         }
     }
@@ -87028,20 +87028,20 @@ async function saveManifestToCache(manifest, manifestPath, manifestCacheKey) {
  * Provides functions for formatting time durations and calculating execution times.
  */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.formatExecutionTime = formatExecutionTime;
+exports.formatTimeBetween = formatTimeBetween;
 const date_fns_1 = __nccwpck_require__(94367);
 /**
  * Formats the time difference between start and end timestamps into a human-readable duration string.
  * Uses date-fns to create a natural language representation of the duration.
  *
- * @param startTime - Start timestamp in milliseconds
- * @param endTime - End timestamp in milliseconds
+ * @param startTimestampMs - Start timestamp in milliseconds
+ * @param endTimestampMs - End timestamp in milliseconds
  * @returns Human-readable duration string (e.g., "1 hour 2 minutes 3 seconds")
  */
-function formatExecutionTime(startTime, endTime) {
+function formatTimeBetween(startTimestampMs, endTimestampMs) {
     const duration = (0, date_fns_1.intervalToDuration)({
         start: 0,
-        end: endTime - startTime,
+        end: endTimestampMs - startTimestampMs,
     });
     return (0, date_fns_1.formatDuration)(duration, {
         format: ['hours', 'minutes', 'seconds'],
@@ -87106,20 +87106,20 @@ const exec = __importStar(__nccwpck_require__(95236));
 /**
  * Executes a Docker command and logs execution time.
  *
- * @param args - Array of command arguments.
+ * @param dockerArgs - Array of command arguments.
  * @param options - Execution options.
  * @returns Promise resolving to object containing exit code, stdout, and stderr.
  */
-async function executeDockerCommand(args, options) {
+async function executeDockerCommand(dockerArgs, options) {
     // Format command for logging
-    const fullCommand = `docker ${args.join(' ')}`;
+    const fullCommand = `docker ${dockerArgs.join(' ')}`;
     // Log command execution
     core.info(`Executing: ${fullCommand}`);
     // Record start time
-    const startTime = performance.now();
+    const executionStartTime = performance.now();
     // Note: This function requires controlled mutation for stream collection
     // The mutation is localized to this function and the arrays are treated as immutable elsewhere
-    const outputState = {
+    const commandOutputBuffer = {
         stdout: [],
         stderr: [],
     };
@@ -87129,18 +87129,18 @@ async function executeDockerCommand(args, options) {
         listeners: {
             ...options.listeners,
             stdout: (data) => {
-                const text = data.toString();
+                const outputChunk = data.toString();
                 // Controlled mutation: creating new immutable array each time
-                outputState.stdout = [...outputState.stdout, text];
+                commandOutputBuffer.stdout = [...commandOutputBuffer.stdout, outputChunk];
                 // If the original options had a stdout listener, call it
                 if (options.listeners?.stdout) {
                     options.listeners.stdout(data);
                 }
             },
             stderr: (data) => {
-                const text = data.toString();
+                const outputChunk = data.toString();
                 // Controlled mutation: creating new immutable array each time
-                outputState.stderr = [...outputState.stderr, text];
+                commandOutputBuffer.stderr = [...commandOutputBuffer.stderr, outputChunk];
                 // If the original options had a stderr listener, call it
                 if (options.listeners?.stderr) {
                     options.listeners.stderr(data);
@@ -87150,20 +87150,20 @@ async function executeDockerCommand(args, options) {
     };
     try {
         // Execute the command
-        const exitCode = await exec.exec('docker', [...args], execOptionsWithCapture);
+        const exitCode = await exec.exec('docker', [...dockerArgs], execOptionsWithCapture);
         // Calculate and log execution time
-        const endTime = performance.now();
-        const executionTimeMs = Math.round(endTime - startTime);
+        const executionEndTime = performance.now();
+        const executionTimeMs = Math.round(executionEndTime - executionStartTime);
         core.info(`Command completed in ${executionTimeMs}ms: ${fullCommand}`);
         // Join all chunks to create the complete output strings
-        const stdout = outputState.stdout.join('');
-        const stderr = outputState.stderr.join('');
+        const stdout = commandOutputBuffer.stdout.join('');
+        const stderr = commandOutputBuffer.stderr.join('');
         return { exitCode, stdout, stderr };
     }
     catch (error) {
         // Log execution failure
-        const endTime = performance.now();
-        const executionTimeMs = Math.round(endTime - startTime);
+        const executionEndTime = performance.now();
+        const executionTimeMs = Math.round(executionEndTime - executionStartTime);
         core.error(`Command failed after ${executionTimeMs}ms: ${fullCommand}`);
         throw error;
     }
@@ -87179,12 +87179,12 @@ async function pullImage(imageName, platform) {
     try {
         const execOptions = { ignoreReturnCode: true };
         // Construct args array conditionally including platform flag if specified
-        const dockerCommandArguments = platform ? ['pull', '--platform', platform, imageName] : ['pull', imageName];
+        const pullCommandArgs = platform ? ['pull', '--platform', platform, imageName] : ['pull', imageName];
         if (platform) {
             core.info(`Pulling image ${imageName} for platform ${platform}`);
         }
         // Execute docker pull command
-        const { exitCode, stderr } = await executeDockerCommand(dockerCommandArguments, execOptions);
+        const { exitCode, stderr } = await executeDockerCommand(pullCommandArgs, execOptions);
         if (exitCode !== 0) {
             core.warning(`Failed to pull image ${imageName}${platform ? ` for platform ${platform}` : ''}: ${stderr}`);
             return false;
@@ -87221,8 +87221,8 @@ async function inspectImageRemote(imageName) {
             const manifest = JSON.parse(stdout.trim());
             return manifest;
         }
-        catch (manifestParseError) {
-            core.warning(`Failed to parse manifest JSON for ${imageName}: ${manifestParseError}`);
+        catch (manifestJsonParseError) {
+            core.warning(`Failed to parse manifest JSON for ${imageName}: ${manifestJsonParseError}`);
             return undefined;
         }
     }
@@ -87260,11 +87260,11 @@ async function inspectImageLocal(imageName) {
         }
         try {
             // Parse the JSON output to extract the image information
-            const inspectInfo = JSON.parse(stdout.trim());
-            return inspectInfo;
+            const imageMetadata = JSON.parse(stdout.trim());
+            return imageMetadata;
         }
-        catch (jsonParseError) {
-            core.warning(`Failed to parse inspect JSON for ${imageName}: ${jsonParseError}`);
+        catch (inspectJsonParseError) {
+            core.warning(`Failed to parse inspect JSON for ${imageName}: ${inspectJsonParseError}`);
             return undefined;
         }
     }
@@ -87383,12 +87383,12 @@ const DEFAULT_COMPOSE_FILE_NAMES = [
 /**
  * Returns the list of Docker Compose file paths to process, based on input or defaults.
  *
- * @param composeFilePaths - Array of paths to Docker Compose files to check. If empty, default file names are used.
+ * @param candidateComposeFilePaths - Array of paths to Docker Compose files to check. If empty, default file names are used.
  * @returns Array of existing Docker Compose file paths to process.
  */
-function getComposeFilePathsToProcess(composeFilePaths) {
-    return composeFilePaths.length > 0
-        ? composeFilePaths.filter((filePath) => fs.existsSync(filePath))
+function getComposeFilePathsToProcess(candidateComposeFilePaths) {
+    return candidateComposeFilePaths.length > 0
+        ? candidateComposeFilePaths.filter((filePath) => fs.existsSync(filePath))
         : DEFAULT_COMPOSE_FILE_NAMES.filter((fileName) => fs.existsSync(fileName));
 }
 /**
@@ -87396,32 +87396,32 @@ function getComposeFilePathsToProcess(composeFilePaths) {
  * Removes duplicate services (same image and platform).
  *
  * @param composeFilePaths - Array of paths to Docker Compose files to parse. Each file is read and parsed as YAML.
- * @param excludeImageNames - Array of image names to exclude from results. Services with these image names are filtered out.
+ * @param excludedImageNames - Array of image names to exclude from results. Services with these image names are filtered out.
  * @returns Array of unique ComposeService objects from all valid files (duplicates by image+platform are removed).
  */
-function getComposeServicesFromFiles(composeFilePaths, excludeImageNames) {
-    const excludedImageSet = new Set(excludeImageNames);
+function getComposeServicesFromFiles(composeFilePaths, excludedImageNames) {
+    const excludedImageLookup = new Set(excludedImageNames);
     return (0, lodash_1.chain)(composeFilePaths)
-        .flatMap((composeFilePath) => {
+        .flatMap((currentComposeFile) => {
         try {
-            const fileContent = fs.readFileSync(composeFilePath, 'utf8');
-            const parsedComposeFile = yaml.load(fileContent);
-            if (!parsedComposeFile) {
-                core.debug(`Empty or invalid YAML file: ${composeFilePath}`);
+            const yamlContent = fs.readFileSync(currentComposeFile, 'utf8');
+            const composeDefinition = yaml.load(yamlContent);
+            if (!composeDefinition) {
+                core.debug(`Empty or invalid YAML file: ${currentComposeFile}`);
                 return [];
             }
-            if (!parsedComposeFile.services) {
-                core.debug(`No services section found in ${composeFilePath}`);
+            if (!composeDefinition.services) {
+                core.debug(`No services section found in ${currentComposeFile}`);
                 return [];
             }
-            return Object.values(parsedComposeFile.services);
+            return Object.values(composeDefinition.services);
         }
-        catch (parsingError) {
-            core.warning(`Failed to parse ${composeFilePath}: ${parsingError}`);
+        catch (yamlParsingError) {
+            core.warning(`Failed to parse ${currentComposeFile}: ${yamlParsingError}`);
             return [];
         }
     })
-        .filter((composeService) => composeService.image !== undefined && !excludedImageSet.has(composeService.image))
+        .filter((composeService) => composeService.image !== undefined && !excludedImageLookup.has(composeService.image))
         .uniqBy((composeService) => `${composeService.image}|${composeService.platform ?? ''}`)
         .value();
 }
@@ -87479,39 +87479,39 @@ const docker_command_1 = __nccwpck_require__(44919);
 /**
  * Pulls an image and saves it to cache.
  */
-async function pullAndCacheImage(fullImageName, platformString, serviceCacheKey, manifestCacheKey, imageTarPath, manifestPath, imageDigest, manifest) {
+async function pullAndCacheImage(completeImageName, platformString, imageCacheKey, manifestCacheKey, imageTarPath, manifestPath, imageDigest, manifest) {
     // Pull the image
-    if (!(await (0, docker_command_1.pullImage)(fullImageName, platformString))) {
+    if (!(await (0, docker_command_1.pullImage)(completeImageName, platformString))) {
         return {
             success: false,
-            error: `Failed to pull image: ${fullImageName}`,
+            error: `Failed to pull image: ${completeImageName}`,
         };
     }
     // Verify the digest matches after pull
-    const newManifest = await (0, docker_command_1.inspectImageRemote)(fullImageName);
+    const newManifest = await (0, docker_command_1.inspectImageRemote)(completeImageName);
     const newImageDigest = newManifest?.digest;
     if (newImageDigest !== imageDigest) {
         return {
             success: false,
-            error: `Digest mismatch for ${fullImageName}: expected ${imageDigest}, got ${newImageDigest}`,
+            error: `Digest mismatch for ${completeImageName}: expected ${imageDigest}, got ${newImageDigest}`,
         };
     }
     // Save the image to tar file
-    if (!(await (0, docker_command_1.saveImageToTar)(fullImageName, imageTarPath))) {
+    if (!(await (0, docker_command_1.saveImageToTar)(completeImageName, imageTarPath))) {
         return {
             success: false,
-            error: `Failed to save image to tar: ${fullImageName}`,
+            error: `Failed to save image to tar: ${completeImageName}`,
         };
     }
     // Save manifest to cache
     await (0, cache_1.saveManifestToCache)(manifest, manifestPath, manifestCacheKey);
     // Save image tar to cache
-    const cacheResult = await (0, cache_1.saveToCache)([imageTarPath], serviceCacheKey);
+    const cacheResult = await (0, cache_1.saveToCache)([imageTarPath], imageCacheKey);
     if (cacheResult.success) {
-        core.info(`Cached ${fullImageName} with key ${serviceCacheKey}`);
+        core.info(`Cached ${completeImageName} with key ${imageCacheKey}`);
     }
     // Get image size
-    const inspectInfo = await (0, docker_command_1.inspectImageLocal)(fullImageName);
+    const inspectInfo = await (0, docker_command_1.inspectImageLocal)(completeImageName);
     return {
         success: true,
         imageSize: inspectInfo?.Size,
@@ -87520,30 +87520,30 @@ async function pullAndCacheImage(fullImageName, platformString, serviceCacheKey,
 /**
  * Processes cache hit scenario with optional manifest validation.
  */
-async function processCacheHit(fullImageName, imageTarPath, manifestPath, manifestCacheHitKey, skipLatestCheck, imageDigest, platform) {
+async function processCacheHit(completeImageName, imageTarPath, manifestPath, manifestCacheHitKey, skipLatestCheck, imageDigest, platform) {
     // Load image from cache
     const loadSuccess = await (0, docker_command_1.loadImageFromTar)(imageTarPath);
     if (!loadSuccess) {
         return {
             success: false,
             restoredFromCache: false,
-            imageName: fullImageName,
+            imageName: completeImageName,
             cacheKey: '',
             digest: imageDigest,
             platform,
-            error: `Failed to load image from cache: ${fullImageName}`,
+            error: `Failed to load image from cache: ${completeImageName}`,
         };
     }
     // Get image size after successful load
-    const inspectInfo = await (0, docker_command_1.inspectImageLocal)(fullImageName);
+    const inspectInfo = await (0, docker_command_1.inspectImageLocal)(completeImageName);
     const imageSize = inspectInfo?.Size;
     // If skip latest check is enabled, return immediately
     if (skipLatestCheck) {
-        core.info(`Skipped latest check for ${fullImageName}, using cached version`);
+        core.info(`Skipped latest check for ${completeImageName}, using cached version`);
         return {
             success: true,
             restoredFromCache: true,
-            imageName: fullImageName,
+            imageName: completeImageName,
             cacheKey: '',
             digest: imageDigest,
             platform,
@@ -87552,11 +87552,11 @@ async function processCacheHit(fullImageName, imageTarPath, manifestPath, manife
     }
     // Skip manifest check if no manifest cache hit
     if (!manifestCacheHitKey) {
-        core.debug(`No manifest cache for ${fullImageName}`);
+        core.debug(`No manifest cache for ${completeImageName}`);
         return {
             success: true,
             restoredFromCache: true,
-            imageName: fullImageName,
+            imageName: completeImageName,
             cacheKey: '',
             digest: imageDigest,
             platform,
@@ -87566,15 +87566,15 @@ async function processCacheHit(fullImageName, imageTarPath, manifestPath, manife
     // Perform manifest validation
     const [cachedManifest, remoteManifest] = await Promise.all([
         (0, cache_1.readManifestFromFile)(manifestPath),
-        (0, docker_command_1.inspectImageRemote)(fullImageName),
+        (0, docker_command_1.inspectImageRemote)(completeImageName),
     ]);
     // Skip if manifest can't be loaded or no current manifest
     if (!cachedManifest || !remoteManifest) {
-        core.debug(`Cannot compare manifests for ${fullImageName}: missing data`);
+        core.debug(`Cannot compare manifests for ${completeImageName}: missing data`);
         return {
             success: true,
             restoredFromCache: true,
-            imageName: fullImageName,
+            imageName: completeImageName,
             cacheKey: '',
             digest: imageDigest,
             platform,
@@ -87583,11 +87583,11 @@ async function processCacheHit(fullImageName, imageTarPath, manifestPath, manife
     }
     // If manifests match, return success
     if (cachedManifest.digest === remoteManifest.digest) {
-        core.debug(`Manifest match confirmed for ${fullImageName}`);
+        core.debug(`Manifest match confirmed for ${completeImageName}`);
         return {
             success: true,
             restoredFromCache: true,
-            imageName: fullImageName,
+            imageName: completeImageName,
             cacheKey: '',
             digest: imageDigest,
             platform,
@@ -87595,15 +87595,15 @@ async function processCacheHit(fullImageName, imageTarPath, manifestPath, manife
         };
     }
     // Handle manifest mismatch - pull fresh image
-    core.info(`Manifest mismatch detected for ${fullImageName}, pulling fresh image`);
-    const pullSuccess = await (0, docker_command_1.pullImage)(fullImageName, platform);
+    core.info(`Manifest mismatch detected for ${completeImageName}, pulling fresh image`);
+    const pullSuccess = await (0, docker_command_1.pullImage)(completeImageName, platform);
     if (!pullSuccess) {
-        core.warning(`Failed to pull updated image ${fullImageName}`);
+        core.warning(`Failed to pull updated image ${completeImageName}`);
     }
     return {
         success: true,
         restoredFromCache: true,
-        imageName: fullImageName,
+        imageName: completeImageName,
         cacheKey: '',
         digest: imageDigest,
         platform,
@@ -87615,46 +87615,46 @@ async function processCacheHit(fullImageName, imageTarPath, manifestPath, manife
  * Tries to restore from cache, if cache miss, pulls and caches the image.
  */
 async function processService(serviceDefinition, cacheKeyPrefix, skipLatestCheck) {
-    const fullImageName = serviceDefinition.image;
-    const [baseImageName, imageTag = 'latest'] = fullImageName.split(':');
+    const completeImageName = serviceDefinition.image;
+    const [imageNameWithoutTag, imageTagOrLatest = 'latest'] = completeImageName.split(':');
     // Get image manifest with digest for cache key generation
-    const manifest = await (0, docker_command_1.inspectImageRemote)(fullImageName);
+    const manifest = await (0, docker_command_1.inspectImageRemote)(completeImageName);
     if (!manifest || !manifest.digest) {
-        core.warning(`Could not get digest for ${fullImageName}, skipping cache`);
+        core.warning(`Could not get digest for ${completeImageName}, skipping cache`);
         return {
             success: false,
             restoredFromCache: false,
-            imageName: fullImageName,
+            imageName: completeImageName,
             cacheKey: '',
             digest: undefined,
             platform: serviceDefinition.platform,
-            error: `Could not get digest for ${fullImageName}`,
+            error: `Could not get digest for ${completeImageName}`,
         };
     }
     const imageDigest = manifest.digest;
-    const serviceCacheKey = (0, cache_1.generateCacheKey)(cacheKeyPrefix, baseImageName, imageTag, serviceDefinition.platform);
-    const imageTarPath = (0, cache_1.generateTarPath)(baseImageName, imageTag, serviceDefinition.platform);
-    const manifestCacheKey = (0, cache_1.generateManifestCacheKey)(cacheKeyPrefix, baseImageName, imageTag, serviceDefinition.platform);
-    const manifestPath = (0, cache_1.generateManifestPath)(baseImageName, imageTag, serviceDefinition.platform);
+    const imageCacheKey = (0, cache_1.generateCacheKey)(cacheKeyPrefix, imageNameWithoutTag, imageTagOrLatest, serviceDefinition.platform);
+    const imageTarPath = (0, cache_1.generateTarPath)(imageNameWithoutTag, imageTagOrLatest, serviceDefinition.platform);
+    const manifestCacheKey = (0, cache_1.generateManifestCacheKey)(cacheKeyPrefix, imageNameWithoutTag, imageTagOrLatest, serviceDefinition.platform);
+    const manifestPath = (0, cache_1.generateManifestPath)(imageNameWithoutTag, imageTagOrLatest, serviceDefinition.platform);
     if (serviceDefinition.platform) {
-        core.info(`Using platform ${serviceDefinition.platform} for ${fullImageName}`);
+        core.info(`Using platform ${serviceDefinition.platform} for ${completeImageName}`);
     }
-    core.info(`Cache key for ${fullImageName}: ${serviceCacheKey}`);
+    core.info(`Cache key for ${completeImageName}: ${imageCacheKey}`);
     core.debug(`Cache path: ${imageTarPath}`);
     // Try to restore from cache first
     const [cacheResult, manifestCacheResult] = await Promise.all([
-        (0, cache_1.restoreFromCache)([imageTarPath], serviceCacheKey),
+        (0, cache_1.restoreFromCache)([imageTarPath], imageCacheKey),
         (0, cache_1.restoreFromCache)([manifestPath], manifestCacheKey),
     ]);
     // If no cache hit, proceed to pull the image
     if (!cacheResult.success) {
-        core.info(`Cache miss for ${fullImageName}, pulling and saving`);
-        const pullResult = await pullAndCacheImage(fullImageName, serviceDefinition.platform, serviceCacheKey, manifestCacheKey, imageTarPath, manifestPath, imageDigest, manifest);
+        core.info(`Cache miss for ${completeImageName}, pulling and saving`);
+        const pullResult = await pullAndCacheImage(completeImageName, serviceDefinition.platform, imageCacheKey, manifestCacheKey, imageTarPath, manifestPath, imageDigest, manifest);
         return {
             success: pullResult.success,
             restoredFromCache: false,
-            imageName: fullImageName,
-            cacheKey: serviceCacheKey,
+            imageName: completeImageName,
+            cacheKey: imageCacheKey,
             digest: imageDigest,
             platform: serviceDefinition.platform,
             error: pullResult.error,
@@ -87662,11 +87662,11 @@ async function processService(serviceDefinition, cacheKeyPrefix, skipLatestCheck
         };
     }
     // Process cache hit
-    core.info(`Cache hit for ${fullImageName}, loading from cache`);
-    const result = await processCacheHit(fullImageName, imageTarPath, manifestPath, manifestCacheResult.cacheKey, skipLatestCheck, imageDigest, serviceDefinition.platform);
+    core.info(`Cache hit for ${completeImageName}, loading from cache`);
+    const result = await processCacheHit(completeImageName, imageTarPath, manifestPath, manifestCacheResult.cacheKey, skipLatestCheck, imageDigest, serviceDefinition.platform);
     return {
         ...result,
-        cacheKey: serviceCacheKey,
+        cacheKey: imageCacheKey,
     };
 }
 
@@ -87707,20 +87707,20 @@ function sanitizePathComponent(value) {
 /**
  * Formats a file size in bytes to a human-readable string.
  *
- * @param sizeInBytes - Size in bytes.
+ * @param fileSizeBytes - Size in bytes.
  * @returns Human-readable size string (e.g. "10.5 MB").
  */
-function formatFileSize(sizeInBytes) {
-    if (sizeInBytes === undefined) {
+function formatFileSize(fileSizeBytes) {
+    if (fileSizeBytes === undefined) {
         return 'N/A';
     }
-    if (sizeInBytes === 0) {
+    if (fileSizeBytes === 0) {
         return '0 Bytes';
     }
-    const i = Math.floor(Math.log(sizeInBytes) / Math.log(FILE_SIZE_BASE));
-    const unitIndex = Math.min(i, FILE_SIZE_UNITS.length - 1);
-    const unit = FILE_SIZE_UNITS[unitIndex] || FILE_SIZE_UNITS[0];
-    return `${(sizeInBytes / Math.pow(FILE_SIZE_BASE, unitIndex)).toFixed(2).replace(/\.0+$|(\.[0-9]*[1-9])0+$/, '$1')} ${unit}`;
+    const rawUnitIndex = Math.floor(Math.log(fileSizeBytes) / Math.log(FILE_SIZE_BASE));
+    const safeUnitIndex = Math.min(rawUnitIndex, FILE_SIZE_UNITS.length - 1);
+    const sizeUnit = FILE_SIZE_UNITS[safeUnitIndex] || FILE_SIZE_UNITS[0];
+    return `${(fileSizeBytes / Math.pow(FILE_SIZE_BASE, safeUnitIndex)).toFixed(2).replace(/\.0+$|(\.[0-9]*[1-9])0+$/, '$1')} ${sizeUnit}`;
 }
 
 
@@ -87797,37 +87797,37 @@ function getActionConfig() {
 async function run() {
     const actionStartTime = performance.now();
     try {
-        const config = getActionConfig();
-        const referencedComposeFiles = (0, docker_compose_file_1.getComposeFilePathsToProcess)(config.composeFilePaths);
-        const serviceDefinitions = (0, docker_compose_file_1.getComposeServicesFromFiles)(referencedComposeFiles, config.excludeImageNames);
-        if (serviceDefinitions.length === 0) {
+        const actionConfig = getActionConfig();
+        const discoveredComposeFiles = (0, docker_compose_file_1.getComposeFilePathsToProcess)(actionConfig.composeFilePaths);
+        const targetServices = (0, docker_compose_file_1.getComposeServicesFromFiles)(discoveredComposeFiles, actionConfig.excludeImageNames);
+        if (targetServices.length === 0) {
             core.info('No Docker services found in compose files or all services were excluded');
             (0, action_outputs_1.setActionOutputs)(false, []);
             return;
         }
-        core.info(`Found ${serviceDefinitions.length} services to cache`);
+        core.info(`Found ${targetServices.length} services to cache`);
         // Process all services concurrently
-        const processingResults = await Promise.all(serviceDefinitions.map(async (serviceDefinition) => {
-            const processingStartTime = performance.now();
-            const processingResult = await (0, docker_compose_service_processing_1.processService)(serviceDefinition, config.cacheKeyPrefix, config.skipLatestCheck);
-            const processingEndTime = performance.now();
+        const serviceProcessingResults = await Promise.all(targetServices.map(async (currentService) => {
+            const serviceStartTime = performance.now();
+            const serviceResult = await (0, docker_compose_service_processing_1.processService)(currentService, actionConfig.cacheKeyPrefix, actionConfig.skipLatestCheck);
+            const serviceEndTime = performance.now();
             return {
-                ...processingResult,
-                processingDuration: processingEndTime - processingStartTime,
-                humanReadableDuration: (0, date_utils_1.formatExecutionTime)(processingStartTime, processingEndTime),
+                ...serviceResult,
+                processingDuration: serviceEndTime - serviceStartTime,
+                humanReadableDuration: (0, date_utils_1.formatTimeBetween)(serviceStartTime, serviceEndTime),
             };
         }));
         const actionEndTime = performance.now();
         const executionTimeMs = actionEndTime - actionStartTime;
-        const summary = (0, action_outputs_1.calculateActionSummary)(processingResults, executionTimeMs);
-        const imageListOutput = (0, action_outputs_1.buildProcessedImageList)(processingResults);
+        const summary = (0, action_outputs_1.calculateActionSummary)(serviceProcessingResults, executionTimeMs);
+        const imageListOutput = (0, action_outputs_1.buildProcessedImageList)(serviceProcessingResults);
         (0, action_outputs_1.setActionOutputs)(summary.allServicesFromCache, imageListOutput);
-        (0, action_outputs_1.createActionSummary)(processingResults, summary, referencedComposeFiles, config.skipLatestCheck);
+        (0, action_outputs_1.createActionSummary)(serviceProcessingResults, summary, discoveredComposeFiles, actionConfig.skipLatestCheck);
         (0, action_outputs_1.logActionCompletion)(summary);
     }
-    catch (actionError) {
-        if (actionError instanceof Error) {
-            core.setFailed(actionError.message);
+    catch (executionError) {
+        if (executionError instanceof Error) {
+            core.setFailed(executionError.message);
         }
         else {
             core.setFailed('Unknown error occurred');

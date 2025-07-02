@@ -51,38 +51,38 @@ export type TimedServiceResult = {
  * Sets the standard output values for the action.
  * Ensures consistent output formats and proper type handling for GitHub Actions outputs.
  *
- * @param cacheHit - Whether all services were restored from cache
- * @param imageList - Complete list of processed services with metadata
+ * @param allServicesFromCache - Whether all services were restored from cache
+ * @param processedImageList - Complete list of processed services with metadata
  */
-export declare function setActionOutputs(cacheHit: boolean, imageList: ProcessedImageList): void;
+export declare function setActionOutputs(allServicesFromCache: boolean, processedImageList: ProcessedImageList): void;
 /**
  * Builds a processed image list from service results.
  * Transforms internal processing results into the format expected by GitHub Actions.
  *
- * @param results - Array of service processing results with timing information
+ * @param serviceResults - Array of service processing results with timing information
  * @returns Formatted image list suitable for action output
  */
-export declare function buildProcessedImageList(results: readonly TimedServiceResult[]): ProcessedImageList;
+export declare function buildProcessedImageList(serviceResults: readonly TimedServiceResult[]): ProcessedImageList;
 /**
  * Calculates action summary metrics from processing results.
  * Aggregates statistics across all processed services.
  *
- * @param results - Array of service processing results
+ * @param serviceResults - Array of service processing results
  * @param executionTimeMs - Total action execution time in milliseconds
  * @returns Summary statistics for the action run
  */
-export declare function calculateActionSummary(results: readonly TimedServiceResult[], executionTimeMs: number): ActionSummary;
+export declare function calculateActionSummary(serviceResults: readonly TimedServiceResult[], executionTimeMs: number): ActionSummary;
 /**
  * Creates GitHub Actions summary table from processing results.
  * Generates a detailed markdown table showing service processing results,
  * action summary, and referenced Compose files.
  *
- * @param results - Array of service processing results with timing
+ * @param serviceResults - Array of service processing results with timing
  * @param summary - Aggregated action summary statistics
  * @param referencedComposeFiles - List of Docker Compose files that were processed
  * @param skipLatestCheck - Whether latest version checking was disabled
  */
-export declare function createActionSummary(results: readonly TimedServiceResult[], summary: ActionSummary, referencedComposeFiles: ReadonlyArray<string>, skipLatestCheck: boolean): void;
+export declare function createActionSummary(serviceResults: readonly TimedServiceResult[], summary: ActionSummary, referencedComposeFiles: ReadonlyArray<string>, skipLatestCheck: boolean): void;
 /**
  * Logs action completion information.
  * Outputs final status messages including cache statistics and execution time.

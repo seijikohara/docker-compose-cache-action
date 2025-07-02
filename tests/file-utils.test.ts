@@ -59,6 +59,26 @@ describe('file-utils', () => {
       const extremelyLarge = 1024 * 1024 * 1024 * 1024 * 1024 * 1024; // 1 exabyte
       expect(formatFileSize(extremelyLarge)).toBe('1024 PB');
     });
+
+    it('should handle edge case where size exceeds all predefined units', () => {
+      // Test case that would cause unitIndex to exceed FILE_SIZE_UNITS length
+      const enormousSize = Math.pow(1024, 10); // Extremely large size
+      const result = formatFileSize(enormousSize);
+      expect(result).toContain('PB'); // Should fall back to the last unit (PB)
+    });
+
+    it('should handle edge case with Math.log calculation boundaries', () => {
+      // Test edge case where Math.floor(Math.log(size) / Math.log(1024)) might be at boundary
+      const boundarySize = Math.pow(1024, 5); // Exactly 1 PB
+      const result = formatFileSize(boundarySize);
+      expect(result).toBe('1 PB');
+    });
+
+    it('should handle fractional bytes edge case', () => {
+      // Test fractional bytes (should round appropriately)
+      expect(formatFileSize(1.7)).toBe('1.7 Bytes');
+      expect(formatFileSize(100.1)).toBe('100.1 Bytes');
+    });
   });
 
   describe('sanitizePathComponent', () => {
