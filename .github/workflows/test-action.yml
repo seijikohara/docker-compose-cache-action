@@ -62,7 +62,7 @@ jobs:
       test-result: ${{ steps.validate.outputs.result }}
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Run Cache Action
         id: docker-cache
@@ -137,7 +137,7 @@ jobs:
       test-result: ${{ steps.validate.outputs.result }}
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Run Cache Action
         id: docker-cache
@@ -212,7 +212,7 @@ jobs:
       test-result: ${{ steps.validate.outputs.result }}
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Run Cache Action with Skip Latest Check True
         id: docker-cache
