@@ -36,9 +36,9 @@ jobs:
         run: |
           # Wait for CI checks to pass (30 minute timeout)
           gh pr checks ${{ github.event.pull_request.number }} --watch --interval=30 --timeout=1800
-          
+
           # Approve the PR first
           gh pr review ${{ github.event.pull_request.number }} --approve
-          
+
           # Enable auto-merge with squash strategy
           gh pr merge ${{ github.event.pull_request.number }} --auto --squash --delete-branch
