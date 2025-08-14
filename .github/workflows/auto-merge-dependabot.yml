@@ -30,8 +30,15 @@ jobs:
         with:
           token: ${{ steps.app-token.outputs.token }}
 
-      - name: Merge Dependabot PR
+      - name: Auto-merge Dependabot PR
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          gh pr comment ${{ github.event.pull_request.number }} --body "@dependabot merge"
+          # Wait for CI checks to pass
+          gh pr checks ${{ github.event.pull_request.number }} --watch
+          
+          # Approve the PR first
+          gh pr review ${{ github.event.pull_request.number }} --approve
+          
+          # Enable auto-merge with squash strategy
+          gh pr merge ${{ github.event.pull_request.number }} --auto --squash --delete-branch
