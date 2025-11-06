@@ -32,7 +32,9 @@
     "fix": "npm run format && npm run lint:fix",
     "test": "jest",
     "test:watch": "jest --watch",
-    "prepare": "husky"
+    "prepare": "husky",
+    "deps:update": "npx npm-check-updates -u && npm install",
+    "deps:check": "npx npm-check-updates"
   },
   "dependencies": {
     "@actions/cache": "^4.1.0",
@@ -43,15 +45,15 @@
     "lodash": "^4.17.21"
   },
   "devDependencies": {
-    "@eslint/js": "^9.38.0",
+    "@eslint/js": "^9.39.1",
     "@types/jest": "^30.0.0",
     "@types/js-yaml": "^4.0.9",
     "@types/lodash": "^4.17.20",
     "@types/node": "^24.10.0",
     "@typescript-eslint/eslint-plugin": "^8.46.3",
-    "@typescript-eslint/parser": "^8.46.2",
+    "@typescript-eslint/parser": "^8.46.3",
     "@vercel/ncc": "^0.38.4",
-    "eslint": "^9.39.0",
+    "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
     "eslint-plugin-security": "^3.0.1",
