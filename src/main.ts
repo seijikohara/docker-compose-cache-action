@@ -29,8 +29,35 @@ type ActionConfig = {
   readonly composeFilePaths: ReadonlyArray<string>;
   readonly excludeImageNames: ReadonlyArray<string>;
   readonly cacheKeyPrefix: string;
-  readonly skipLatestCheck: boolean;
+  readonly skipDigestVerification: boolean;
 };
+
+/**
+ * Gets the skip digest verification setting from action inputs.
+ * Handles both the new 'skip-digest-verification' and deprecated 'skip-latest-check' inputs.
+ * If the deprecated input is used, a warning is logged.
+ *
+ * @returns boolean indicating whether to skip digest verification
+ */
+function getSkipDigestVerification(): boolean {
+  // Check new input first
+  const skipDigestVerificationInput = core.getInput('skip-digest-verification');
+  if (skipDigestVerificationInput !== '') {
+    return core.getBooleanInput('skip-digest-verification');
+  }
+
+  // Fall back to deprecated input
+  const skipLatestCheckInput = core.getInput('skip-latest-check');
+  if (skipLatestCheckInput !== '' && skipLatestCheckInput !== 'false') {
+    core.warning(
+      "The 'skip-latest-check' input is deprecated and will be removed in a future major version. " +
+        "Please use 'skip-digest-verification' instead."
+    );
+    return core.getBooleanInput('skip-latest-check');
+  }
+
+  return false;
+}
 
 /**
  * Gets action configuration from GitHub Actions environment.
@@ -40,7 +67,7 @@ function getActionConfig(): ActionConfig {
     composeFilePaths: core.getMultilineInput('compose-files'),
     excludeImageNames: core.getMultilineInput('exclude-images'),
     cacheKeyPrefix: core.getInput('cache-key-prefix') || DEFAULT_CACHE_KEY_PREFIX,
-    skipLatestCheck: core.getBooleanInput('skip-latest-check'),
+    skipDigestVerification: getSkipDigestVerification(),
   };
 }
 
@@ -72,7 +99,7 @@ export async function run(): Promise<void> {
         const serviceResult = await processService(
           currentService,
           actionConfig.cacheKeyPrefix,
-          actionConfig.skipLatestCheck
+          actionConfig.skipDigestVerification
         );
         const serviceEndTime = performance.now();
 
@@ -91,7 +118,7 @@ export async function run(): Promise<void> {
     const imageListOutput = buildProcessedImageList(serviceProcessingResults);
 
     setActionOutputs(summary.allServicesFromCache, imageListOutput);
-    createActionSummary(serviceProcessingResults, summary, discoveredComposeFiles, actionConfig.skipLatestCheck);
+    createActionSummary(serviceProcessingResults, summary, discoveredComposeFiles, actionConfig.skipDigestVerification);
     logActionCompletion(summary);
   } catch (executionError) {
     if (executionError instanceof Error) {

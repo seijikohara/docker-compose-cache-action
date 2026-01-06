@@ -142,6 +142,8 @@ describe('main', () => {
 
       mockCoreGetBooleanInput.mockImplementation((inputName) => {
         switch (inputName) {
+          case 'skip-digest-verification':
+            return false;
           case 'skip-latest-check':
             return false;
           default:
@@ -382,7 +384,7 @@ describe('main', () => {
       expect(mockCoreSetOutput).toHaveBeenCalledWith('cache-hit', 'true');
     });
 
-    describe('skip-latest-check option', () => {
+    describe('skip-digest-verification option', () => {
       beforeEach(() => {
         // Setup single service for cleaner test
         const singleServiceDefinition = [{ image: 'nginx:latest' }];
@@ -394,14 +396,24 @@ describe('main', () => {
         });
       });
 
-      it('should skip registry checks when skip-latest-check is true', async () => {
+      it('should skip registry checks when skip-digest-verification is true', async () => {
         // Mock cache hit
         mockCacheRestore.mockResolvedValue('cache-key');
 
-        // Enable skip-latest-check
+        // Enable skip-digest-verification
+        mockCoreGetInput.mockImplementation((inputName) => {
+          switch (inputName) {
+            case 'cache-key-prefix':
+              return 'test-cache';
+            case 'skip-digest-verification':
+              return 'true';
+            default:
+              return '';
+          }
+        });
         mockCoreGetBooleanInput.mockImplementation((inputName) => {
           switch (inputName) {
-            case 'skip-latest-check':
+            case 'skip-digest-verification':
               return true;
             default:
               return false;
@@ -421,13 +433,27 @@ describe('main', () => {
         expect(mockCoreInfo).toHaveBeenCalledWith(expect.stringContaining('Skipped latest check for nginx:latest'));
       });
 
-      it('should perform registry checks when skip-latest-check is false (default)', async () => {
+      it('should perform registry checks when skip-digest-verification is false (default)', async () => {
         // Mock cache hit
         mockCacheRestore.mockResolvedValue('cache-key');
 
-        // Disable skip-latest-check (default behavior)
+        // Disable skip-digest-verification (default behavior)
+        mockCoreGetInput.mockImplementation((inputName) => {
+          switch (inputName) {
+            case 'cache-key-prefix':
+              return 'test-cache';
+            case 'skip-digest-verification':
+              return '';
+            case 'skip-latest-check':
+              return '';
+            default:
+              return '';
+          }
+        });
         mockCoreGetBooleanInput.mockImplementation((inputName) => {
           switch (inputName) {
+            case 'skip-digest-verification':
+              return false;
             case 'skip-latest-check':
               return false;
             default:
@@ -437,7 +463,7 @@ describe('main', () => {
 
         await run();
 
-        // Verify that inspectImageRemote was called twice when skip-latest-check is false
+        // Verify that inspectImageRemote was called twice when skip-digest-verification is false
         // (once for cache key generation, once for digest comparison)
         expect(dockerCommandMock.inspectImageRemote).toHaveBeenCalledTimes(2);
         expect(dockerCommandMock.inspectImageRemote).toHaveBeenCalledWith('nginx:latest');
@@ -446,7 +472,7 @@ describe('main', () => {
         expect(dockerCommandMock.loadImageFromTar).toHaveBeenCalled();
       });
 
-      it('should handle digest mismatch when skip-latest-check is false', async () => {
+      it('should handle digest mismatch when skip-digest-verification is false', async () => {
         // Mock cache hit for both image and manifest
         mockCacheRestore.mockResolvedValue('cache-key');
 
@@ -455,9 +481,23 @@ describe('main', () => {
           .mockResolvedValueOnce({ digest: 'sha256:digest' }) // Initial digest for processService
           .mockResolvedValueOnce({ digest: 'sha256:different-digest' }); // Different digest in cache hit check
 
-        // Disable skip-latest-check
+        // Disable skip-digest-verification
+        mockCoreGetInput.mockImplementation((inputName) => {
+          switch (inputName) {
+            case 'cache-key-prefix':
+              return 'test-cache';
+            case 'skip-digest-verification':
+              return '';
+            case 'skip-latest-check':
+              return '';
+            default:
+              return '';
+          }
+        });
         mockCoreGetBooleanInput.mockImplementation((inputName) => {
           switch (inputName) {
+            case 'skip-digest-verification':
+              return false;
             case 'skip-latest-check':
               return false;
             default:
@@ -479,14 +519,24 @@ describe('main', () => {
         );
       });
 
-      it('should use cached image without registry call when skip-latest-check is true and cache hit', async () => {
+      it('should use cached image without registry call when skip-digest-verification is true and cache hit', async () => {
         // Mock cache hit
         mockCacheRestore.mockResolvedValue('cache-key');
 
-        // Enable skip-latest-check
+        // Enable skip-digest-verification
+        mockCoreGetInput.mockImplementation((inputName) => {
+          switch (inputName) {
+            case 'cache-key-prefix':
+              return 'test-cache';
+            case 'skip-digest-verification':
+              return 'true';
+            default:
+              return '';
+          }
+        });
         mockCoreGetBooleanInput.mockImplementation((inputName) => {
           switch (inputName) {
-            case 'skip-latest-check':
+            case 'skip-digest-verification':
               return true;
             default:
               return false;
@@ -510,14 +560,24 @@ describe('main', () => {
         expect(imageList[0].status).toBe('Cached');
       });
 
-      it('should still pull images on cache miss regardless of skip-latest-check setting', async () => {
+      it('should still pull images on cache miss regardless of skip-digest-verification setting', async () => {
         // Mock cache miss
         mockCacheRestore.mockResolvedValue(undefined);
 
-        // Enable skip-latest-check
+        // Enable skip-digest-verification
+        mockCoreGetInput.mockImplementation((inputName) => {
+          switch (inputName) {
+            case 'cache-key-prefix':
+              return 'test-cache';
+            case 'skip-digest-verification':
+              return 'true';
+            default:
+              return '';
+          }
+        });
         mockCoreGetBooleanInput.mockImplementation((inputName) => {
           switch (inputName) {
-            case 'skip-latest-check':
+            case 'skip-digest-verification':
               return true;
             default:
               return false;
@@ -534,6 +594,99 @@ describe('main', () => {
 
         // Verify that image was saved to cache
         expect(dockerCommandMock.saveImageToTar).toHaveBeenCalled();
+      });
+    });
+
+    describe('deprecated skip-latest-check option', () => {
+      beforeEach(() => {
+        // Setup single service for cleaner test
+        const singleServiceDefinition = [{ image: 'nginx:latest' }];
+        (dockerComposeFile.getComposeServicesFromFiles as jest.Mock).mockImplementation((files, _excludes) => {
+          if (Array.isArray(files) && files.length > 0) {
+            return singleServiceDefinition;
+          }
+          return [];
+        });
+      });
+
+      it('should show deprecation warning when skip-latest-check is used', async () => {
+        // Mock cache hit
+        mockCacheRestore.mockResolvedValue('cache-key');
+
+        // Use deprecated skip-latest-check option
+        mockCoreGetInput.mockImplementation((inputName) => {
+          switch (inputName) {
+            case 'cache-key-prefix':
+              return 'test-cache';
+            case 'skip-digest-verification':
+              return '';
+            case 'skip-latest-check':
+              return 'true';
+            default:
+              return '';
+          }
+        });
+        mockCoreGetBooleanInput.mockImplementation((inputName) => {
+          switch (inputName) {
+            case 'skip-digest-verification':
+              return false;
+            case 'skip-latest-check':
+              return true;
+            default:
+              return false;
+          }
+        });
+
+        await run();
+
+        // Verify deprecation warning was shown
+        expect(mockCoreWarning).toHaveBeenCalledWith(
+          expect.stringContaining("'skip-latest-check' input is deprecated")
+        );
+
+        // Verify that the functionality still works (skips digest verification)
+        expect(dockerCommandMock.inspectImageRemote).toHaveBeenCalledTimes(1);
+        expect(mockCoreInfo).toHaveBeenCalledWith(expect.stringContaining('Skipped latest check for nginx:latest'));
+      });
+
+      it('should prefer skip-digest-verification over deprecated skip-latest-check', async () => {
+        // Mock cache hit
+        mockCacheRestore.mockResolvedValue('cache-key');
+
+        // Set both options - skip-digest-verification should take precedence
+        mockCoreGetInput.mockImplementation((inputName) => {
+          switch (inputName) {
+            case 'cache-key-prefix':
+              return 'test-cache';
+            case 'skip-digest-verification':
+              return 'false';
+            case 'skip-latest-check':
+              return 'true';
+            default:
+              return '';
+          }
+        });
+        mockCoreGetBooleanInput.mockImplementation((inputName) => {
+          switch (inputName) {
+            case 'skip-digest-verification':
+              return false;
+            case 'skip-latest-check':
+              return true;
+            default:
+              return false;
+          }
+        });
+
+        await run();
+
+        // Verify that skip-digest-verification: false takes precedence
+        // (inspectImageRemote called twice for digest comparison)
+        expect(dockerCommandMock.inspectImageRemote).toHaveBeenCalledTimes(2);
+
+        // Verify no deprecation warning since skip-digest-verification was explicitly set
+        expect(mockCoreWarning).not.toHaveBeenCalledWith(
+          expect.stringContaining("'skip-latest-check' input is deprecated")
+        );
       });
     });
   });

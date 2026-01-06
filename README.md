@@ -104,8 +104,8 @@ jobs:
             my-internal-tool:latest
           # Optional: Change the cache key prefix
           cache-key-prefix: my-project-docker-images
-          # Optional: Skip checking for latest image versions from registry
-          skip-latest-check: false
+          # Optional: Skip digest verification against the registry
+          skip-digest-verification: false
 
       - name: Display Cache Info
         run: |
@@ -175,20 +175,20 @@ This design ensures that:
 | `variant`      | Architecture variant (if applicable)        | `v7`, `v8`, `none`              |
 | `digestPrefix` | First 12 characters of image digest         | `a1b2c3d4e5f6`                  |
 
-## Skip Latest Check Feature
+## Skip Digest Verification Feature
 
-By default, this action performs digest verification to ensure cached images are up-to-date with the registry. However, you can disable this behavior using the `skip-latest-check` option:
+By default, this action performs digest verification to ensure cached images are up-to-date with the registry. However, you can disable this behavior using the `skip-digest-verification` option:
 
 ```yaml
-- name: Cache Docker Compose Images (Skip Latest Check)
+- name: Cache Docker Compose Images (Skip Digest Verification)
   uses: seijikohara/docker-compose-cache-action@v1
   with:
-    skip-latest-check: true
+    skip-digest-verification: true
 ```
 
-### When to Use Skip Latest Check
+### When to Use Skip Digest Verification
 
-**Enable `skip-latest-check: true` when:**
+**Enable `skip-digest-verification: true` when:**
 
 - You want faster workflow execution by avoiding registry calls
 - Working with specific image versions that don't change (e.g., `mysql:8.0.32` instead of `mysql:8.0`)
@@ -196,7 +196,7 @@ By default, this action performs digest verification to ensure cached images are
 - You need consistent image versions across workflow runs
 - Working in air-gapped environments
 
-**Keep `skip-latest-check: false` (default) when:**
+**Keep `skip-digest-verification: false` (default) when:**
 
 - You use floating tags like `latest`, `stable`, or `main`
 - You want to ensure you have the most recent security updates
@@ -205,21 +205,24 @@ By default, this action performs digest verification to ensure cached images are
 
 ### Behavior Differences
 
-| Setting                              | Behavior                                                                                                     |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
-| `skip-latest-check: false` (default) | Compares cached image digest with registry. Pulls fresh image if digests don't match.                        |
-| `skip-latest-check: true`            | Uses cached images directly without registry verification. Significantly faster but may use outdated images. |
+| Setting                                     | Behavior                                                                                                     |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `skip-digest-verification: false` (default) | Compares cached image digest with registry. Pulls fresh image if digests don't match.                        |
+| `skip-digest-verification: true`            | Uses cached images directly without registry verification. Significantly faster but may use outdated images. |
+
+> **Note:** The `skip-latest-check` input is deprecated and will be removed in a future major version. Please use `skip-digest-verification` instead.
 
 ## Configuration
 
 ### Inputs
 
-| Input               | Description                                                                                                                                                      | Required | Default                                                                             |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------- |
-| `compose-files`     | Path(s) to Docker Compose file(s). Provide multiple files as multiline string with pipe character.                                                               | `false`  | Searches `compose.yaml`, `compose.yml`, `docker-compose.yaml`, `docker-compose.yml` |
-| `exclude-images`    | Images to exclude from caching. Provide multiple images as multiline string with pipe character.                                                                 | `false`  | (empty list)                                                                        |
-| `cache-key-prefix`  | Prefix for the generated cache key for each image. Change to invalidate existing caches.                                                                         | `false`  | `docker-compose-image`                                                              |
-| `skip-latest-check` | Skip checking the latest version of Docker images from the registry. When enabled, cached images will be used without verifying if newer versions are available. | `false`  | `false`                                                                             |
+| Input                      | Description                                                                                                                                          | Required | Default                                                                             |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------- |
+| `compose-files`            | Path(s) to Docker Compose file(s). Provide multiple files as multiline string with pipe character.                                                   | `false`  | Searches `compose.yaml`, `compose.yml`, `docker-compose.yaml`, `docker-compose.yml` |
+| `exclude-images`           | Images to exclude from caching. Provide multiple images as multiline string with pipe character.                                                     | `false`  | (empty list)                                                                        |
+| `cache-key-prefix`         | Prefix for the generated cache key for each image. Change to invalidate existing caches.                                                             | `false`  | `docker-compose-image`                                                              |
+| `skip-digest-verification` | Skip verifying image digests against the remote registry. When enabled, cached images will be used without checking if newer versions are available. | `false`  | `false`                                                                             |
+| `skip-latest-check`        | **[DEPRECATED]** Use `skip-digest-verification` instead. This option will be removed in a future major version.                                      | `false`  | `false`                                                                             |
 
 ### Outputs
 

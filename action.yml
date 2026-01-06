@@ -26,10 +26,15 @@ inputs:
     description: 'Prefix for the generated cache key.'
     required: false
     default: 'docker-compose-image'
-  skip-latest-check:
-    description: 'Skip checking the latest version of Docker images from the registry. When enabled, cached images will be used without verifying if newer versions are available.'
+  skip-digest-verification:
+    description: 'Skip verifying image digests against the remote registry. When enabled, cached images will be used without checking if newer versions are available. This speeds up execution but may result in using outdated images.'
     required: false
     default: 'false'
+  skip-latest-check:
+    description: '[DEPRECATED] Use skip-digest-verification instead. This option will be removed in a future major version.'
+    required: false
+    default: 'false'
+    deprecationMessage: 'skip-latest-check is deprecated. Use skip-digest-verification instead.'
 outputs:
   cache-hit:
     description: "Boolean value ('true' or 'false') indicating if *all* required images were restored from cache (and digests matched). Example: 'true'"
