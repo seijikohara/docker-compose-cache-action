@@ -20,19 +20,29 @@ export type CacheOperationResult = {
  */
 export declare function getTempDirectory(): string;
 /**
- * Generates a unique cache key for a Docker image.
- * The key is based on image name, tag, and platform information.
+ * Extracts a short prefix from a Docker image digest for use in cache keys.
+ * Removes the 'sha256:' prefix if present and takes the first N characters.
  *
- * Combines the provided prefix with sanitized image name, tag, and platform
- * components to create a unique, filesystem-safe cache key.
+ * @param digest - Full digest string (e.g., 'sha256:abc123...')
+ * @returns Short digest prefix for cache key, or 'none' if digest is unavailable
+ */
+export declare function extractDigestPrefix(digest: string | undefined): string;
+/**
+ * Generates a unique cache key for a Docker image.
+ * The key is based on image name, tag, platform information, and digest.
+ *
+ * Including the digest in the cache key ensures that when an image is updated
+ * in the registry (even with the same tag like 'latest'), a new cache entry
+ * will be created, preventing stale cache issues.
  *
  * @param cacheKeyPrefix - Prefix for the cache key (from action input)
  * @param imageName - Docker image name (e.g., 'nginx')
  * @param imageTag - Docker image tag (e.g., 'latest')
  * @param targetPlatformString - Optional platform string (e.g., 'linux/amd64')
+ * @param digest - Optional image digest for cache key uniqueness (e.g., 'sha256:abc123...')
  * @returns Unique cache key string
  */
-export declare function generateCacheKey(cacheKeyPrefix: string, imageName: string, imageTag: string, targetPlatformString: string | undefined): string;
+export declare function generateCacheKey(cacheKeyPrefix: string, imageName: string, imageTag: string, targetPlatformString: string | undefined, digest: string | undefined): string;
 /**
  * Generates a manifest cache key for a Docker image.
  * Appends a manifest suffix to the standard cache key.
@@ -41,27 +51,30 @@ export declare function generateCacheKey(cacheKeyPrefix: string, imageName: stri
  * @param imageName - Docker image name
  * @param imageTag - Docker image tag
  * @param targetPlatformString - Optional platform string
+ * @param digest - Optional image digest for cache key uniqueness
  * @returns Manifest-specific cache key string
  */
-export declare function generateManifestCacheKey(cacheKeyPrefix: string, imageName: string, imageTag: string, targetPlatformString: string | undefined): string;
+export declare function generateManifestCacheKey(cacheKeyPrefix: string, imageName: string, imageTag: string, targetPlatformString: string | undefined, digest: string | undefined): string;
 /**
  * Generates the filesystem path for storing a Docker image tar file.
  *
  * @param imageName - Docker image name
  * @param imageTag - Docker image tag
  * @param targetPlatformString - Optional platform string
+ * @param digest - Optional image digest for path uniqueness
  * @returns Full filesystem path for the tar file
  */
-export declare function generateTarPath(imageName: string, imageTag: string, targetPlatformString: string | undefined): string;
+export declare function generateTarPath(imageName: string, imageTag: string, targetPlatformString: string | undefined, digest: string | undefined): string;
 /**
  * Generates the filesystem path for storing a Docker image manifest file.
  *
  * @param imageName - Docker image name
  * @param imageTag - Docker image tag
  * @param targetPlatformString - Optional platform string
+ * @param digest - Optional image digest for path uniqueness
  * @returns Full filesystem path for the manifest file
  */
-export declare function generateManifestPath(imageName: string, imageTag: string, targetPlatformString: string | undefined): string;
+export declare function generateManifestPath(imageName: string, imageTag: string, targetPlatformString: string | undefined, digest: string | undefined): string;
 /**
  * Writes a Docker manifest to a JSON file.
  *

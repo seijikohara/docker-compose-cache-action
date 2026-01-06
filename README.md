@@ -143,6 +143,38 @@ jobs:
 
 This action also handles platform-specific images automatically. When a platform is specified in the Docker Compose service definition (e.g., `platform: linux/arm64`), it is respected during pulling and caching. For services without an explicit platform, the action uses the runner's architecture.
 
+## Cache Key Structure
+
+Cache keys include the image digest to ensure that updated images create new cache entries. The cache key format is:
+
+```
+{prefix}-{imageName}-{tag}-{os}-{arch}-{variant}-{digestPrefix}
+```
+
+For example:
+
+```
+docker-compose-image-nginx-latest-linux-amd64-none-a1b2c3d4e5f6
+```
+
+This design ensures that:
+
+- **Floating tags are handled correctly**: When an image with a tag like `latest` is updated in the registry, a new cache entry is created with the new digest
+- **No stale cache issues**: Each unique image version gets its own cache entry
+- **Automatic cache rotation**: Old cache entries are naturally evicted by GitHub Actions' cache policies (unused entries expire after 7 days)
+
+### Cache Key Components
+
+| Component      | Description                                 | Example                         |
+| -------------- | ------------------------------------------- | ------------------------------- |
+| `prefix`       | Custom prefix from `cache-key-prefix` input | `docker-compose-image`          |
+| `imageName`    | Docker image name (sanitized)               | `nginx`, `myregistry-com-myapp` |
+| `tag`          | Image tag                                   | `latest`, `v1.0.0`              |
+| `os`           | Operating system                            | `linux`, `windows`              |
+| `arch`         | Architecture                                | `amd64`, `arm64`                |
+| `variant`      | Architecture variant (if applicable)        | `v7`, `v8`, `none`              |
+| `digestPrefix` | First 12 characters of image digest         | `a1b2c3d4e5f6`                  |
+
 ## Skip Latest Check Feature
 
 By default, this action performs digest verification to ensure cached images are up-to-date with the registry. However, you can disable this behavior using the `skip-latest-check` option:
@@ -205,27 +237,27 @@ By default, this action performs digest verification to ensure cached images are
     "platform": "linux/amd64",
     "status": "Cached",
     "size": 524288000,
-    "digest": "sha256:abc123...",
+    "digest": "sha256:abc123def456...",
     "processingTimeMs": 1200.5,
-    "cacheKey": "docker-compose-image-mysql-8.0-linux-amd64-none"
+    "cacheKey": "docker-compose-image-mysql-8.0-linux-amd64-none-abc123def456"
   },
   {
     "name": "redis:alpine",
     "platform": "linux/amd64",
     "status": "Pulled",
     "size": 32768000,
-    "digest": "sha256:def456...",
+    "digest": "sha256:def456789abc...",
     "processingTimeMs": 3500.2,
-    "cacheKey": "docker-compose-image-redis-alpine-linux-amd64-none"
+    "cacheKey": "docker-compose-image-redis-alpine-linux-amd64-none-def456789abc"
   },
   {
     "name": "node:18",
     "platform": "linux/amd64",
     "status": "Cached",
     "size": 128456789,
-    "digest": "sha256:789abc...",
+    "digest": "sha256:789abcdef012...",
     "processingTimeMs": 950.8,
-    "cacheKey": "docker-compose-image-node-18-linux-amd64-none"
+    "cacheKey": "docker-compose-image-node-18-linux-amd64-none-789abcdef012"
   }
 ]
 ```
@@ -271,6 +303,14 @@ This action fully supports platform-specific Docker images, which is particularl
 - Works optimally with public Docker images
 - Private registries require authentication configured before invoking the action
 - Images built in the workflow (not pulled from a registry) won't have registry digests to verify against
+
+### GitHub Actions Cache Considerations
+
+1. **Cache Size Limit**: GitHub Actions provides up to 10 GB of cache storage per repository. Large Docker images may consume significant space.
+
+2. **Cache Eviction**: Cache entries not accessed for 7 days are automatically deleted. Older entries are evicted first when approaching the storage limit.
+
+3. **Cross-Platform Caching**: When caching ARM images on x86 runners (or vice versa), the images are cached correctly but cannot run without QEMU emulation. Use [docker/setup-qemu-action](https://github.com/docker/setup-qemu-action) if you need to run cross-platform containers.
 
 ## Contributing
 

@@ -261,16 +261,23 @@ export async function processService(
     cacheKeyPrefix,
     imageNameWithoutTag,
     imageTagOrLatest,
-    serviceDefinition.platform
+    serviceDefinition.platform,
+    imageDigest
   );
-  const imageTarPath = generateTarPath(imageNameWithoutTag, imageTagOrLatest, serviceDefinition.platform);
+  const imageTarPath = generateTarPath(imageNameWithoutTag, imageTagOrLatest, serviceDefinition.platform, imageDigest);
   const manifestCacheKey = generateManifestCacheKey(
     cacheKeyPrefix,
     imageNameWithoutTag,
     imageTagOrLatest,
-    serviceDefinition.platform
+    serviceDefinition.platform,
+    imageDigest
   );
-  const manifestPath = generateManifestPath(imageNameWithoutTag, imageTagOrLatest, serviceDefinition.platform);
+  const manifestPath = generateManifestPath(
+    imageNameWithoutTag,
+    imageTagOrLatest,
+    serviceDefinition.platform,
+    imageDigest
+  );
 
   if (serviceDefinition.platform) {
     core.info(`Using platform ${serviceDefinition.platform} for ${completeImageName}`);

@@ -3,6 +3,7 @@ import * as cache from '@actions/cache';
 import * as core from '@actions/core';
 
 import {
+  extractDigestPrefix,
   generateCacheKey,
   generateManifestCacheKey,
   generateManifestPath,
@@ -75,41 +76,88 @@ describe('cache', () => {
     });
   });
 
-  describe('generateCacheKey', () => {
-    it('should generate cache key with all components', () => {
-      const result = generateCacheKey('test-prefix', 'nginx', 'latest', 'linux/amd64');
-      expect(result).toBe('test-prefix-nginx-latest-linux-amd64-none');
+  describe('extractDigestPrefix', () => {
+    it('should extract first 12 characters from digest', () => {
+      const result = extractDigestPrefix('sha256:abc123def456789');
+      expect(result).toBe('abc123def456');
     });
 
-    it('should generate cache key without platform', () => {
-      const result = generateCacheKey('test-prefix', 'nginx', 'latest', undefined);
-      expect(result).toBe('test-prefix-nginx-latest-linux-amd64-none');
+    it('should handle digest without algorithm prefix', () => {
+      const result = extractDigestPrefix('abc123def456789');
+      expect(result).toBe('abc123def456');
+    });
+
+    it('should return "none" for undefined digest', () => {
+      const result = extractDigestPrefix(undefined);
+      expect(result).toBe('none');
+    });
+
+    it('should return "none" for empty digest', () => {
+      const result = extractDigestPrefix('');
+      expect(result).toBe('none');
+    });
+
+    it('should handle short digest values', () => {
+      const result = extractDigestPrefix('sha256:abc');
+      expect(result).toBe('abc');
+    });
+  });
+
+  describe('generateCacheKey', () => {
+    it('should generate cache key with all components including digest', () => {
+      const result = generateCacheKey('test-prefix', 'nginx', 'latest', 'linux/amd64', 'sha256:abc123def456789');
+      expect(result).toBe('test-prefix-nginx-latest-linux-amd64-none-abc123def456');
+    });
+
+    it('should generate cache key without platform but with digest', () => {
+      const result = generateCacheKey('test-prefix', 'nginx', 'latest', undefined, 'sha256:abc123def456789');
+      expect(result).toBe('test-prefix-nginx-latest-linux-amd64-none-abc123def456');
+    });
+
+    it('should generate cache key without digest', () => {
+      const result = generateCacheKey('test-prefix', 'nginx', 'latest', undefined, undefined);
+      expect(result).toBe('test-prefix-nginx-latest-linux-amd64-none-none');
     });
 
     it('should sanitize unsafe characters', () => {
-      const result = generateCacheKey('test-prefix', 'nginx/custom', 'v1.0', undefined);
-      expect(result).toBe('test-prefix-nginx-custom-v1.0-linux-amd64-none');
+      const result = generateCacheKey('test-prefix', 'nginx/custom', 'v1.0', undefined, 'sha256:xyz789');
+      expect(result).toBe('test-prefix-nginx-custom-v1.0-linux-amd64-none-xyz789');
     });
   });
 
   describe('generateManifestCacheKey', () => {
-    it('should append manifest suffix to cache key', () => {
-      const result = generateManifestCacheKey('test-prefix', 'nginx', 'latest', undefined);
-      expect(result).toBe('test-prefix-nginx-latest-linux-amd64-none-manifest');
+    it('should append manifest suffix to cache key with digest', () => {
+      const result = generateManifestCacheKey('test-prefix', 'nginx', 'latest', undefined, 'sha256:abc123def456');
+      expect(result).toBe('test-prefix-nginx-latest-linux-amd64-none-abc123def456-manifest');
+    });
+
+    it('should append manifest suffix to cache key without digest', () => {
+      const result = generateManifestCacheKey('test-prefix', 'nginx', 'latest', undefined, undefined);
+      expect(result).toBe('test-prefix-nginx-latest-linux-amd64-none-none-manifest');
     });
   });
 
   describe('generateTarPath', () => {
-    it('should generate tar file path', () => {
-      const result = generateTarPath('nginx', 'latest', undefined);
-      expect(result).toBe('/tmp/-nginx-latest-linux-amd64-none.tar');
+    it('should generate tar file path with digest', () => {
+      const result = generateTarPath('nginx', 'latest', undefined, 'sha256:abc123def456');
+      expect(result).toBe('/tmp/-nginx-latest-linux-amd64-none-abc123def456.tar');
+    });
+
+    it('should generate tar file path without digest', () => {
+      const result = generateTarPath('nginx', 'latest', undefined, undefined);
+      expect(result).toBe('/tmp/-nginx-latest-linux-amd64-none-none.tar');
     });
   });
 
   describe('generateManifestPath', () => {
-    it('should generate manifest file path', () => {
-      const result = generateManifestPath('nginx', 'latest', undefined);
-      expect(result).toBe('/tmp/-nginx-latest-linux-amd64-none-manifest.json');
+    it('should generate manifest file path with digest', () => {
+      const result = generateManifestPath('nginx', 'latest', undefined, 'sha256:abc123def456');
+      expect(result).toBe('/tmp/-nginx-latest-linux-amd64-none-abc123def456-manifest.json');
+    });
+
+    it('should generate manifest file path without digest', () => {
+      const result = generateManifestPath('nginx', 'latest', undefined, undefined);
+      expect(result).toBe('/tmp/-nginx-latest-linux-amd64-none-none-manifest.json');
     });
   });
 

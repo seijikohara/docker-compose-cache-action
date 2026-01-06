@@ -46,23 +46,48 @@ export function getTempDirectory(): string {
 }
 
 /**
- * Generates a unique cache key for a Docker image.
- * The key is based on image name, tag, and platform information.
+ * Length of the digest prefix used in cache keys.
+ * Using first 12 characters provides sufficient uniqueness while keeping keys readable.
+ */
+const DIGEST_PREFIX_LENGTH = 12;
+
+/**
+ * Extracts a short prefix from a Docker image digest for use in cache keys.
+ * Removes the 'sha256:' prefix if present and takes the first N characters.
  *
- * Combines the provided prefix with sanitized image name, tag, and platform
- * components to create a unique, filesystem-safe cache key.
+ * @param digest - Full digest string (e.g., 'sha256:abc123...')
+ * @returns Short digest prefix for cache key, or 'none' if digest is unavailable
+ */
+export function extractDigestPrefix(digest: string | undefined): string {
+  if (!digest) {
+    return 'none';
+  }
+  // Remove 'sha256:' or similar algorithm prefix
+  const digestValue = digest.includes(':') ? (digest.split(':')[1] ?? digest) : digest;
+  return digestValue.substring(0, DIGEST_PREFIX_LENGTH) || 'none';
+}
+
+/**
+ * Generates a unique cache key for a Docker image.
+ * The key is based on image name, tag, platform information, and digest.
+ *
+ * Including the digest in the cache key ensures that when an image is updated
+ * in the registry (even with the same tag like 'latest'), a new cache entry
+ * will be created, preventing stale cache issues.
  *
  * @param cacheKeyPrefix - Prefix for the cache key (from action input)
  * @param imageName - Docker image name (e.g., 'nginx')
  * @param imageTag - Docker image tag (e.g., 'latest')
  * @param targetPlatformString - Optional platform string (e.g., 'linux/amd64')
+ * @param digest - Optional image digest for cache key uniqueness (e.g., 'sha256:abc123...')
  * @returns Unique cache key string
  */
 export function generateCacheKey(
   cacheKeyPrefix: string,
   imageName: string,
   imageTag: string,
-  targetPlatformString: string | undefined
+  targetPlatformString: string | undefined,
+  digest: string | undefined
 ): string {
   const sanitizedImageName = sanitizePathComponent(imageName);
   const sanitizedImageTag = sanitizePathComponent(imageTag);
@@ -73,7 +98,9 @@ export function generateCacheKey(
   const sanitizedArch = sanitizePathComponent(platformInfo?.arch || 'none');
   const sanitizedVariant = sanitizePathComponent(platformInfo?.variant || 'none');
 
-  return `${cacheKeyPrefix}-${sanitizedImageName}-${sanitizedImageTag}-${sanitizedOs}-${sanitizedArch}-${sanitizedVariant}`;
+  const digestPrefix = extractDigestPrefix(digest);
+
+  return `${cacheKeyPrefix}-${sanitizedImageName}-${sanitizedImageTag}-${sanitizedOs}-${sanitizedArch}-${sanitizedVariant}-${digestPrefix}`;
 }
 
 /**
@@ -84,15 +111,17 @@ export function generateCacheKey(
  * @param imageName - Docker image name
  * @param imageTag - Docker image tag
  * @param targetPlatformString - Optional platform string
+ * @param digest - Optional image digest for cache key uniqueness
  * @returns Manifest-specific cache key string
  */
 export function generateManifestCacheKey(
   cacheKeyPrefix: string,
   imageName: string,
   imageTag: string,
-  targetPlatformString: string | undefined
+  targetPlatformString: string | undefined,
+  digest: string | undefined
 ): string {
-  return `${generateCacheKey(cacheKeyPrefix, imageName, imageTag, targetPlatformString)}-manifest`;
+  return `${generateCacheKey(cacheKeyPrefix, imageName, imageTag, targetPlatformString, digest)}-manifest`;
 }
 
 /**
@@ -101,10 +130,16 @@ export function generateManifestCacheKey(
  * @param imageName - Docker image name
  * @param imageTag - Docker image tag
  * @param targetPlatformString - Optional platform string
+ * @param digest - Optional image digest for path uniqueness
  * @returns Full filesystem path for the tar file
  */
-export function generateTarPath(imageName: string, imageTag: string, targetPlatformString: string | undefined): string {
-  const tarFileName = generateCacheKey('', imageName, imageTag, targetPlatformString);
+export function generateTarPath(
+  imageName: string,
+  imageTag: string,
+  targetPlatformString: string | undefined,
+  digest: string | undefined
+): string {
+  const tarFileName = generateCacheKey('', imageName, imageTag, targetPlatformString, digest);
   return path.join(getTempDirectory(), `${tarFileName}${CACHE_FILE_EXTENSIONS.TAR}`);
 }
 
@@ -114,14 +149,16 @@ export function generateTarPath(imageName: string, imageTag: string, targetPlatf
  * @param imageName - Docker image name
  * @param imageTag - Docker image tag
  * @param targetPlatformString - Optional platform string
+ * @param digest - Optional image digest for path uniqueness
  * @returns Full filesystem path for the manifest file
  */
 export function generateManifestPath(
   imageName: string,
   imageTag: string,
-  targetPlatformString: string | undefined
+  targetPlatformString: string | undefined,
+  digest: string | undefined
 ): string {
-  const manifestFileName = generateCacheKey('', imageName, imageTag, targetPlatformString);
+  const manifestFileName = generateCacheKey('', imageName, imageTag, targetPlatformString, digest);
   return path.join(getTempDirectory(), `${manifestFileName}${CACHE_FILE_EXTENSIONS.MANIFEST}`);
 }
 
