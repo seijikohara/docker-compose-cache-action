@@ -19,5 +19,10 @@ export type ServiceResult = {
 /**
  * Processes a single Docker Compose service.
  * Tries to restore from cache, if cache miss, pulls and caches the image.
+ *
+ * @param serviceDefinition - The Docker Compose service to process
+ * @param cacheKeyPrefix - Prefix for cache keys
+ * @param skipLatestCheck - Whether to skip digest verification
+ * @param forceRefresh - Whether to ignore existing cache and pull fresh images
  */
-export declare function processService(serviceDefinition: ComposeService, cacheKeyPrefix: string, skipLatestCheck: boolean): Promise<ServiceResult>;
+export declare function processService(serviceDefinition: ComposeService, cacheKeyPrefix: string, skipLatestCheck: boolean, forceRefresh?: boolean): Promise<ServiceResult>;

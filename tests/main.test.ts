@@ -728,5 +728,118 @@ describe('main', () => {
         );
       });
     });
+
+    describe('force-refresh option', () => {
+      beforeEach(() => {
+        // Setup single service for cleaner test
+        const singleServiceDefinition = [{ image: 'nginx:latest' }];
+        (dockerComposeFile.getComposeServicesFromFiles as jest.Mock).mockImplementation((files, _excludes) => {
+          if (Array.isArray(files) && files.length > 0) {
+            return singleServiceDefinition;
+          }
+          return [];
+        });
+      });
+
+      it('should skip cache restore when force-refresh is enabled', async () => {
+        // Setup mocks for pull scenario
+        mockCacheSave.mockResolvedValue(123);
+
+        // Enable force-refresh
+        mockCoreGetInput.mockImplementation((inputName) => {
+          switch (inputName) {
+            case 'cache-key-prefix':
+              return 'test-cache';
+            case 'skip-digest-verification':
+              return '';
+            case 'skip-latest-check':
+              return '';
+            default:
+              return '';
+          }
+        });
+        mockCoreGetBooleanInput.mockImplementation((inputName) => {
+          switch (inputName) {
+            case 'force-refresh':
+              return true;
+            case 'skip-digest-verification':
+              return false;
+            case 'skip-latest-check':
+              return false;
+            default:
+              return false;
+          }
+        });
+
+        await run();
+
+        // Verify that force refresh message is logged
+        expect(mockCoreInfo).toHaveBeenCalledWith('Force refresh enabled - ignoring existing cache');
+        expect(mockCoreInfo).toHaveBeenCalledWith(expect.stringContaining('Force refresh enabled for nginx:latest'));
+
+        // Verify cache restore was NOT called
+        expect(mockCacheRestore).not.toHaveBeenCalled();
+
+        // Verify image was pulled
+        expect(dockerCommandMock.pullImage).toHaveBeenCalledWith('nginx:latest', undefined);
+
+        // Verify image was saved to cache
+        expect(mockCacheSave).toHaveBeenCalled();
+      });
+
+      it('should use cache when force-refresh is disabled', async () => {
+        // Mock cache hit
+        mockCacheRestore.mockResolvedValue('cache-key');
+
+        // Disable force-refresh (default)
+        mockCoreGetInput.mockImplementation((inputName) => {
+          switch (inputName) {
+            case 'cache-key-prefix':
+              return 'test-cache';
+            default:
+              return '';
+          }
+        });
+        mockCoreGetBooleanInput.mockImplementation((inputName) => {
+          switch (inputName) {
+            case 'force-refresh':
+              return false;
+            case 'skip-digest-verification':
+              return false;
+            case 'skip-latest-check':
+              return false;
+            default:
+              return false;
+          }
+        });
+
+        await run();
+
+        // Verify cache restore WAS called
+        expect(mockCacheRestore).toHaveBeenCalled();
+
+        // Verify force refresh message was NOT logged
+        expect(mockCoreInfo).not.toHaveBeenCalledWith('Force refresh enabled - ignoring existing cache');
+      });
+
+      it('should set cache-hit to false when force-refresh is used', async () => {
+        mockCacheSave.mockResolvedValue(123);
+
+        // Enable force-refresh
+        mockCoreGetBooleanInput.mockImplementation((inputName) => {
+          switch (inputName) {
+            case 'force-refresh':
+              return true;
+            default:
+              return false;
+          }
+        });
+
+        await run();
+
+        // cache-hit should be false since images were pulled, not restored
+        expect(mockCoreSetOutput).toHaveBeenCalledWith('cache-hit', 'false');
+      });
+    });
   });
 });

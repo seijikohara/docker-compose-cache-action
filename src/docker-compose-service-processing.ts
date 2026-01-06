@@ -218,11 +218,17 @@ async function processCacheHit(
 /**
  * Processes a single Docker Compose service.
  * Tries to restore from cache, if cache miss, pulls and caches the image.
+ *
+ * @param serviceDefinition - The Docker Compose service to process
+ * @param cacheKeyPrefix - Prefix for cache keys
+ * @param skipLatestCheck - Whether to skip digest verification
+ * @param forceRefresh - Whether to ignore existing cache and pull fresh images
  */
 export async function processService(
   serviceDefinition: ComposeService,
   cacheKeyPrefix: string,
-  skipLatestCheck: boolean
+  skipLatestCheck: boolean,
+  forceRefresh = false
 ): Promise<ServiceResult> {
   const completeImageName = serviceDefinition.image;
   const [imageNamePart, imageTagOrLatest = 'latest'] = completeImageName.split(':');
@@ -284,6 +290,32 @@ export async function processService(
   }
   core.info(`Cache key for ${completeImageName}: ${imageCacheKey}`);
   core.debug(`Cache path: ${imageTarPath}`);
+
+  // Skip cache restore if force refresh is enabled
+  if (forceRefresh) {
+    core.info(`Force refresh enabled for ${completeImageName}, pulling fresh image`);
+    const pullResult = await pullAndCacheImage(
+      completeImageName,
+      serviceDefinition.platform,
+      imageCacheKey,
+      manifestCacheKey,
+      imageTarPath,
+      manifestPath,
+      imageDigest,
+      manifest
+    );
+
+    return {
+      success: pullResult.success,
+      restoredFromCache: false,
+      imageName: completeImageName,
+      cacheKey: imageCacheKey,
+      digest: imageDigest,
+      platform: serviceDefinition.platform,
+      error: pullResult.error,
+      imageSize: pullResult.imageSize,
+    };
+  }
 
   // Try to restore from cache first
   const [cacheResult, manifestCacheResult] = await Promise.all([

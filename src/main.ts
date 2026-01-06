@@ -30,6 +30,7 @@ type ActionConfig = {
   readonly excludeImageNames: ReadonlyArray<string>;
   readonly cacheKeyPrefix: string;
   readonly skipDigestVerification: boolean;
+  readonly forceRefresh: boolean;
 };
 
 /**
@@ -68,6 +69,7 @@ function getActionConfig(): ActionConfig {
     excludeImageNames: core.getMultilineInput('exclude-images'),
     cacheKeyPrefix: core.getInput('cache-key-prefix') || DEFAULT_CACHE_KEY_PREFIX,
     skipDigestVerification: getSkipDigestVerification(),
+    forceRefresh: core.getBooleanInput('force-refresh'),
   };
 }
 
@@ -92,6 +94,10 @@ export async function run(): Promise<void> {
 
     core.info(`Found ${targetServices.length} services to cache`);
 
+    if (actionConfig.forceRefresh) {
+      core.info('Force refresh enabled - ignoring existing cache');
+    }
+
     // Process all services concurrently
     const serviceProcessingResults: readonly TimedServiceResult[] = await Promise.all(
       targetServices.map(async (currentService) => {
@@ -99,7 +105,8 @@ export async function run(): Promise<void> {
         const serviceResult = await processService(
           currentService,
           actionConfig.cacheKeyPrefix,
-          actionConfig.skipDigestVerification
+          actionConfig.skipDigestVerification,
+          actionConfig.forceRefresh
         );
         const serviceEndTime = performance.now();
 

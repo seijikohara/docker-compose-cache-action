@@ -30,6 +30,10 @@ inputs:
     description: 'Skip verifying image digests against the remote registry. When enabled, cached images will be used without checking if newer versions are available. This speeds up execution but may result in using outdated images.'
     required: false
     default: 'false'
+  force-refresh:
+    description: 'Ignore existing cache and pull all images fresh from the registry. Pulled images will still be saved to cache for future runs. Useful for security updates or debugging cache issues.'
+    required: false
+    default: 'false'
   skip-latest-check:
     description: '[DEPRECATED] Use skip-digest-verification instead. This option will be removed in a future major version.'
     required: false

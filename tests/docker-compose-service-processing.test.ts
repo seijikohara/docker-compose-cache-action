@@ -310,5 +310,97 @@ describe('docker-compose-service-processing', () => {
       expect(result.success).toBe(false);
       expect(result.error).toContain('Digest mismatch');
     });
+
+    describe('force refresh', () => {
+      it('should skip cache restore when force refresh is enabled', async () => {
+        mockInspectImageRemote.mockResolvedValue(mockManifest);
+        mockPullImage.mockResolvedValue(true);
+        mockSaveImageToTar.mockResolvedValue(true);
+        mockSaveManifestToCache.mockResolvedValue(true);
+        mockCacheSave.mockResolvedValue({ success: true });
+        mockInspectImageLocal.mockResolvedValue(mockInspectInfo);
+
+        const result = await processService(serviceDefinition, 'test-cache', false, true);
+
+        expect(result).toEqual({
+          success: true,
+          restoredFromCache: false,
+          imageName: 'nginx:latest',
+          cacheKey: 'test-cache-nginx-latest-default',
+          digest: 'sha256:testdigest',
+          platform: undefined,
+          imageSize: 1024000,
+        });
+
+        // Cache restore should NOT be called when force refresh is enabled
+        expect(mockCacheRestore).not.toHaveBeenCalled();
+        // Image should be pulled
+        expect(mockPullImage).toHaveBeenCalledWith('nginx:latest', undefined);
+        // Image should be saved to cache
+        expect(mockCacheSave).toHaveBeenCalled();
+        // Info message should indicate force refresh
+        expect(mockCoreInfo).toHaveBeenCalledWith('Force refresh enabled for nginx:latest, pulling fresh image');
+      });
+
+      it('should still save to cache when force refresh pulls image', async () => {
+        mockInspectImageRemote.mockResolvedValue(mockManifest);
+        mockPullImage.mockResolvedValue(true);
+        mockSaveImageToTar.mockResolvedValue(true);
+        mockSaveManifestToCache.mockResolvedValue(true);
+        mockCacheSave.mockResolvedValue({ success: true });
+        mockInspectImageLocal.mockResolvedValue(mockInspectInfo);
+
+        await processService(serviceDefinition, 'test-cache', false, true);
+
+        // Verify image is saved to cache for future use
+        expect(mockSaveImageToTar).toHaveBeenCalled();
+        expect(mockCacheSave).toHaveBeenCalled();
+        expect(mockSaveManifestToCache).toHaveBeenCalled();
+      });
+
+      it('should handle pull failure with force refresh', async () => {
+        mockInspectImageRemote.mockResolvedValue(mockManifest);
+        mockPullImage.mockResolvedValue(false);
+
+        const result = await processService(serviceDefinition, 'test-cache', false, true);
+
+        expect(result.success).toBe(false);
+        expect(result.error).toContain('Failed to pull image');
+        expect(mockCacheRestore).not.toHaveBeenCalled();
+      });
+
+      it('should work with platform-specific images and force refresh', async () => {
+        mockInspectImageRemote.mockResolvedValue(mockManifest);
+        mockPullImage.mockResolvedValue(true);
+        mockSaveImageToTar.mockResolvedValue(true);
+        mockSaveManifestToCache.mockResolvedValue(true);
+        mockCacheSave.mockResolvedValue({ success: true });
+        mockInspectImageLocal.mockResolvedValue(mockInspectInfo);
+
+        const result = await processService(serviceWithPlatform, 'test-cache', false, true);
+
+        expect(result.success).toBe(true);
+        expect(result.platform).toBe('linux/arm64');
+        expect(mockPullImage).toHaveBeenCalledWith('nginx:latest', 'linux/arm64');
+        expect(mockCacheRestore).not.toHaveBeenCalled();
+      });
+
+      it('should use cache when force refresh is false (default behavior)', async () => {
+        mockInspectImageRemote.mockResolvedValue(mockManifest);
+        mockCacheRestore.mockResolvedValueOnce({ success: true, cacheKey: 'cache-key' });
+        mockCacheRestore.mockResolvedValueOnce({ success: true, cacheKey: 'manifest-cache-key' });
+        mockLoadImageFromTar.mockResolvedValue(true);
+        mockInspectImageLocal.mockResolvedValue(mockInspectInfo);
+        mockReadManifestFromFile.mockResolvedValue(mockManifest);
+
+        const result = await processService(serviceDefinition, 'test-cache', false, false);
+
+        expect(result.success).toBe(true);
+        expect(result.restoredFromCache).toBe(true);
+        // Cache restore SHOULD be called when force refresh is false
+        expect(mockCacheRestore).toHaveBeenCalled();
+        expect(mockLoadImageFromTar).toHaveBeenCalled();
+      });
+    });
   });
 });

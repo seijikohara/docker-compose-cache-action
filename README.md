@@ -212,6 +212,46 @@ By default, this action performs digest verification to ensure cached images are
 
 > **Note:** The `skip-latest-check` input is deprecated and will be removed in a future major version. Please use `skip-digest-verification` instead.
 
+## Force Refresh Feature
+
+The `force-refresh` option allows you to bypass the cache completely and pull all images fresh from the registry. This is useful for:
+
+- **Security updates**: Ensuring you have the latest security patches
+- **Debugging cache issues**: Troubleshooting problems related to cached images
+- **Scheduled refreshes**: Periodically updating images in scheduled workflows
+
+### Usage Examples
+
+```yaml
+# Force refresh - always pull fresh images
+- name: Cache Docker Compose Images
+  uses: seijikohara/docker-compose-cache-action@v1
+  with:
+    force-refresh: true
+
+# Conditional force refresh based on event type
+- name: Cache Docker Compose Images
+  uses: seijikohara/docker-compose-cache-action@v1
+  with:
+    force-refresh: ${{ github.event_name == 'schedule' }}
+
+# Force refresh on manual workflow dispatch
+- name: Cache Docker Compose Images
+  uses: seijikohara/docker-compose-cache-action@v1
+  with:
+    force-refresh: ${{ github.event_name == 'workflow_dispatch' }}
+```
+
+### Behavior
+
+When `force-refresh: true`:
+
+1. Existing cache is completely ignored
+2. All images are pulled fresh from the registry
+3. Pulled images are saved to cache for future runs (when `force-refresh` is not enabled)
+
+This differs from changing `cache-key-prefix` in that the new images are still saved with the standard cache key, so subsequent runs without `force-refresh` will use the newly cached images.
+
 ## Configuration
 
 ### Inputs
@@ -222,6 +262,7 @@ By default, this action performs digest verification to ensure cached images are
 | `exclude-images`           | Images to exclude from caching. Provide multiple images as multiline string with pipe character.                                                     | `false`  | (empty list)                                                                        |
 | `cache-key-prefix`         | Prefix for the generated cache key for each image. Change to invalidate existing caches.                                                             | `false`  | `docker-compose-image`                                                              |
 | `skip-digest-verification` | Skip verifying image digests against the remote registry. When enabled, cached images will be used without checking if newer versions are available. | `false`  | `false`                                                                             |
+| `force-refresh`            | Ignore existing cache and pull all images fresh from the registry. Pulled images will still be saved to cache for future runs.                       | `false`  | `false`                                                                             |
 | `skip-latest-check`        | **[DEPRECATED]** Use `skip-digest-verification` instead. This option will be removed in a future major version.                                      | `false`  | `false`                                                                             |
 
 ### Outputs
