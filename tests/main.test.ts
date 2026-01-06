@@ -649,6 +649,45 @@ describe('main', () => {
         expect(mockCoreInfo).toHaveBeenCalledWith(expect.stringContaining('Skipped latest check for nginx:latest'));
       });
 
+      it('should show deprecation warning when skip-latest-check is set to false explicitly', async () => {
+        // Mock cache hit
+        mockCacheRestore.mockResolvedValue('cache-key');
+
+        // Use deprecated skip-latest-check option with value 'false'
+        mockCoreGetInput.mockImplementation((inputName) => {
+          switch (inputName) {
+            case 'cache-key-prefix':
+              return 'test-cache';
+            case 'skip-digest-verification':
+              return '';
+            case 'skip-latest-check':
+              return 'false';
+            default:
+              return '';
+          }
+        });
+        mockCoreGetBooleanInput.mockImplementation((inputName) => {
+          switch (inputName) {
+            case 'skip-digest-verification':
+              return false;
+            case 'skip-latest-check':
+              return false;
+            default:
+              return false;
+          }
+        });
+
+        await run();
+
+        // Verify deprecation warning was shown even when value is 'false'
+        expect(mockCoreWarning).toHaveBeenCalledWith(
+          expect.stringContaining("'skip-latest-check' input is deprecated")
+        );
+
+        // Verify that digest verification is performed (not skipped)
+        expect(dockerCommandMock.inspectImageRemote).toHaveBeenCalledTimes(2);
+      });
+
       it('should prefer skip-digest-verification over deprecated skip-latest-check', async () => {
         // Mock cache hit
         mockCacheRestore.mockResolvedValue('cache-key');

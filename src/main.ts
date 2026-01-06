@@ -48,7 +48,7 @@ function getSkipDigestVerification(): boolean {
 
   // Fall back to deprecated input
   const skipLatestCheckInput = core.getInput('skip-latest-check');
-  if (skipLatestCheckInput !== '' && skipLatestCheckInput !== 'false') {
+  if (skipLatestCheckInput !== '') {
     core.warning(
       "The 'skip-latest-check' input is deprecated and will be removed in a future major version. " +
         "Please use 'skip-digest-verification' instead."
