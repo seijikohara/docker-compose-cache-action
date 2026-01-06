@@ -2,7 +2,7 @@ import * as core from '@actions/core';
 
 import * as cache from '../src/cache';
 import * as dockerCommand from '../src/docker-command';
-import { ComposeService } from '../src/docker-compose-file';
+import type { ComposeService } from '../src/docker-compose-file';
 import { processService } from '../src/docker-compose-service-processing';
 
 jest.mock('@actions/core', () => ({

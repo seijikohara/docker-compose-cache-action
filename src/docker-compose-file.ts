@@ -3,8 +3,8 @@
  * Handles reading, parsing, and filtering of Docker Compose services.
  */
 
+import * as fs from 'node:fs';
 import * as core from '@actions/core';
-import * as fs from 'fs';
 import * as yaml from 'js-yaml';
 import { chain } from 'lodash';
 

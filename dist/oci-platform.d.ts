@@ -13,7 +13,7 @@ export type OciPlatform = {
     /** The normalized OCI architecture identifier (e.g., 'amd64', 'arm64'). */
     readonly arch: string;
     /** The normalized OCI architecture variant identifier (e.g., 'v7', 'v8'), if applicable. */
-    readonly variant?: string;
+    readonly variant?: string | undefined;
 };
 /**
  * Determines the OCI platform string (os/arch[/variant]) for the current Node.js runtime.

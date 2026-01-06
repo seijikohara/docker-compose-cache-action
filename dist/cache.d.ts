@@ -2,15 +2,15 @@
  * @fileoverview Cache management utilities for Docker images and manifests.
  * Handles cache key generation, file path management, and cache operations.
  */
-import { DockerImageManifest } from './docker-command';
+import type { DockerImageManifest } from './docker-command';
 /**
  * Result of a cache operation.
  * Represents the outcome of cache save or restore operations.
  */
 export type CacheOperationResult = {
     readonly success: boolean;
-    readonly cacheKey?: string;
-    readonly error?: string;
+    readonly cacheKey?: string | undefined;
+    readonly error?: string | undefined;
 };
 /**
  * Gets the temporary directory for storing cache files.

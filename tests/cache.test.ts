@@ -1,6 +1,6 @@
+import * as fs from 'node:fs/promises';
 import * as cache from '@actions/cache';
 import * as core from '@actions/core';
-import * as fs from 'fs/promises';
 
 import {
   generateCacheKey,
@@ -14,7 +14,7 @@ import {
   saveToCache,
   writeManifestToFile,
 } from '../src/cache';
-import { DockerImageManifest } from '../src/docker-command';
+import type { DockerImageManifest } from '../src/docker-command';
 
 jest.mock('@actions/cache', () => ({
   restoreCache: jest.fn(),
@@ -42,7 +42,9 @@ jest.mock('../src/oci-platform', () => ({
     variant: undefined,
   })),
   parseOciPlatformString: jest.fn((platformString?: string) => {
-    if (!platformString) return undefined;
+    if (!platformString) {
+      return undefined;
+    }
     const [os, arch, variant] = platformString.split('/');
     return { os, arch, variant };
   }),

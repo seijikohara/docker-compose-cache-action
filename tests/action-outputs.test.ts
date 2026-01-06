@@ -1,14 +1,14 @@
 import * as core from '@actions/core';
 
 import {
-  ActionSummary,
+  type ActionSummary,
   buildProcessedImageList,
   calculateActionSummary,
   createActionSummary,
   logActionCompletion,
-  ProcessedImageList,
+  type ProcessedImageList,
   setActionOutputs,
-  TimedServiceResult,
+  type TimedServiceResult,
 } from '../src/action-outputs';
 
 jest.mock('@actions/core', () => ({
@@ -25,19 +25,33 @@ jest.mock('@actions/core', () => ({
 jest.mock('../src/date-utils', () => ({
   formatTimeBetween: jest.fn((start: number, end: number) => {
     const duration = end - start;
-    if (duration >= 3600000) return '1 hour';
-    if (duration >= 60000) return '1 minute';
-    if (duration >= 1000) return '1 second';
+    if (duration >= 3600000) {
+      return '1 hour';
+    }
+    if (duration >= 60000) {
+      return '1 minute';
+    }
+    if (duration >= 1000) {
+      return '1 second';
+    }
     return '';
   }),
 }));
 
 jest.mock('../src/file-utils', () => ({
   formatFileSize: jest.fn((size?: number) => {
-    if (size === undefined) return 'N/A';
-    if (size === 0) return '0 Bytes';
-    if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-    if (size >= 1024) return `${(size / 1024).toFixed(1)} KB`;
+    if (size === undefined) {
+      return 'N/A';
+    }
+    if (size === 0) {
+      return '0 Bytes';
+    }
+    if (size >= 1024 * 1024) {
+      return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+    }
+    if (size >= 1024) {
+      return `${(size / 1024).toFixed(1)} KB`;
+    }
     return `${size} Bytes`;
   }),
 }));

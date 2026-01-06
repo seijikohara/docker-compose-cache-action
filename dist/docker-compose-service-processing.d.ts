@@ -2,7 +2,7 @@
  * @fileoverview Image processing logic for Docker Compose services.
  * Handles image pulling, caching, and cache restoration with manifest validation.
  */
-import { ComposeService } from './docker-compose-file';
+import type { ComposeService } from './docker-compose-file';
 /**
  * Result of processing a single Docker service.
  */
@@ -11,10 +11,10 @@ export type ServiceResult = {
     readonly restoredFromCache: boolean;
     readonly imageName: string;
     readonly cacheKey: string;
-    readonly digest?: string;
-    readonly platform?: string;
-    readonly error?: string;
-    readonly imageSize?: number;
+    readonly digest?: string | undefined;
+    readonly platform?: string | undefined;
+    readonly error?: string | undefined;
+    readonly imageSize?: number | undefined;
 };
 /**
  * Processes a single Docker Compose service.

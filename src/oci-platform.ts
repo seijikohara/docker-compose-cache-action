@@ -14,7 +14,7 @@ export type OciPlatform = {
   /** The normalized OCI architecture identifier (e.g., 'amd64', 'arm64'). */
   readonly arch: string;
   /** The normalized OCI architecture variant identifier (e.g., 'v7', 'v8'), if applicable. */
-  readonly variant?: string;
+  readonly variant?: string | undefined;
 };
 
 /**
@@ -83,7 +83,9 @@ function toOciArch(arch: string): string {
  * @returns OCI variant string or undefined if not provided.
  */
 function toOciVariant(variant: string | undefined): string | undefined {
-  if (!variant) return undefined;
+  if (!variant) {
+    return undefined;
+  }
   return NODE_TO_OCI_VARIANT[variant as keyof typeof NODE_TO_OCI_VARIANT] ?? variant;
 }
 

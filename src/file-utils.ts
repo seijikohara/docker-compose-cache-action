@@ -44,5 +44,5 @@ export function formatFileSize(fileSizeBytes: number | undefined): string {
   const safeUnitIndex = Math.min(rawUnitIndex, FILE_SIZE_UNITS.length - 1);
   const sizeUnit = FILE_SIZE_UNITS[safeUnitIndex as keyof typeof FILE_SIZE_UNITS] || FILE_SIZE_UNITS[0];
 
-  return `${(fileSizeBytes / Math.pow(FILE_SIZE_BASE, safeUnitIndex)).toFixed(2).replace(/\.0+$|(\.[0-9]*[1-9])0+$/, '$1')} ${sizeUnit}`;
+  return `${(fileSizeBytes / FILE_SIZE_BASE ** safeUnitIndex).toFixed(2).replace(/\.0+$|(\.[0-9]*[1-9])0+$/, '$1')} ${sizeUnit}`;
 }

@@ -62,14 +62,14 @@ describe('file-utils', () => {
 
     it('should handle edge case where size exceeds all predefined units', () => {
       // Test case that would cause unitIndex to exceed FILE_SIZE_UNITS length
-      const enormousSize = Math.pow(1024, 10); // Extremely large size
+      const enormousSize = 1024 ** 10; // Extremely large size
       const result = formatFileSize(enormousSize);
       expect(result).toContain('PB'); // Should fall back to the last unit (PB)
     });
 
     it('should handle edge case with Math.log calculation boundaries', () => {
       // Test edge case where Math.floor(Math.log(size) / Math.log(1024)) might be at boundary
-      const boundarySize = Math.pow(1024, 5); // Exactly 1 PB
+      const boundarySize = 1024 ** 5; // Exactly 1 PB
       const result = formatFileSize(boundarySize);
       expect(result).toBe('1 PB');
     });

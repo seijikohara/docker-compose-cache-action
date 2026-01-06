@@ -40,10 +40,10 @@ export type TimedServiceResult = {
     readonly restoredFromCache: boolean;
     readonly imageName: string;
     readonly cacheKey: string;
-    readonly digest?: string;
-    readonly platform?: string;
-    readonly error?: string;
-    readonly imageSize?: number;
+    readonly digest?: string | undefined;
+    readonly platform?: string | undefined;
+    readonly error?: string | undefined;
+    readonly imageSize?: number | undefined;
     readonly processingDuration: number;
     readonly humanReadableDuration: string;
 };

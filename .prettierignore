@@ -1,3 +1,13 @@
+# Biome handles these files
+*.ts
+*.tsx
+*.js
+*.jsx
+*.mjs
+*.cjs
+*.json
+
+# Package files
 package-lock.json
 dist/
 

@@ -11,7 +11,7 @@ import {
   createActionSummary,
   logActionCompletion,
   setActionOutputs,
-  TimedServiceResult,
+  type TimedServiceResult,
 } from './action-outputs';
 import { formatTimeBetween } from './date-utils';
 import { getComposeFilePathsToProcess, getComposeServicesFromFiles } from './docker-compose-file';

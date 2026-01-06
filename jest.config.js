@@ -12,7 +12,7 @@ module.exports = {
       'ts-jest',
       {
         // ts-jest specific options go here
-        tsconfig: 'tsconfig.eslint.json', // Point ts-jest to the ESLint/Test tsconfig
+        tsconfig: 'tsconfig.json',
       },
     ],
   },

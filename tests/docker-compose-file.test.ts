@@ -1,5 +1,5 @@
+import * as fs from 'node:fs';
 import * as core from '@actions/core';
-import * as fs from 'fs';
 
 import { getComposeFilePathsToProcess, getComposeServicesFromFiles } from '../src/docker-compose-file';
 
@@ -51,8 +51,12 @@ describe('docker-compose-file', () => {
 
     it('merges services from multiple files', () => {
       (fs.readFileSync as jest.Mock).mockImplementation((file) => {
-        if (file === 'a.yml') return createYaml({ nginx: { image: 'nginx:latest' } });
-        if (file === 'b.yml') return createYaml({ redis: { image: 'redis:alpine' } });
+        if (file === 'a.yml') {
+          return createYaml({ nginx: { image: 'nginx:latest' } });
+        }
+        if (file === 'b.yml') {
+          return createYaml({ redis: { image: 'redis:alpine' } });
+        }
         return '';
       });
       const result = getComposeServicesFromFiles(['a.yml', 'b.yml'], []);

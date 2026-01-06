@@ -16,14 +16,14 @@ import {
   saveToCache,
 } from './cache';
 import {
-  DockerImageManifest,
+  type DockerImageManifest,
   inspectImageLocal,
   inspectImageRemote,
   loadImageFromTar,
   pullImage,
   saveImageToTar,
 } from './docker-command';
-import { ComposeService } from './docker-compose-file';
+import type { ComposeService } from './docker-compose-file';
 
 /**
  * Result of processing a single Docker service.
@@ -33,10 +33,10 @@ export type ServiceResult = {
   readonly restoredFromCache: boolean;
   readonly imageName: string;
   readonly cacheKey: string;
-  readonly digest?: string;
-  readonly platform?: string;
-  readonly error?: string;
-  readonly imageSize?: number;
+  readonly digest?: string | undefined;
+  readonly platform?: string | undefined;
+  readonly error?: string | undefined;
+  readonly imageSize?: number | undefined;
 };
 
 /**
@@ -44,8 +44,8 @@ export type ServiceResult = {
  */
 type ImageOperationResult = {
   readonly success: boolean;
-  readonly imageSize?: number;
-  readonly error?: string;
+  readonly imageSize?: number | undefined;
+  readonly error?: string | undefined;
 };
 
 /**
@@ -225,7 +225,21 @@ export async function processService(
   skipLatestCheck: boolean
 ): Promise<ServiceResult> {
   const completeImageName = serviceDefinition.image;
-  const [imageNameWithoutTag, imageTagOrLatest = 'latest'] = completeImageName.split(':');
+  const [imageNamePart, imageTagOrLatest = 'latest'] = completeImageName.split(':');
+
+  // Guard against undefined or empty image name
+  if (!imageNamePart) {
+    return {
+      success: false,
+      restoredFromCache: false,
+      imageName: completeImageName,
+      cacheKey: '',
+      digest: undefined,
+      platform: serviceDefinition.platform,
+      error: `Invalid image name format: ${completeImageName}`,
+    };
+  }
+  const imageNameWithoutTag = imageNamePart;
 
   // Get image manifest with digest for cache key generation
   const manifest = await inspectImageRemote(completeImageName);

@@ -3,12 +3,12 @@
  * Handles cache key generation, file path management, and cache operations.
  */
 
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import * as cache from '@actions/cache';
 import * as core from '@actions/core';
-import * as fs from 'fs/promises';
-import * as path from 'path';
 
-import { DockerImageManifest } from './docker-command';
+import type { DockerImageManifest } from './docker-command';
 import { sanitizePathComponent } from './file-utils';
 import { getCurrentPlatformInfo, parseOciPlatformString } from './oci-platform';
 
@@ -31,8 +31,8 @@ const CACHE_FILE_EXTENSIONS = {
  */
 export type CacheOperationResult = {
   readonly success: boolean;
-  readonly cacheKey?: string;
-  readonly error?: string;
+  readonly cacheKey?: string | undefined;
+  readonly error?: string | undefined;
 };
 
 /**
