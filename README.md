@@ -395,11 +395,66 @@ This action fully supports platform-specific Docker images, which is particularl
 
 ### GitHub Actions Cache Considerations
 
-1. **Cache Size Limit**: GitHub Actions provides up to 10 GB of cache storage per repository. Large Docker images may consume significant space.
+1. **Cache Size Limit**: GitHub Actions provides up to 10 GB of cache storage per repository. Large Docker images (e.g., `pytorch/pytorch`, `nvidia/cuda`) may consume significant space. Consider using `exclude-images` for very large or frequently changing images.
 
-2. **Cache Eviction**: Cache entries not accessed for 7 days are automatically deleted. Older entries are evicted first when approaching the storage limit.
+2. **Cache Immutability**: GitHub Actions cache entries **cannot be overwritten** with the same key. This action handles this by including the image digest in the cache key, ensuring updated images create new cache entries automatically.
 
-3. **Cross-Platform Caching**: When caching ARM images on x86 runners (or vice versa), the images are cached correctly but cannot run without QEMU emulation. Use [docker/setup-qemu-action](https://github.com/docker/setup-qemu-action) if you need to run cross-platform containers.
+3. **Cache Eviction**: Cache entries not accessed for 7 days are automatically deleted. Older entries are evicted first when approaching the storage limit. Branch-specific caches may also be evicted when branches are deleted.
+
+4. **Cross-Platform Caching**: When caching ARM images on x86 runners (or vice versa), the images are cached correctly but cannot run without QEMU emulation:
+
+   ```yaml
+   - uses: docker/setup-qemu-action@v3
+   - uses: seijikohara/docker-compose-cache-action@v1
+   ```
+
+## Error Handling
+
+When an image fails to process, the `image-list` output will include an entry with `status: "Error"`:
+
+```json
+{
+  "name": "private-registry.com/myapp:latest",
+  "platform": "linux/amd64",
+  "status": "Error",
+  "size": 0,
+  "digest": "",
+  "processingTimeMs": 5234.7,
+  "cacheKey": ""
+}
+```
+
+### Common Error Causes
+
+| Error Scenario           | Possible Cause                               | Solution                                     |
+| ------------------------ | -------------------------------------------- | -------------------------------------------- |
+| Authentication failure   | Private registry without login               | Add `docker/login-action` before this action |
+| Image not found          | Typo in image name or tag                    | Verify image exists in the registry          |
+| Digest retrieval failure | Registry doesn't support manifest inspection | Use `skip-digest-verification: true`         |
+| Network timeout          | Registry unreachable                         | Check network connectivity and retry         |
+
+### Troubleshooting Example
+
+```yaml
+- name: Log in to Docker Hub
+  uses: docker/login-action@v3
+  with:
+    username: ${{ secrets.DOCKERHUB_USERNAME }}
+    password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+- name: Cache Docker Compose Images
+  id: cache-docker
+  uses: seijikohara/docker-compose-cache-action@v1
+
+- name: Check for errors
+  run: |
+    IMAGE_LIST='${{ steps.cache-docker.outputs.image-list }}'
+    ERRORS=$(echo "$IMAGE_LIST" | jq '[.[] | select(.status == "Error")]')
+    if [ "$ERRORS" != "[]" ]; then
+      echo "::warning::Some images failed to process:"
+      echo "$ERRORS" | jq -r '.[] | "  - \(.name)"'
+    fi
+```
 
 ## Contributing
 
