@@ -7,6 +7,7 @@ import * as core from '@actions/core';
 
 import {
   generateCacheKey,
+  generateCacheKeyPrefix,
   generateManifestCacheKey,
   generateManifestPath,
   generateTarPath,
@@ -102,6 +103,63 @@ async function pullAndCacheImage(
   return {
     success: true,
     imageSize: inspectInfo?.Size,
+  };
+}
+
+/**
+ * Attempts to restore from cache using prefix matching when registry is unavailable.
+ * This is a fallback mechanism for when digest cannot be retrieved from the registry.
+ *
+ * @param completeImageName - Full image name with tag
+ * @param imageNameWithoutTag - Image name without tag
+ * @param imageTag - Image tag
+ * @param platform - Optional platform string
+ * @param cacheKeyPrefix - Prefix for cache keys
+ * @returns Promise resolving to ServiceResult if cache found, undefined otherwise
+ */
+async function tryRestoreFromCacheWithoutDigest(
+  completeImageName: string,
+  imageNameWithoutTag: string,
+  imageTag: string,
+  platform: string | undefined,
+  cacheKeyPrefix: string
+): Promise<ServiceResult | undefined> {
+  // Generate cache key prefix without digest for fallback matching
+  const cacheKeyPrefixWithoutDigest = generateCacheKeyPrefix(cacheKeyPrefix, imageNameWithoutTag, imageTag, platform);
+
+  // Generate tar path without digest (we'll use a temporary path for restoration)
+  const fallbackTarPath = generateTarPath(imageNameWithoutTag, imageTag, platform, 'fallback');
+
+  // Try to restore using prefix matching
+  const cacheResult = await restoreFromCache(
+    [fallbackTarPath],
+    `${cacheKeyPrefixWithoutDigest}-fallback`, // This won't match exactly
+    [cacheKeyPrefixWithoutDigest] // But this prefix will match any cached version
+  );
+
+  if (!cacheResult.success) {
+    return undefined;
+  }
+
+  // Load image from cache
+  const loadSuccess = await loadImageFromTar(fallbackTarPath);
+  if (!loadSuccess) {
+    core.debug(`Failed to load image from fallback cache: ${completeImageName}`);
+    return undefined;
+  }
+
+  // Get image size after successful load
+  const inspectInfo = await inspectImageLocal(completeImageName);
+  const imageSize = inspectInfo?.Size;
+
+  return {
+    success: true,
+    restoredFromCache: true,
+    imageName: completeImageName,
+    cacheKey: cacheResult.cacheKey || '',
+    digest: undefined,
+    platform,
+    imageSize,
   };
 }
 
@@ -250,6 +308,25 @@ export async function processService(
   // Get image manifest with digest for cache key generation
   const manifest = await inspectImageRemote(completeImageName);
   if (!manifest || !manifest.digest) {
+    // Registry unavailable - try fallback to cached version if skip-digest-verification is enabled
+    if (skipLatestCheck && !forceRefresh) {
+      const fallbackResult = await tryRestoreFromCacheWithoutDigest(
+        completeImageName,
+        imageNameWithoutTag,
+        imageTagOrLatest,
+        serviceDefinition.platform,
+        cacheKeyPrefix
+      );
+
+      if (fallbackResult) {
+        core.warning(
+          `Registry unavailable for ${completeImageName}. Using cached version. ` +
+            `Image may be outdated. Enable network access or set force-refresh to pull fresh images.`
+        );
+        return fallbackResult;
+      }
+    }
+
     core.warning(`Could not get digest for ${completeImageName}, skipping cache`);
     return {
       success: false,

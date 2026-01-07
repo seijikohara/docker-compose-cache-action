@@ -44,6 +44,17 @@ export declare function extractDigestPrefix(digest: string | undefined): string;
  */
 export declare function generateCacheKey(cacheKeyPrefix: string, imageName: string, imageTag: string, targetPlatformString: string | undefined, digest: string | undefined): string;
 /**
+ * Generates a cache key prefix without the digest component.
+ * This is used for prefix-based cache matching when the registry is unavailable.
+ *
+ * @param cacheKeyPrefix - Prefix for the cache key (from action input)
+ * @param imageName - Docker image name (e.g., 'nginx')
+ * @param imageTag - Docker image tag (e.g., 'latest')
+ * @param targetPlatformString - Optional platform string (e.g., 'linux/amd64')
+ * @returns Cache key prefix without digest
+ */
+export declare function generateCacheKeyPrefix(cacheKeyPrefix: string, imageName: string, imageTag: string, targetPlatformString: string | undefined): string;
+/**
  * Generates a manifest cache key for a Docker image.
  * Appends a manifest suffix to the standard cache key.
  *
@@ -95,9 +106,10 @@ export declare function readManifestFromFile(manifestPath: string): Promise<Dock
  *
  * @param targetFilePaths - Array of file paths to restore from cache
  * @param cacheKey - Cache key to search for
+ * @param restoreKeys - Optional array of cache key prefixes for fallback matching
  * @returns Promise resolving to cache operation result
  */
-export declare function restoreFromCache(targetFilePaths: readonly string[], cacheKey: string): Promise<CacheOperationResult>;
+export declare function restoreFromCache(targetFilePaths: readonly string[], cacheKey: string, restoreKeys?: readonly string[]): Promise<CacheOperationResult>;
 /**
  * Attempts to save files to cache.
  *

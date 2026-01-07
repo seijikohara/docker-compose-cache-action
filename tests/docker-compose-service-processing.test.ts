@@ -13,6 +13,7 @@ jest.mock('@actions/core', () => ({
 
 jest.mock('../src/cache', () => ({
   generateCacheKey: jest.fn((prefix, name, tag, platform) => `${prefix}-${name}-${tag}-${platform || 'default'}`),
+  generateCacheKeyPrefix: jest.fn((prefix, name, tag, platform) => `${prefix}-${name}-${tag}-${platform || 'default'}`),
   generateManifestCacheKey: jest.fn(
     (prefix, name, tag, platform) => `${prefix}-${name}-${tag}-${platform || 'default'}-manifest`
   ),
@@ -400,6 +401,93 @@ describe('docker-compose-service-processing', () => {
         // Cache restore SHOULD be called when force refresh is false
         expect(mockCacheRestore).toHaveBeenCalled();
         expect(mockLoadImageFromTar).toHaveBeenCalled();
+      });
+    });
+
+    describe('registry unavailable fallback', () => {
+      it('should fallback to cached version when registry is unavailable and skip-digest-verification is enabled', async () => {
+        // Registry unavailable (returns undefined)
+        mockInspectImageRemote.mockResolvedValue(undefined);
+        // Cache hit with prefix matching
+        mockCacheRestore.mockResolvedValue({ success: true, cacheKey: 'test-cache-nginx-latest-default-abc123' });
+        mockLoadImageFromTar.mockResolvedValue(true);
+        mockInspectImageLocal.mockResolvedValue(mockInspectInfo);
+
+        const result = await processService(serviceDefinition, 'test-cache', true, false);
+
+        expect(result.success).toBe(true);
+        expect(result.restoredFromCache).toBe(true);
+        expect(result.digest).toBeUndefined();
+        expect(result.cacheKey).toBe('test-cache-nginx-latest-default-abc123');
+        expect(mockCoreWarning).toHaveBeenCalledWith(expect.stringContaining('Registry unavailable for nginx:latest'));
+        expect(mockCoreWarning).toHaveBeenCalledWith(expect.stringContaining('Using cached version'));
+      });
+
+      it('should fail when registry is unavailable, skip-digest-verification is enabled, but no cache exists', async () => {
+        // Registry unavailable
+        mockInspectImageRemote.mockResolvedValue(undefined);
+        // Cache miss
+        mockCacheRestore.mockResolvedValue({ success: false });
+
+        const result = await processService(serviceDefinition, 'test-cache', true, false);
+
+        expect(result.success).toBe(false);
+        expect(result.error).toContain('Could not get digest');
+        expect(mockCoreWarning).toHaveBeenCalledWith(expect.stringContaining('Could not get digest'));
+      });
+
+      it('should fail when registry is unavailable and skip-digest-verification is disabled', async () => {
+        // Registry unavailable
+        mockInspectImageRemote.mockResolvedValue(undefined);
+
+        const result = await processService(serviceDefinition, 'test-cache', false, false);
+
+        expect(result.success).toBe(false);
+        expect(result.error).toContain('Could not get digest');
+        // Should not attempt fallback cache restore
+        expect(mockCacheRestore).not.toHaveBeenCalled();
+      });
+
+      it('should fail when registry is unavailable and force-refresh is enabled (even with skip-digest-verification)', async () => {
+        // Registry unavailable
+        mockInspectImageRemote.mockResolvedValue(undefined);
+
+        const result = await processService(serviceDefinition, 'test-cache', true, true);
+
+        expect(result.success).toBe(false);
+        expect(result.error).toContain('Could not get digest');
+        // Should not attempt fallback cache restore when force-refresh is enabled
+        expect(mockCacheRestore).not.toHaveBeenCalled();
+      });
+
+      it('should fail fallback when cache restore succeeds but image load fails', async () => {
+        // Registry unavailable
+        mockInspectImageRemote.mockResolvedValue(undefined);
+        // Cache hit
+        mockCacheRestore.mockResolvedValue({ success: true, cacheKey: 'cache-key' });
+        // But image load fails
+        mockLoadImageFromTar.mockResolvedValue(false);
+
+        const result = await processService(serviceDefinition, 'test-cache', true, false);
+
+        expect(result.success).toBe(false);
+        expect(result.error).toContain('Could not get digest');
+      });
+
+      it('should handle registry unavailable fallback with platform-specific image', async () => {
+        // Registry unavailable
+        mockInspectImageRemote.mockResolvedValue(undefined);
+        // Cache hit
+        mockCacheRestore.mockResolvedValue({ success: true, cacheKey: 'test-cache-nginx-latest-linux/arm64-abc123' });
+        mockLoadImageFromTar.mockResolvedValue(true);
+        mockInspectImageLocal.mockResolvedValue(mockInspectInfo);
+
+        const result = await processService(serviceWithPlatform, 'test-cache', true, false);
+
+        expect(result.success).toBe(true);
+        expect(result.restoredFromCache).toBe(true);
+        expect(result.platform).toBe('linux/arm64');
+        expect(mockCoreWarning).toHaveBeenCalledWith(expect.stringContaining('Registry unavailable for nginx:latest'));
       });
     });
   });

@@ -89,6 +89,28 @@ export function generateCacheKey(
   targetPlatformString: string | undefined,
   digest: string | undefined
 ): string {
+  const baseKey = generateCacheKeyPrefix(cacheKeyPrefix, imageName, imageTag, targetPlatformString);
+  const digestPrefix = extractDigestPrefix(digest);
+
+  return `${baseKey}-${digestPrefix}`;
+}
+
+/**
+ * Generates a cache key prefix without the digest component.
+ * This is used for prefix-based cache matching when the registry is unavailable.
+ *
+ * @param cacheKeyPrefix - Prefix for the cache key (from action input)
+ * @param imageName - Docker image name (e.g., 'nginx')
+ * @param imageTag - Docker image tag (e.g., 'latest')
+ * @param targetPlatformString - Optional platform string (e.g., 'linux/amd64')
+ * @returns Cache key prefix without digest
+ */
+export function generateCacheKeyPrefix(
+  cacheKeyPrefix: string,
+  imageName: string,
+  imageTag: string,
+  targetPlatformString: string | undefined
+): string {
   const sanitizedImageName = sanitizePathComponent(imageName);
   const sanitizedImageTag = sanitizePathComponent(imageTag);
 
@@ -98,9 +120,7 @@ export function generateCacheKey(
   const sanitizedArch = sanitizePathComponent(platformInfo?.arch || 'none');
   const sanitizedVariant = sanitizePathComponent(platformInfo?.variant || 'none');
 
-  const digestPrefix = extractDigestPrefix(digest);
-
-  return `${cacheKeyPrefix}-${sanitizedImageName}-${sanitizedImageTag}-${sanitizedOs}-${sanitizedArch}-${sanitizedVariant}-${digestPrefix}`;
+  return `${cacheKeyPrefix}-${sanitizedImageName}-${sanitizedImageTag}-${sanitizedOs}-${sanitizedArch}-${sanitizedVariant}`;
 }
 
 /**
@@ -200,14 +220,20 @@ export async function readManifestFromFile(manifestPath: string): Promise<Docker
  *
  * @param targetFilePaths - Array of file paths to restore from cache
  * @param cacheKey - Cache key to search for
+ * @param restoreKeys - Optional array of cache key prefixes for fallback matching
  * @returns Promise resolving to cache operation result
  */
 export async function restoreFromCache(
   targetFilePaths: readonly string[],
-  cacheKey: string
+  cacheKey: string,
+  restoreKeys?: readonly string[]
 ): Promise<CacheOperationResult> {
   try {
-    const restoredCacheKey = await cache.restoreCache([...targetFilePaths], cacheKey);
+    const restoredCacheKey = await cache.restoreCache(
+      [...targetFilePaths],
+      cacheKey,
+      restoreKeys ? [...restoreKeys] : undefined
+    );
     return {
       success: !!restoredCacheKey,
       cacheKey: restoredCacheKey || undefined,

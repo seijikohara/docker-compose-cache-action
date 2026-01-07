@@ -5,6 +5,7 @@ import * as core from '@actions/core';
 import {
   extractDigestPrefix,
   generateCacheKey,
+  generateCacheKeyPrefix,
   generateManifestCacheKey,
   generateManifestPath,
   generateTarPath,
@@ -122,6 +123,23 @@ describe('cache', () => {
     it('should sanitize unsafe characters', () => {
       const result = generateCacheKey('test-prefix', 'nginx/custom', 'v1.0', undefined, 'sha256:xyz789');
       expect(result).toBe('test-prefix-nginx-custom-v1.0-linux-amd64-none-xyz789');
+    });
+  });
+
+  describe('generateCacheKeyPrefix', () => {
+    it('should generate cache key prefix without digest', () => {
+      const result = generateCacheKeyPrefix('test-prefix', 'nginx', 'latest', 'linux/amd64');
+      expect(result).toBe('test-prefix-nginx-latest-linux-amd64-none');
+    });
+
+    it('should generate cache key prefix without platform', () => {
+      const result = generateCacheKeyPrefix('test-prefix', 'nginx', 'latest', undefined);
+      expect(result).toBe('test-prefix-nginx-latest-linux-amd64-none');
+    });
+
+    it('should sanitize unsafe characters in prefix', () => {
+      const result = generateCacheKeyPrefix('test-prefix', 'nginx/custom', 'v1.0', undefined);
+      expect(result).toBe('test-prefix-nginx-custom-v1.0-linux-amd64-none');
     });
   });
 
@@ -252,6 +270,29 @@ describe('cache', () => {
       expect(result).toEqual({
         success: false,
         error: 'Cache error',
+      });
+    });
+
+    it('should restore cache with restoreKeys for prefix matching', async () => {
+      mockCacheRestore.mockResolvedValue('cache-key-prefix-abc123');
+
+      const result = await restoreFromCache(['/tmp/file.tar'], 'cache-key-exact', ['cache-key-prefix']);
+
+      expect(result).toEqual({
+        success: true,
+        cacheKey: 'cache-key-prefix-abc123',
+      });
+      expect(mockCacheRestore).toHaveBeenCalledWith(['/tmp/file.tar'], 'cache-key-exact', ['cache-key-prefix']);
+    });
+
+    it('should handle cache miss with restoreKeys', async () => {
+      mockCacheRestore.mockResolvedValue(undefined);
+
+      const result = await restoreFromCache(['/tmp/file.tar'], 'cache-key-exact', ['cache-key-prefix']);
+
+      expect(result).toEqual({
+        success: false,
+        cacheKey: undefined,
       });
     });
   });

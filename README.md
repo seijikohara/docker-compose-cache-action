@@ -211,6 +211,30 @@ By default, this action performs digest verification to ensure cached images are
 | `skip-digest-verification: false` (default) | Compares cached image digest with registry. Pulls fresh image if digests don't match.                        |
 | `skip-digest-verification: true`            | Uses cached images directly without registry verification. Significantly faster but may use outdated images. |
 
+### Registry Unavailable Fallback
+
+When `skip-digest-verification: true` is enabled and the registry is unavailable (e.g., network issues, registry downtime), the action will attempt to restore images from the cache using prefix-based matching. This allows CI workflows to continue even when the registry is temporarily unreachable.
+
+**Behavior when registry is unavailable:**
+
+| Setting                           | Behavior                                                                     |
+| --------------------------------- | ---------------------------------------------------------------------------- |
+| `skip-digest-verification: true`  | Attempts to restore from cache with a warning. CI continues if cache exists. |
+| `skip-digest-verification: false` | Fails immediately since digest verification requires registry access.        |
+| `force-refresh: true`             | Fails immediately since fresh images must be pulled from the registry.       |
+
+**Example warning message:**
+
+```
+Warning: Registry unavailable for nginx:latest. Using cached version. Image may be outdated. Enable network access or set force-refresh to pull fresh images.
+```
+
+This fallback mechanism is particularly useful for:
+
+- **Intermittent network issues**: Continue CI when registry connectivity is temporarily lost
+- **Registry maintenance windows**: Workflows can proceed using cached images during planned downtime
+- **Rate limiting**: If you hit registry rate limits, cached versions can be used as a fallback
+
 > **Note:** The `skip-latest-check` input is deprecated and will be removed in a future major version. Please use `skip-digest-verification` instead.
 
 ## Force Refresh Feature
@@ -426,12 +450,13 @@ When an image fails to process, the `image-list` output will include an entry wi
 
 ### Common Error Causes
 
-| Error Scenario           | Possible Cause                               | Solution                                     |
-| ------------------------ | -------------------------------------------- | -------------------------------------------- |
-| Authentication failure   | Private registry without login               | Add `docker/login-action` before this action |
-| Image not found          | Typo in image name or tag                    | Verify image exists in the registry          |
-| Digest retrieval failure | Registry doesn't support manifest inspection | Use `skip-digest-verification: true`         |
-| Network timeout          | Registry unreachable                         | Check network connectivity and retry         |
+| Error Scenario           | Possible Cause                               | Solution                                                                    |
+| ------------------------ | -------------------------------------------- | --------------------------------------------------------------------------- |
+| Authentication failure   | Private registry without login               | Add `docker/login-action` before this action                                |
+| Image not found          | Typo in image name or tag                    | Verify image exists in the registry                                         |
+| Digest retrieval failure | Registry doesn't support manifest inspection | Use `skip-digest-verification: true`                                        |
+| Network timeout          | Registry unreachable                         | Use `skip-digest-verification: true` to fallback to cache, or check network |
+| Registry unavailable     | Registry downtime or network issues          | Enable `skip-digest-verification: true` to use cached images as fallback    |
 
 ### Troubleshooting Example
 
