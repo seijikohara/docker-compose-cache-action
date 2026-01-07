@@ -1,7 +1,11 @@
 import * as fs from 'node:fs';
 import * as core from '@actions/core';
 
-import { getComposeFilePathsToProcess, getComposeServicesFromFiles } from '../src/docker-compose-file';
+import {
+  getComposeFilePathsToProcess,
+  getComposeServicesFromFiles,
+  matchesExcludePattern,
+} from '../src/docker-compose-file';
 
 jest.mock('@actions/core', () => ({
   debug: jest.fn(),
@@ -149,6 +153,182 @@ describe('docker-compose-file', () => {
 
       const result = getComposeFilePathsToProcess([]);
       expect(result).toEqual(['docker-compose.yaml']);
+    });
+  });
+
+  describe('matchesExcludePattern', () => {
+    describe('exact matching', () => {
+      it('should match exact image name', () => {
+        expect(matchesExcludePattern('nginx:latest', ['nginx:latest'])).toBe(true);
+      });
+
+      it('should not match different image name', () => {
+        expect(matchesExcludePattern('nginx:latest', ['redis:alpine'])).toBe(false);
+      });
+
+      it('should match one of multiple patterns', () => {
+        expect(matchesExcludePattern('redis:alpine', ['nginx:latest', 'redis:alpine'])).toBe(true);
+      });
+
+      it('should return false for empty patterns', () => {
+        expect(matchesExcludePattern('nginx:latest', [])).toBe(false);
+      });
+    });
+
+    describe('wildcard * matching', () => {
+      it('should match all tags with image:*', () => {
+        expect(matchesExcludePattern('nginx:latest', ['nginx:*'])).toBe(true);
+        expect(matchesExcludePattern('nginx:1.25', ['nginx:*'])).toBe(true);
+        expect(matchesExcludePattern('nginx:alpine', ['nginx:*'])).toBe(true);
+      });
+
+      it('should not match different image with image:*', () => {
+        expect(matchesExcludePattern('redis:alpine', ['nginx:*'])).toBe(false);
+      });
+
+      it('should match all images with specific tag using *:tag', () => {
+        expect(matchesExcludePattern('nginx:latest', ['*:latest'])).toBe(true);
+        expect(matchesExcludePattern('redis:latest', ['*:latest'])).toBe(true);
+        expect(matchesExcludePattern('myregistry.com/app:latest', ['*:latest'])).toBe(true);
+      });
+
+      it('should not match different tag with *:tag', () => {
+        expect(matchesExcludePattern('nginx:alpine', ['*:latest'])).toBe(false);
+      });
+
+      it('should match registry prefix with registry/*', () => {
+        expect(matchesExcludePattern('ghcr.io/myorg/app:latest', ['ghcr.io/myorg/*'])).toBe(true);
+        expect(matchesExcludePattern('ghcr.io/myorg/another:v1', ['ghcr.io/myorg/*'])).toBe(true);
+      });
+
+      it('should not match different registry', () => {
+        expect(matchesExcludePattern('docker.io/myorg/app:latest', ['ghcr.io/myorg/*'])).toBe(false);
+      });
+
+      it('should match with wildcard in middle', () => {
+        expect(matchesExcludePattern('myregistry.com/app:latest', ['myregistry.com/*:latest'])).toBe(true);
+        expect(matchesExcludePattern('myregistry.com/service:latest', ['myregistry.com/*:latest'])).toBe(true);
+      });
+
+      it('should match everything with *', () => {
+        expect(matchesExcludePattern('nginx:latest', ['*'])).toBe(true);
+        expect(matchesExcludePattern('ghcr.io/org/app:v1.0.0', ['*'])).toBe(true);
+      });
+    });
+
+    describe('wildcard ? matching', () => {
+      it('should match single character with ?', () => {
+        expect(matchesExcludePattern('app1:latest', ['app?:latest'])).toBe(true);
+        expect(matchesExcludePattern('app2:latest', ['app?:latest'])).toBe(true);
+        expect(matchesExcludePattern('appX:latest', ['app?:latest'])).toBe(true);
+      });
+
+      it('should not match multiple characters with single ?', () => {
+        expect(matchesExcludePattern('app12:latest', ['app?:latest'])).toBe(false);
+      });
+
+      it('should match multiple single characters with multiple ?', () => {
+        expect(matchesExcludePattern('app12:latest', ['app??:latest'])).toBe(true);
+      });
+    });
+
+    describe('combined patterns', () => {
+      it('should match with both * and ?', () => {
+        expect(matchesExcludePattern('app1:v1.0', ['app?:v*'])).toBe(true);
+        expect(matchesExcludePattern('app2:v2.0.1', ['app?:v*'])).toBe(true);
+      });
+
+      it('should handle complex patterns', () => {
+        expect(matchesExcludePattern('myregistry.com/team-a/service:1.0', ['myregistry.com/team-?/*:*'])).toBe(true);
+      });
+    });
+
+    describe('special regex characters', () => {
+      it('should escape dots in pattern', () => {
+        expect(matchesExcludePattern('myregistry.com/app:latest', ['myregistry.com/*'])).toBe(true);
+        expect(matchesExcludePattern('myregistryXcom/app:latest', ['myregistry.com/*'])).toBe(false);
+      });
+
+      it('should escape other special characters', () => {
+        expect(matchesExcludePattern('app[1]:latest', ['app[1]:latest'])).toBe(true);
+        expect(matchesExcludePattern('app(test):latest', ['app(test):latest'])).toBe(true);
+      });
+    });
+  });
+
+  describe('getComposeServicesFromFiles with wildcard patterns', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+    });
+
+    const createYaml = (services: Record<string, { image?: string; platform?: string }>) =>
+      `services:\n${Object.entries(services)
+        .map(
+          ([name, conf]) =>
+            `  ${name}:\n    ${conf.image ? `image: ${conf.image}` : ''}${conf.platform ? `\n    platform: ${conf.platform}` : ''}`
+        )
+        .join('\n')}`;
+
+    it('should exclude images matching wildcard pattern nginx:*', () => {
+      (fs.readFileSync as jest.Mock).mockReturnValue(
+        createYaml({
+          nginx1: { image: 'nginx:latest' },
+          nginx2: { image: 'nginx:alpine' },
+          redis: { image: 'redis:alpine' },
+        })
+      );
+      const result = getComposeServicesFromFiles(['docker-compose.yml'], ['nginx:*']);
+      expect(result).toEqual([{ image: 'redis:alpine' }]);
+    });
+
+    it('should exclude all latest tags with *:latest pattern', () => {
+      (fs.readFileSync as jest.Mock).mockReturnValue(
+        createYaml({
+          nginx: { image: 'nginx:latest' },
+          redis: { image: 'redis:latest' },
+          postgres: { image: 'postgres:15' },
+        })
+      );
+      const result = getComposeServicesFromFiles(['docker-compose.yml'], ['*:latest']);
+      expect(result).toEqual([{ image: 'postgres:15' }]);
+    });
+
+    it('should exclude registry-specific images', () => {
+      (fs.readFileSync as jest.Mock).mockReturnValue(
+        createYaml({
+          app: { image: 'ghcr.io/myorg/app:latest' },
+          service: { image: 'ghcr.io/myorg/service:v1' },
+          nginx: { image: 'nginx:latest' },
+        })
+      );
+      const result = getComposeServicesFromFiles(['docker-compose.yml'], ['ghcr.io/myorg/*']);
+      expect(result).toEqual([{ image: 'nginx:latest' }]);
+    });
+
+    it('should support multiple wildcard patterns', () => {
+      (fs.readFileSync as jest.Mock).mockReturnValue(
+        createYaml({
+          nginx: { image: 'nginx:latest' },
+          redis: { image: 'redis:alpine' },
+          postgres: { image: 'postgres:15' },
+          mysql: { image: 'mysql:8' },
+        })
+      );
+      const result = getComposeServicesFromFiles(['docker-compose.yml'], ['nginx:*', 'mysql:*']);
+      expect(result).toEqual([{ image: 'redis:alpine' }, { image: 'postgres:15' }]);
+    });
+
+    it('should support mixed exact and wildcard patterns', () => {
+      (fs.readFileSync as jest.Mock).mockReturnValue(
+        createYaml({
+          nginx: { image: 'nginx:latest' },
+          redis: { image: 'redis:alpine' },
+          postgres: { image: 'postgres:15' },
+        })
+      );
+      const result = getComposeServicesFromFiles(['docker-compose.yml'], ['nginx:latest', 'postgres:*']);
+      expect(result).toEqual([{ image: 'redis:alpine' }]);
     });
   });
 });

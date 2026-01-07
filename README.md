@@ -98,10 +98,11 @@ jobs:
           compose-files: |
             docker-compose.yml
             docker-compose.prod.yml
-          # Optional: Exclude specific images from caching
+          # Optional: Exclude specific images from caching (supports glob patterns)
           exclude-images: |
-            nginx:stable
-            my-internal-tool:latest
+            nginx:*
+            *:latest
+            ghcr.io/myorg/*
           # Optional: Change the cache key prefix
           cache-key-prefix: my-project-docker-images
           # Optional: Skip digest verification against the registry
@@ -252,6 +253,50 @@ When `force-refresh: true`:
 
 This differs from changing `cache-key-prefix` in that the new images are still saved with the standard cache key, so subsequent runs without `force-refresh` will use the newly cached images.
 
+## Exclude Images with Patterns
+
+The `exclude-images` input supports glob-style patterns for flexible image exclusion:
+
+### Supported Wildcards
+
+| Wildcard | Description              | Example       |
+| -------- | ------------------------ | ------------- |
+| `*`      | Matches any characters   | `nginx:*`     |
+| `?`      | Matches single character | `app?:latest` |
+
+### Pattern Examples
+
+```yaml
+exclude-images: |
+  # Exclude all nginx tags
+  nginx:*
+
+  # Exclude all 'latest' tags
+  *:latest
+
+  # Exclude all images from a registry
+  ghcr.io/myorg/*
+
+  # Exclude specific registry + tag combination
+  myregistry.com/*:dev
+
+  # Exact match (no wildcards)
+  redis:alpine
+
+  # Single character wildcard
+  app?:latest
+```
+
+### Use Cases
+
+| Use Case                        | Pattern               |
+| ------------------------------- | --------------------- |
+| Exclude all tags of an image    | `nginx:*`             |
+| Exclude private registry images | `ghcr.io/myorg/*`     |
+| Exclude all latest tags         | `*:latest`            |
+| Exclude dev/test images         | `*-dev:*`, `*-test:*` |
+| Exclude images by version range | `postgres:1?-alpine`  |
+
 ## Configuration
 
 ### Inputs
@@ -259,7 +304,7 @@ This differs from changing `cache-key-prefix` in that the new images are still s
 | Input                      | Description                                                                                                                                          | Required | Default                                                                             |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------- |
 | `compose-files`            | Path(s) to Docker Compose file(s). Provide multiple files as multiline string with pipe character.                                                   | `false`  | Searches `compose.yaml`, `compose.yml`, `docker-compose.yaml`, `docker-compose.yml` |
-| `exclude-images`           | Images to exclude from caching. Provide multiple images as multiline string with pipe character.                                                     | `false`  | (empty list)                                                                        |
+| `exclude-images`           | Images to exclude from caching. Supports glob patterns (`*` and `?`). Provide multiple patterns as multiline string with pipe character.             | `false`  | (empty list)                                                                        |
 | `cache-key-prefix`         | Prefix for the generated cache key for each image. Change to invalidate existing caches.                                                             | `false`  | `docker-compose-image`                                                              |
 | `skip-digest-verification` | Skip verifying image digests against the remote registry. When enabled, cached images will be used without checking if newer versions are available. | `false`  | `false`                                                                             |
 | `force-refresh`            | Ignore existing cache and pull all images fresh from the registry. Pulled images will still be saved to cache for future runs.                       | `false`  | `false`                                                                             |

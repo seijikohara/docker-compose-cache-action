@@ -16,11 +16,12 @@ inputs:
     required: false
   exclude-images:
     description: >
-      Images to exclude from caching.
-      Specify multiple images using multiline string with pipe (|):
+      Images to exclude from caching. Supports glob patterns with '*' (any chars) and '?' (single char).
+      Specify multiple patterns using multiline string with pipe (|):
         exclude-images: |
-          mysql:8.0
-          redis:alpine
+          nginx:*
+          *:latest
+          ghcr.io/myorg/*
     required: false
   cache-key-prefix:
     description: 'Prefix for the generated cache key.'
