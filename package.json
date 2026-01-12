@@ -38,7 +38,7 @@
     "deps:check": "npx npm-check-updates"
   },
   "dependencies": {
-    "@actions/cache": "^5.0.1",
+    "@actions/cache": "^5.0.2",
     "@actions/core": "^2.0.1",
     "@actions/exec": "^2.0.0",
     "date-fns": "^4.1.0",
