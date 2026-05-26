@@ -46,7 +46,7 @@ jobs:
         run: npm run package
 
       - name: Commit generated files
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: "github.event_name == 'push' && github.ref == 'refs/heads/main' && github.event.head_commit.message != 'build: update generated files'"
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
