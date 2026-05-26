@@ -3,6 +3,8 @@
   extends: ['config:recommended'],
   enabledManagers: ['npm', 'github-actions'],
   dependencyDashboard: true,
+  platformAutomerge: true,
+  rebaseWhen: 'auto',
   lockFileMaintenance: {
     enabled: true,
   },
