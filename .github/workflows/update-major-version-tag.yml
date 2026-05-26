@@ -1,10 +1,21 @@
-name: Update Major Version Tags
+name: Update Release Tags
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'dist/**'
+      - 'package.json'
+      - 'package-lock.json'
+
+concurrency:
+  group: update-release-tags
+  cancel-in-progress: true
 
 jobs:
-  update-major-tags:
+  update-release-tags:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -31,31 +42,38 @@ jobs:
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
 
-      - name: Update major version tags
+      - name: Sync release tags
         run: |
-          echo "### 📌 Updating Major Version Tags" >> $GITHUB_STEP_SUMMARY
+          set -euo pipefail
+
+          current_version=$(node -p "require('./package.json').version")
+          current_commit=$(git rev-parse HEAD)
+          version_tag="v${current_version}"
+          major_tag="v${current_version%%.*}"
+
+          echo "### 📌 Updating Release Tags" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Major Tag | Latest Semantic Tag | Commit SHA |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----------|----------------------|------------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Tag | Commit SHA |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|------------|" >> $GITHUB_STEP_SUMMARY
 
-          # Get all semantic version tags and sort them
-          git tag \
-            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
-            | sort -V \
-            | while read tag; do
-                version=$(echo "$tag" | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+')
-                major=$(echo "$version" | cut -d. -f1)
-                major_tag="v$major"
-                commit_sha=$(git rev-list -n 1 "$tag")
+          existing_version_commit=""
+          if git rev-parse --verify "$version_tag" >/dev/null 2>&1; then
+            existing_version_commit=$(git rev-list -n 1 "$version_tag")
+          fi
 
-                # Store latest semantic tag per major version
-                echo "$major_tag $tag $commit_sha"
-              done \
-            | awk '{ a[$1]=$2; b[$1]=$3 } END { for (k in a) print k, a[k], b[k] }' \
-            | sort \
-            | while read major_tag latest_tag commit_sha; do
-                short_sha=$(git rev-parse --short "$commit_sha")
-                git tag -fa "$major_tag" "$commit_sha" -m "chore(release): update $major_tag to point to $latest_tag"
-                git push origin "$major_tag" --force
-                echo "| \`$major_tag\` | \`$latest_tag\` | \`$short_sha\` |" >> $GITHUB_STEP_SUMMARY
-              done
+          if [[ -n "$existing_version_commit" && "$existing_version_commit" != "$current_commit" ]]; then
+            echo "::error::Release tag $version_tag already exists on a different commit."
+            exit 1
+          fi
+
+          if [[ -z "$existing_version_commit" ]]; then
+            git tag -a "$version_tag" "$current_commit" -m "chore(release): publish $version_tag"
+            git push origin "$version_tag"
+          fi
+
+          git tag -fa "$major_tag" "$current_commit" -m "chore(release): update $major_tag to $version_tag"
+          git push --force origin "$major_tag"
+
+          short_sha=$(git rev-parse --short "$current_commit")
+          echo "| \`$version_tag\` | \`$short_sha\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`$major_tag\` | \`$short_sha\` |" >> $GITHUB_STEP_SUMMARY

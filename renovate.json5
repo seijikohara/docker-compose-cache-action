@@ -1,0 +1,29 @@
+{
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  extends: ['config:recommended'],
+  enabledManagers: ['npm', 'github-actions'],
+  dependencyDashboard: true,
+  platformAutomerge: true,
+  rebaseWhen: 'auto',
+  lockFileMaintenance: {
+    enabled: true,
+  },
+  packageRules: [
+    {
+      matchManagers: ['npm'],
+      groupName: 'npm dependencies',
+      matchUpdateTypes: ['patch', 'minor', 'digest'],
+      automerge: true,
+    },
+    {
+      matchManagers: ['github-actions'],
+      groupName: 'GitHub Actions',
+      matchUpdateTypes: ['patch', 'minor', 'digest'],
+      automerge: true,
+    },
+    {
+      matchUpdateTypes: ['major'],
+      dependencyDashboardApproval: true,
+    },
+  ],
+}
