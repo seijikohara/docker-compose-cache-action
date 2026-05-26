@@ -46,15 +46,14 @@ jobs:
         run: npm run package
 
       - name: Commit generated files
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           set -euo pipefail
 
-          if ! git diff --quiet -- dist/; then
-            if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF}" == "refs/heads/main" ]]; then
-              npm version patch --no-git-tag-version
-            fi
+          if [[ -n "$(git status --porcelain -- dist/)" ]]; then
+            npm version patch --no-git-tag-version
 
             git add dist/ package.json package-lock.json
 
