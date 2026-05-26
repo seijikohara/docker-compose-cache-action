@@ -1,6 +1,6 @@
 {
   "name": "docker-compose-cache-action",
-  "version": "1.8.40",
+  "version": "1.8.41",
   "description": "Dynamically caches Docker images defined in a docker-compose.yml file using TypeScript.",
   "keywords": [
     "github",
