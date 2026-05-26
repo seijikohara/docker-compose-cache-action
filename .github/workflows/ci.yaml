@@ -46,30 +46,26 @@ jobs:
         run: npm run package
 
       - name: Commit generated files
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: "github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor != 'development-automation-bot[bot]'"
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           set -euo pipefail
 
-          if [[ -n "$(git status --porcelain -- dist/)" ]]; then
-            npm version patch --no-git-tag-version
-
-            git add dist/ package.json package-lock.json
-
-            if git diff --cached --quiet; then
-              echo "No generated changes detected"
-              exit 0
-            fi
-
-            git config --global user.name '${{ steps.app-token.outputs.app-slug }}[bot]'
-            git config --global user.email '${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com'
-            git commit -m "build: update generated files"
-            git push
-            echo "Committed generated files"
-          else
+          git add dist/
+          if git diff --cached --quiet; then
             echo "No dist changes detected"
+            exit 0
           fi
+
+          npm version patch --no-git-tag-version
+          git add package.json package-lock.json
+
+          git config --global user.name '${{ steps.app-token.outputs.app-slug }}[bot]'
+          git config --global user.email '${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com'
+          git commit -m "build: update generated files"
+          git push
+          echo "Committed generated files"
 
   build-and-test-summary:
     name: Build and Test Summary
