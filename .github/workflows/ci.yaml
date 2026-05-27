@@ -11,14 +11,19 @@ jobs:
     name: Build & Test
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout with App token
-        id: setup
-        uses: ./.github/actions/checkout-with-app-token
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ vars.DEV_AUTOMATION_APP_ID }}
           private-key: ${{ secrets.DEV_AUTOMATION_PRIVATE_KEY }}
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
           fetch-depth: 0
           fetch-tags: true
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -44,9 +49,9 @@ jobs:
       - name: Commit generated files
         if: "github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor != 'development-automation-bot[bot]'"
         env:
-          GITHUB_TOKEN: ${{ steps.setup.outputs.token }}
-          BOT_NAME: ${{ steps.setup.outputs.app-slug }}[bot]
-          BOT_EMAIL: ${{ steps.setup.outputs.app-slug }}[bot]@users.noreply.github.com
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          BOT_NAME: ${{ steps.app-token.outputs.app-slug }}[bot]
+          BOT_EMAIL: ${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com
         run: |
           set -euo pipefail
 
@@ -69,8 +74,8 @@ jobs:
         if: "github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor == 'development-automation-bot[bot]'"
         uses: ./.github/actions/sync-release-tags
         with:
-          bot-name: ${{ steps.setup.outputs.app-slug }}[bot]
-          bot-email: ${{ steps.setup.outputs.app-slug }}[bot]@users.noreply.github.com
+          bot-name: ${{ steps.app-token.outputs.app-slug }}[bot]
+          bot-email: ${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com
 
   build-and-test-summary:
     name: Build and Test Summary
