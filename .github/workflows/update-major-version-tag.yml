@@ -1,14 +1,11 @@
 name: Update Release Tags
 
+# Auto-tagging on bot push is handled inside the CI workflow's
+# `Create release tags` step. This workflow is kept as a manual
+# fallback to re-sync v{version} and v{major} tags against the
+# current main HEAD when needed.
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - 'dist/**'
-      - 'package.json'
-      - 'package-lock.json'
 
 concurrency:
   group: update-release-tags
@@ -32,10 +29,8 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          fetch-tags: true
           token: ${{ steps.app-token.outputs.token }}
-
-      - name: Fetch all tags
-        run: git fetch --tags
 
       - name: Configure Git
         run: |
@@ -57,23 +52,23 @@ jobs:
           echo "|-----|------------|" >> $GITHUB_STEP_SUMMARY
 
           existing_version_commit=""
-          if git rev-parse --verify "$version_tag" >/dev/null 2>&1; then
-            existing_version_commit=$(git rev-list -n 1 "$version_tag")
+          if git rev-parse --verify "refs/tags/${version_tag}" >/dev/null 2>&1; then
+            existing_version_commit=$(git rev-list -n 1 "refs/tags/${version_tag}")
           fi
 
           if [[ -n "$existing_version_commit" && "$existing_version_commit" != "$current_commit" ]]; then
-            echo "::error::Release tag $version_tag already exists on a different commit."
+            echo "::error::Release tag ${version_tag} already exists on a different commit (${existing_version_commit})."
             exit 1
           fi
 
           if [[ -z "$existing_version_commit" ]]; then
-            git tag -a "$version_tag" "$current_commit" -m "chore(release): publish $version_tag"
-            git push origin "$version_tag"
+            git tag -a "${version_tag}" "${current_commit}" -m "chore(release): publish ${version_tag}"
+            git push origin "${version_tag}"
           fi
 
-          git tag -fa "$major_tag" "$current_commit" -m "chore(release): update $major_tag to $version_tag"
-          git push --force origin "$major_tag"
+          git tag -fa "${major_tag}" "${current_commit}" -m "chore(release): update ${major_tag} to ${version_tag}"
+          git push --force origin "${major_tag}"
 
-          short_sha=$(git rev-parse --short "$current_commit")
-          echo "| \`$version_tag\` | \`$short_sha\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| \`$major_tag\` | \`$short_sha\` |" >> $GITHUB_STEP_SUMMARY
+          short_sha=$(git rev-parse --short "${current_commit}")
+          echo "| \`${version_tag}\` | \`${short_sha}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`${major_tag}\` | \`${short_sha}\` |" >> $GITHUB_STEP_SUMMARY
