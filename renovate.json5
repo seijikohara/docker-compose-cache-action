@@ -3,27 +3,33 @@
   extends: ['config:recommended'],
   enabledManagers: ['npm', 'github-actions'],
   dependencyDashboard: true,
+  // Default to auto-merging every PR Renovate opens. The packageRules
+  // below opt major updates out so they still require a manual nod
+  // through the dependency dashboard.
+  automerge: true,
   platformAutomerge: true,
-  rebaseWhen: 'auto',
+  // Always rebase a Renovate PR when main moves forward so it stays
+  // mergeable without manual intervention.
+  rebaseWhen: 'behind-base-branch',
   lockFileMaintenance: {
     enabled: true,
+    automerge: true,
   },
   packageRules: [
     {
       matchManagers: ['npm'],
       groupName: 'npm dependencies',
       matchUpdateTypes: ['patch', 'minor', 'digest'],
-      automerge: true,
     },
     {
       matchManagers: ['github-actions'],
       groupName: 'GitHub Actions',
       matchUpdateTypes: ['patch', 'minor', 'digest'],
-      automerge: true,
     },
     {
       matchUpdateTypes: ['major'],
       dependencyDashboardApproval: true,
+      automerge: false,
     },
   ],
 }
