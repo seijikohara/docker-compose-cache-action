@@ -47,7 +47,7 @@ jobs:
         run: npm run package
 
       - name: Commit generated files
-        if: "github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor != 'development-automation-bot[bot]'"
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor != format('{0}[bot]', steps.app-token.outputs.app-slug) }}
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           BOT_NAME: ${{ steps.app-token.outputs.app-slug }}[bot]
@@ -71,7 +71,7 @@ jobs:
           echo "Committed generated files"
 
       - name: Create release tags
-        if: "github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor == 'development-automation-bot[bot]'"
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor == format('{0}[bot]', steps.app-token.outputs.app-slug) }}
         uses: ./.github/actions/sync-release-tags
         with:
           bot-name: ${{ steps.app-token.outputs.app-slug }}[bot]

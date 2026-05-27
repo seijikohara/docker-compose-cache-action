@@ -40,11 +40,11 @@ runs:
 
         if [[ -z "$existing_version_commit" ]]; then
           git tag -a "${version_tag}" "${current_commit}" -m "chore(release): publish ${version_tag}"
-          git push origin "${version_tag}"
+          git push origin "refs/tags/${version_tag}"
         fi
 
         git tag -fa "${major_tag}" "${current_commit}" -m "chore(release): update ${major_tag} to ${version_tag}"
-        git push --force origin "${major_tag}"
+        git push --force origin "refs/tags/${major_tag}"
 
         short_sha=$(git rev-parse --short "${current_commit}")
         {
