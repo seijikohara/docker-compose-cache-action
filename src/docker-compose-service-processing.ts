@@ -15,7 +15,7 @@ import {
   restoreFromCache,
   saveManifestToCache,
   saveToCache,
-} from './cache';
+} from './cache.js';
 import {
   type DockerImageManifest,
   inspectImageLocal,
@@ -23,8 +23,8 @@ import {
   loadImageFromTar,
   pullImage,
   saveImageToTar,
-} from './docker-command';
-import type { ComposeService } from './docker-compose-file';
+} from './docker-command.js';
+import type { ComposeService } from './docker-compose-file.js';
 
 /**
  * Result of processing a single Docker service.

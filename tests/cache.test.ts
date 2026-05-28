@@ -1,6 +1,7 @@
 import * as fs from 'node:fs/promises';
 import * as cache from '@actions/cache';
 import * as core from '@actions/core';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 import {
   extractDigestPrefix,
@@ -15,8 +16,8 @@ import {
   saveManifestToCache,
   saveToCache,
   writeManifestToFile,
-} from '../src/cache';
-import type { DockerImageManifest } from '../src/docker-command';
+} from '../src/cache.js';
+import type { DockerImageManifest } from '../src/docker-command.js';
 
 jest.mock('@actions/cache', () => ({
   restoreCache: jest.fn(),

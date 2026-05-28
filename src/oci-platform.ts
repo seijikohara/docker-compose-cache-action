@@ -90,6 +90,21 @@ function toOciVariant(variant: string | undefined): string | undefined {
 }
 
 /**
+ * Reads `process.config.variables.arm_version` if it exists as a string.
+ * Centralised so the unsafe cast lives in one narrow place rather than at
+ * every call site, and uses `unknown` + type guards instead of double
+ * `as` casts.
+ */
+function readNodeArmVersion(): string | undefined {
+  const variables: unknown = process.config?.variables;
+  if (variables === null || typeof variables !== 'object') {
+    return undefined;
+  }
+  const armVersion = (variables as { readonly arm_version?: unknown }).arm_version;
+  return typeof armVersion === 'string' ? armVersion : undefined;
+}
+
+/**
  * Determines the OCI platform string (os/arch[/variant]) for the current Node.js runtime.
  *
  * @returns The OCI platform string (e.g., "linux/amd64", "linux/arm/v7"), or `undefined` if resolution fails.
@@ -98,8 +113,7 @@ export function getCurrentOciPlatformString(): string | undefined {
   const os = toOciOs(process.platform);
   const arch = toOciArch(process.arch);
   // Determine variant primarily for 'arm' architecture using Node's specific variable.
-  const nodeArmVersion = (process.config?.variables as Record<string, unknown>)?.arm_version as string | undefined;
-  const variant = arch === 'arm' ? toOciVariant(nodeArmVersion) : undefined;
+  const variant = arch === 'arm' ? toOciVariant(readNodeArmVersion()) : undefined;
   return variant ? `${os}/${arch}/${variant}` : `${os}/${arch}`;
 }
 

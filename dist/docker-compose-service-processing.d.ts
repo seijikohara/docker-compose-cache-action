@@ -2,7 +2,7 @@
  * @fileoverview Image processing logic for Docker Compose services.
  * Handles image pulling, caching, and cache restoration with manifest validation.
  */
-import type { ComposeService } from './docker-compose-file';
+import type { ComposeService } from './docker-compose-file.js';
 /**
  * Result of processing a single Docker service.
  */

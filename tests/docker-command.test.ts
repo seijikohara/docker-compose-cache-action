@@ -1,5 +1,6 @@
 import * as core from '@actions/core';
 import * as exec from '@actions/exec';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 import {
   inspectImageLocal,
@@ -7,7 +8,7 @@ import {
   loadImageFromTar,
   pullImage,
   saveImageToTar,
-} from '../src/docker-command';
+} from '../src/docker-command.js';
 
 jest.mock('@actions/core', () => ({
   warning: jest.fn(),

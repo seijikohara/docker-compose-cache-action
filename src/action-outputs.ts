@@ -5,8 +5,8 @@
 
 import * as core from '@actions/core';
 
-import { formatTimeBetween } from './date-utils';
-import { formatFileSize } from './file-utils';
+import { formatTimeBetween } from './date-utils.js';
+import { formatFileSize } from './file-utils.js';
 
 /**
  * Status values for image processing operations.

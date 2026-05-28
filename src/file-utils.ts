@@ -42,7 +42,11 @@ export function formatFileSize(fileSizeBytes: number | undefined): string {
 
   const rawUnitIndex = Math.floor(Math.log(fileSizeBytes) / Math.log(FILE_SIZE_BASE));
   const safeUnitIndex = Math.min(rawUnitIndex, FILE_SIZE_UNITS.length - 1);
-  const sizeUnit = FILE_SIZE_UNITS[safeUnitIndex as keyof typeof FILE_SIZE_UNITS] || FILE_SIZE_UNITS[0];
+  // `at()` returns the same tuple element as bracket access, but its
+  // signature returns `T | undefined` cleanly under `noUncheckedIndexedAccess`
+  // without needing a `keyof typeof` cast. The first unit ('Bytes') is the
+  // fallback for the impossible negative-index case.
+  const sizeUnit = FILE_SIZE_UNITS.at(safeUnitIndex) ?? FILE_SIZE_UNITS[0];
 
   return `${(fileSizeBytes / FILE_SIZE_BASE ** safeUnitIndex).toFixed(2).replace(/\.0+$|(\.[0-9]*[1-9])0+$/, '$1')} ${sizeUnit}`;
 }

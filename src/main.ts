@@ -12,10 +12,10 @@ import {
   logActionCompletion,
   setActionOutputs,
   type TimedServiceResult,
-} from './action-outputs';
-import { formatTimeBetween } from './date-utils';
-import { getComposeFilePathsToProcess, getComposeServicesFromFiles } from './docker-compose-file';
-import { processService } from './docker-compose-service-processing';
+} from './action-outputs.js';
+import { formatTimeBetween } from './date-utils.js';
+import { getComposeFilePathsToProcess, getComposeServicesFromFiles } from './docker-compose-file.js';
+import { processService } from './docker-compose-service-processing.js';
 
 /**
  * Default cache key prefix when none is provided.
@@ -136,5 +136,11 @@ export async function run(): Promise<void> {
   }
 }
 
-// Execute the action
-run();
+// Execute the action. `run` already catches and reports errors via
+// `core.setFailed`, but attach a catch here too so a stray rejection
+// (e.g. from a future refactor) surfaces as an action failure instead
+// of an unhandled promise rejection that the runner only logs.
+run().catch((error: unknown) => {
+  const message = error instanceof Error ? error.message : 'Unknown error occurred';
+  core.setFailed(message);
+});

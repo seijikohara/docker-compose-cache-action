@@ -6,7 +6,6 @@
 import * as fs from 'node:fs';
 import * as core from '@actions/core';
 import * as yaml from 'js-yaml';
-import { chain } from 'lodash';
 
 /**
  * Represents a Docker Compose service definition with an image reference.
@@ -91,32 +90,44 @@ export function getComposeServicesFromFiles(
   composeFilePaths: ReadonlyArray<string>,
   excludedImagePatterns: ReadonlyArray<string>
 ): ReadonlyArray<ComposeService> {
-  return chain(composeFilePaths)
-    .flatMap((currentComposeFile) => {
-      try {
-        const yamlContent = fs.readFileSync(currentComposeFile, 'utf8');
-        const composeDefinition = yaml.load(yamlContent) as ComposeFile | undefined;
+  const collected = composeFilePaths.flatMap((currentComposeFile) => {
+    try {
+      const yamlContent = fs.readFileSync(currentComposeFile, 'utf8');
+      const composeDefinition = yaml.load(yamlContent) as ComposeFile | undefined;
 
-        if (!composeDefinition) {
-          core.debug(`Empty or invalid YAML file: ${currentComposeFile}`);
-          return [];
-        }
-
-        if (!composeDefinition.services) {
-          core.debug(`No services section found in ${currentComposeFile}`);
-          return [];
-        }
-
-        return Object.values(composeDefinition.services);
-      } catch (yamlParsingError) {
-        core.warning(`Failed to parse ${currentComposeFile}: ${yamlParsingError}`);
+      if (!composeDefinition) {
+        core.debug(`Empty or invalid YAML file: ${currentComposeFile}`);
         return [];
       }
-    })
-    .filter(
-      (composeService) =>
-        composeService.image !== undefined && !matchesExcludePattern(composeService.image, excludedImagePatterns)
-    )
-    .uniqBy((composeService) => `${composeService.image}|${composeService.platform ?? ''}`)
-    .value();
+
+      if (!composeDefinition.services) {
+        core.debug(`No services section found in ${currentComposeFile}`);
+        return [];
+      }
+
+      return Object.values(composeDefinition.services);
+    } catch (yamlParsingError) {
+      core.warning(`Failed to parse ${currentComposeFile}: ${yamlParsingError}`);
+      return [];
+    }
+  });
+
+  // Dedupe by (image, platform) while preserving the first occurrence,
+  // matching the previous lodash `uniqBy` semantics without the runtime
+  // dependency. The Map iteration order is insertion order, so the kept
+  // entries follow the order the files were processed in.
+  const dedupedByKey = new Map<string, ComposeService>();
+  for (const composeService of collected) {
+    if (composeService.image === undefined) {
+      continue;
+    }
+    if (matchesExcludePattern(composeService.image, excludedImagePatterns)) {
+      continue;
+    }
+    const key = `${composeService.image}|${composeService.platform ?? ''}`;
+    if (!dedupedByKey.has(key)) {
+      dedupedByKey.set(key, composeService);
+    }
+  }
+  return Array.from(dedupedByKey.values());
 }

@@ -1,4 +1,5 @@
-import { formatTimeBetween } from '../src/date-utils';
+import { describe, expect, it } from '@jest/globals';
+import { formatTimeBetween } from '../src/date-utils.js';
 
 describe('date-utils', () => {
   describe('formatTimeBetween', () => {

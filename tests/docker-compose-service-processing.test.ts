@@ -1,9 +1,10 @@
 import * as core from '@actions/core';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
-import * as cache from '../src/cache';
-import * as dockerCommand from '../src/docker-command';
-import type { ComposeService } from '../src/docker-compose-file';
-import { processService } from '../src/docker-compose-service-processing';
+import * as cache from '../src/cache.js';
+import * as dockerCommand from '../src/docker-command.js';
+import type { ComposeService } from '../src/docker-compose-file.js';
+import { processService } from '../src/docker-compose-service-processing.js';
 
 jest.mock('@actions/core', () => ({
   info: jest.fn(),

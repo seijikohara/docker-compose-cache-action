@@ -1,4 +1,5 @@
-import { formatFileSize, sanitizePathComponent } from '../src/file-utils';
+import { describe, expect, it } from '@jest/globals';
+import { formatFileSize, sanitizePathComponent } from '../src/file-utils.js';
 
 describe('file-utils', () => {
   describe('formatFileSize', () => {

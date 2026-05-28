@@ -1,9 +1,10 @@
 import * as cache from '@actions/cache';
 import * as core from '@actions/core';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
-import * as dockerCommand from '../src/docker-command';
-import * as dockerComposeFile from '../src/docker-compose-file';
-import * as platform from '../src/oci-platform';
+import * as dockerCommand from '../src/docker-command.js';
+import * as dockerComposeFile from '../src/docker-compose-file.js';
+import * as platform from '../src/oci-platform.js';
 
 jest.mock('../src/main', () => {
   const originalModule = jest.requireActual('../src/main');
@@ -51,7 +52,7 @@ jest.mock('../src/docker-compose-file', () => {
   };
 });
 
-import { run } from '../src/main';
+import { run } from '../src/main.js';
 
 jest.mock('../src/action-outputs', () => {
   const original = jest.requireActual('../src/action-outputs');
