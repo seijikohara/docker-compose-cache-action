@@ -6,6 +6,15 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Serialize CI per branch / PR so the bot's dist-commit push (and the
+# subsequent main-side version bump) can't race a still-running earlier
+# run and produce a non-fast-forward `git push`. `cancel-in-progress`
+# leaves only the latest run alive; its checks are what auto-merge and
+# branch protection evaluate against the current HEAD.
+concurrency:
+  group: ci-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-test:
     name: Build & Test
@@ -120,13 +129,14 @@ jobs:
           fi
 
           npm version patch --no-git-tag-version
+          new_version=$(node -p "require('./package.json').version")
           git add package.json package-lock.json
 
           git config --global user.name "$BOT_NAME"
           git config --global user.email "$BOT_EMAIL"
-          git commit -m "build: update generated files"
+          git commit -m "chore(release): bump version to v${new_version}"
           git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/main"
-          echo "Bumped version and pushed bot commit"
+          echo "Bumped version to v${new_version} and pushed bot commit"
 
       - name: Create release tags
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor == format('{0}[bot]', steps.app-token.outputs.app-slug) }}
