@@ -1,32 +1,37 @@
-import * as core from '@actions/core';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
-import * as cache from '../src/cache.js';
-import * as dockerCommand from '../src/docker-command.js';
-import type { ComposeService } from '../src/docker-compose-file.js';
-import { processService } from '../src/docker-compose-service-processing.js';
-
-jest.mock('@actions/core', () => ({
+jest.unstable_mockModule('@actions/core', () => ({
   info: jest.fn(),
   warning: jest.fn(),
   debug: jest.fn(),
 }));
 
-jest.mock('../src/cache', () => ({
-  generateCacheKey: jest.fn((prefix, name, tag, platform) => `${prefix}-${name}-${tag}-${platform || 'default'}`),
-  generateCacheKeyPrefix: jest.fn((prefix, name, tag, platform) => `${prefix}-${name}-${tag}-${platform || 'default'}`),
-  generateManifestCacheKey: jest.fn(
-    (prefix, name, tag, platform) => `${prefix}-${name}-${tag}-${platform || 'default'}-manifest`
+jest.unstable_mockModule('../src/cache.js', () => ({
+  generateCacheKey: jest.fn(
+    (prefix: string, name: string, tag: string, platform?: string) =>
+      `${prefix}-${name}-${tag}-${platform ?? 'default'}`
   ),
-  generateTarPath: jest.fn((name, tag, platform) => `/tmp/${name}-${tag}-${platform || 'default'}.tar`),
-  generateManifestPath: jest.fn((name, tag, platform) => `/tmp/${name}-${tag}-${platform || 'default'}-manifest.json`),
+  generateCacheKeyPrefix: jest.fn(
+    (prefix: string, name: string, tag: string, platform?: string) =>
+      `${prefix}-${name}-${tag}-${platform ?? 'default'}`
+  ),
+  generateManifestCacheKey: jest.fn(
+    (prefix: string, name: string, tag: string, platform?: string) =>
+      `${prefix}-${name}-${tag}-${platform ?? 'default'}-manifest`
+  ),
+  generateTarPath: jest.fn(
+    (name: string, tag: string, platform?: string) => `/tmp/${name}-${tag}-${platform ?? 'default'}.tar`
+  ),
+  generateManifestPath: jest.fn(
+    (name: string, tag: string, platform?: string) => `/tmp/${name}-${tag}-${platform ?? 'default'}-manifest.json`
+  ),
   restoreFromCache: jest.fn(),
   saveToCache: jest.fn(),
   saveManifestToCache: jest.fn(),
   readManifestFromFile: jest.fn(),
 }));
 
-jest.mock('../src/docker-command', () => ({
+jest.unstable_mockModule('../src/docker-command.js', () => ({
   inspectImageRemote: jest.fn(),
   inspectImageLocal: jest.fn(),
   pullImage: jest.fn(),
@@ -34,22 +39,28 @@ jest.mock('../src/docker-command', () => ({
   loadImageFromTar: jest.fn(),
 }));
 
+const core = await import('@actions/core');
+const cache = await import('../src/cache.js');
+const dockerCommand = await import('../src/docker-command.js');
+const { processService } = await import('../src/docker-compose-service-processing.js');
+type ComposeService = import('../src/docker-compose-file.js').ComposeService;
+
+const mockCoreInfo = jest.mocked(core.info);
+const mockCoreWarning = jest.mocked(core.warning);
+const mockCoreDebug = jest.mocked(core.debug);
+
+const mockCacheRestore = jest.mocked(cache.restoreFromCache);
+const mockCacheSave = jest.mocked(cache.saveToCache);
+const mockSaveManifestToCache = jest.mocked(cache.saveManifestToCache);
+const mockReadManifestFromFile = jest.mocked(cache.readManifestFromFile);
+
+const mockInspectImageRemote = jest.mocked(dockerCommand.inspectImageRemote);
+const mockInspectImageLocal = jest.mocked(dockerCommand.inspectImageLocal);
+const mockPullImage = jest.mocked(dockerCommand.pullImage);
+const mockSaveImageToTar = jest.mocked(dockerCommand.saveImageToTar);
+const mockLoadImageFromTar = jest.mocked(dockerCommand.loadImageFromTar);
+
 describe('docker-compose-service-processing', () => {
-  const mockCoreInfo = core.info as jest.Mock;
-  const mockCoreWarning = core.warning as jest.Mock;
-  const mockCoreDebug = core.debug as jest.Mock;
-
-  const mockCacheRestore = cache.restoreFromCache as jest.Mock;
-  const mockCacheSave = cache.saveToCache as jest.Mock;
-  const mockSaveManifestToCache = cache.saveManifestToCache as jest.Mock;
-  const mockReadManifestFromFile = cache.readManifestFromFile as jest.Mock;
-
-  const mockInspectImageRemote = dockerCommand.inspectImageRemote as jest.Mock;
-  const mockInspectImageLocal = dockerCommand.inspectImageLocal as jest.Mock;
-  const mockPullImage = dockerCommand.pullImage as jest.Mock;
-  const mockSaveImageToTar = dockerCommand.saveImageToTar as jest.Mock;
-  const mockLoadImageFromTar = dockerCommand.loadImageFromTar as jest.Mock;
-
   beforeEach(() => {
     jest.clearAllMocks();
   });

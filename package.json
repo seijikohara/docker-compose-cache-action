@@ -34,16 +34,16 @@
     "format:check": "biome format . && prettier --check \"**/*.{yaml,yml,md}\" --ignore-unknown",
     "check": "biome check .",
     "fix": "biome check --write . && prettier --write \"**/*.{yaml,yml,md}\" --ignore-unknown",
-    "test": "jest",
-    "test:watch": "jest --watch",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
     "prepare": "lefthook install",
     "deps:update": "npx npm-check-updates -u && npm install",
     "deps:check": "npx npm-check-updates"
   },
   "dependencies": {
-    "@actions/cache": "^5.0.3",
-    "@actions/core": "^2.0.1",
-    "@actions/exec": "^2.0.0",
+    "@actions/cache": "^6.0.1",
+    "@actions/core": "^3.0.1",
+    "@actions/exec": "^3.0.0",
     "date-fns": "^4.1.0",
     "js-yaml": "^4.1.1"
   },

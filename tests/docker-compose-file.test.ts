@@ -1,27 +1,31 @@
-import * as fs from 'node:fs';
-import * as core from '@actions/core';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
-import {
-  getComposeFilePathsToProcess,
-  getComposeServicesFromFiles,
-  matchesExcludePattern,
-} from '../src/docker-compose-file.js';
-
-jest.mock('@actions/core', () => ({
+jest.unstable_mockModule('@actions/core', () => ({
   debug: jest.fn(),
   warning: jest.fn(),
 }));
-jest.mock('fs');
+
+jest.unstable_mockModule('node:fs', () => ({
+  existsSync: jest.fn(),
+  readFileSync: jest.fn(),
+}));
+
+const fs = await import('node:fs');
+const core = await import('@actions/core');
+const { getComposeFilePathsToProcess, getComposeServicesFromFiles, matchesExcludePattern } = await import(
+  '../src/docker-compose-file.js'
+);
+
+const existsSyncMock = jest.mocked(fs.existsSync);
+const readFileSyncMock = jest.mocked(fs.readFileSync);
+const warningMock = jest.mocked(core.warning);
+const debugMock = jest.mocked(core.debug);
 
 describe('docker-compose-file', () => {
   describe('getComposeServicesFromFiles', () => {
-    const warningMock = core.warning as jest.Mock;
-    const debugMock = core.debug as jest.Mock;
-
     beforeEach(() => {
       jest.clearAllMocks();
-      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      existsSyncMock.mockReturnValue(true);
     });
 
     const createYaml = (services: Record<string, { image?: string; platform?: string }>) =>
@@ -33,21 +37,19 @@ describe('docker-compose-file', () => {
         .join('\n')}`;
 
     it('extracts services with image from a single file', () => {
-      (fs.readFileSync as jest.Mock).mockReturnValue(createYaml({ nginx: { image: 'nginx:latest' } }));
+      readFileSyncMock.mockReturnValue(createYaml({ nginx: { image: 'nginx:latest' } }));
       const result = getComposeServicesFromFiles(['docker-compose.yml'], []);
       expect(result).toEqual([{ image: 'nginx:latest' }]);
     });
 
     it('extracts platform if present', () => {
-      (fs.readFileSync as jest.Mock).mockReturnValue(
-        createYaml({ nginx: { image: 'nginx:latest', platform: 'linux/amd64' } })
-      );
+      readFileSyncMock.mockReturnValue(createYaml({ nginx: { image: 'nginx:latest', platform: 'linux/amd64' } }));
       const result = getComposeServicesFromFiles(['docker-compose.yml'], []);
       expect(result).toEqual([{ image: 'nginx:latest', platform: 'linux/amd64' }]);
     });
 
     it('excludes images in exclude list', () => {
-      (fs.readFileSync as jest.Mock).mockReturnValue(
+      readFileSyncMock.mockReturnValue(
         createYaml({ nginx: { image: 'nginx:latest' }, redis: { image: 'redis:alpine' } })
       );
       const result = getComposeServicesFromFiles(['docker-compose.yml'], ['redis:alpine']);
@@ -55,7 +57,7 @@ describe('docker-compose-file', () => {
     });
 
     it('merges services from multiple files', () => {
-      (fs.readFileSync as jest.Mock).mockImplementation((file) => {
+      readFileSyncMock.mockImplementation((file) => {
         if (file === 'a.yml') {
           return createYaml({ nginx: { image: 'nginx:latest' } });
         }
@@ -69,35 +71,33 @@ describe('docker-compose-file', () => {
     });
 
     it('ignores services without image', () => {
-      (fs.readFileSync as jest.Mock).mockReturnValue(
-        'services:\n  app:\n    build: .\n  nginx:\n    image: nginx:latest'
-      );
+      readFileSyncMock.mockReturnValue('services:\n  app:\n    build: .\n  nginx:\n    image: nginx:latest');
       const result = getComposeServicesFromFiles(['docker-compose.yml'], []);
       expect(result).toEqual([{ image: 'nginx:latest' }]);
     });
 
     it('searches default files if no input', () => {
-      (fs.readFileSync as jest.Mock).mockReturnValue(createYaml({ nginx: { image: 'nginx:latest' } }));
+      readFileSyncMock.mockReturnValue(createYaml({ nginx: { image: 'nginx:latest' } }));
       const result = getComposeServicesFromFiles(['compose.yaml'], []);
       expect(result).toEqual([{ image: 'nginx:latest' }]);
     });
 
     it('returns empty if file is empty', () => {
-      (fs.readFileSync as jest.Mock).mockReturnValue('');
+      readFileSyncMock.mockReturnValue('');
       const result = getComposeServicesFromFiles(['docker-compose.yml'], []);
       expect(result).toEqual([]);
       expect(debugMock).toHaveBeenCalledWith(expect.stringContaining('Empty or invalid YAML file'));
     });
 
     it('returns empty if no services section', () => {
-      (fs.readFileSync as jest.Mock).mockReturnValue('version: "3.8"');
+      readFileSyncMock.mockReturnValue('version: "3.8"');
       const result = getComposeServicesFromFiles(['docker-compose.yml'], []);
       expect(result).toEqual([]);
       expect(debugMock).toHaveBeenCalledWith(expect.stringContaining('No services section'));
     });
 
     it('returns empty and warns on parse error', () => {
-      (fs.readFileSync as jest.Mock).mockImplementation(() => {
+      readFileSyncMock.mockImplementation(() => {
         throw new Error('parse error');
       });
       const result = getComposeServicesFromFiles(['docker-compose.yml'], []);
@@ -112,7 +112,7 @@ describe('docker-compose-file', () => {
     });
 
     it('should return provided file paths when they exist', () => {
-      (fs.existsSync as jest.Mock).mockImplementation((filePath) => {
+      existsSyncMock.mockImplementation((filePath) => {
         return filePath === 'docker-compose.yml' || filePath === 'docker-compose.override.yml';
       });
 
@@ -125,14 +125,14 @@ describe('docker-compose-file', () => {
     });
 
     it('should return empty array when no provided files exist', () => {
-      (fs.existsSync as jest.Mock).mockReturnValue(false);
+      existsSyncMock.mockReturnValue(false);
 
       const result = getComposeFilePathsToProcess(['nonexistent1.yml', 'nonexistent2.yml']);
       expect(result).toEqual([]);
     });
 
     it('should return default compose files when no paths provided and defaults exist', () => {
-      (fs.existsSync as jest.Mock).mockImplementation((filePath) => {
+      existsSyncMock.mockImplementation((filePath) => {
         return filePath === 'docker-compose.yml';
       });
 
@@ -141,14 +141,14 @@ describe('docker-compose-file', () => {
     });
 
     it('should return empty array when no paths provided and no defaults exist', () => {
-      (fs.existsSync as jest.Mock).mockReturnValue(false);
+      existsSyncMock.mockReturnValue(false);
 
       const result = getComposeFilePathsToProcess([]);
       expect(result).toEqual([]);
     });
 
     it('should handle mixed existing and non-existing default files', () => {
-      (fs.existsSync as jest.Mock).mockImplementation((filePath) => {
+      existsSyncMock.mockImplementation((filePath) => {
         return filePath === 'docker-compose.yaml'; // Only .yaml exists, not .yml
       });
 
@@ -260,7 +260,7 @@ describe('docker-compose-file', () => {
   describe('getComposeServicesFromFiles with wildcard patterns', () => {
     beforeEach(() => {
       jest.clearAllMocks();
-      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      existsSyncMock.mockReturnValue(true);
     });
 
     const createYaml = (services: Record<string, { image?: string; platform?: string }>) =>
@@ -272,7 +272,7 @@ describe('docker-compose-file', () => {
         .join('\n')}`;
 
     it('should exclude images matching wildcard pattern nginx:*', () => {
-      (fs.readFileSync as jest.Mock).mockReturnValue(
+      readFileSyncMock.mockReturnValue(
         createYaml({
           nginx1: { image: 'nginx:latest' },
           nginx2: { image: 'nginx:alpine' },
@@ -284,7 +284,7 @@ describe('docker-compose-file', () => {
     });
 
     it('should exclude all latest tags with *:latest pattern', () => {
-      (fs.readFileSync as jest.Mock).mockReturnValue(
+      readFileSyncMock.mockReturnValue(
         createYaml({
           nginx: { image: 'nginx:latest' },
           redis: { image: 'redis:latest' },
@@ -296,7 +296,7 @@ describe('docker-compose-file', () => {
     });
 
     it('should exclude registry-specific images', () => {
-      (fs.readFileSync as jest.Mock).mockReturnValue(
+      readFileSyncMock.mockReturnValue(
         createYaml({
           app: { image: 'ghcr.io/myorg/app:latest' },
           service: { image: 'ghcr.io/myorg/service:v1' },
@@ -308,7 +308,7 @@ describe('docker-compose-file', () => {
     });
 
     it('should support multiple wildcard patterns', () => {
-      (fs.readFileSync as jest.Mock).mockReturnValue(
+      readFileSyncMock.mockReturnValue(
         createYaml({
           nginx: { image: 'nginx:latest' },
           redis: { image: 'redis:alpine' },
@@ -321,7 +321,7 @@ describe('docker-compose-file', () => {
     });
 
     it('should support mixed exact and wildcard patterns', () => {
-      (fs.readFileSync as jest.Mock).mockReturnValue(
+      readFileSyncMock.mockReturnValue(
         createYaml({
           nginx: { image: 'nginx:latest' },
           redis: { image: 'redis:alpine' },
