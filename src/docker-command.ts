@@ -43,69 +43,43 @@ async function executeDockerCommand(
   dockerArgs: readonly string[],
   options: exec.ExecOptions
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
-  // Format command for logging
   const fullCommand = `docker ${dockerArgs.join(' ')}`;
-
-  // Log command execution
   core.info(`Executing: ${fullCommand}`);
 
-  // Record start time
   const executionStartTime = performance.now();
 
-  // Note: This function requires controlled mutation for stream collection
-  // The mutation is localized to this function and the arrays are treated as immutable elsewhere
-  const commandOutputBuffer: {
-    stdout: readonly string[];
-    stderr: readonly string[];
-  } = {
-    stdout: [] as readonly string[],
-    stderr: [] as readonly string[],
-  };
+  // Locally mutable accumulators are fine: they don't escape this function
+  // and avoid the O(N²) cost of immutable [...arr, x] reallocation for
+  // every chunk a long-running command streams.
+  const stdoutChunks: string[] = [];
+  const stderrChunks: string[] = [];
 
-  // Create a new options object with our stdout/stderr listeners
   const execOptionsWithCapture: exec.ExecOptions = {
     ...options,
     listeners: {
       ...options.listeners,
       stdout: (data: Buffer) => {
-        const outputChunk = data.toString();
-        // Controlled mutation: creating new immutable array each time
-        commandOutputBuffer.stdout = [...commandOutputBuffer.stdout, outputChunk] as const;
-        // If the original options had a stdout listener, call it
-        if (options.listeners?.stdout) {
-          options.listeners.stdout(data);
-        }
+        stdoutChunks.push(data.toString());
+        options.listeners?.stdout?.(data);
       },
       stderr: (data: Buffer) => {
-        const outputChunk = data.toString();
-        // Controlled mutation: creating new immutable array each time
-        commandOutputBuffer.stderr = [...commandOutputBuffer.stderr, outputChunk] as const;
-        // If the original options had a stderr listener, call it
-        if (options.listeners?.stderr) {
-          options.listeners.stderr(data);
-        }
+        stderrChunks.push(data.toString());
+        options.listeners?.stderr?.(data);
       },
     },
   };
 
   try {
-    // Execute the command
     const exitCode = await exec.exec('docker', [...dockerArgs], execOptionsWithCapture);
-
-    // Calculate and log execution time
-    const executionEndTime = performance.now();
-    const executionTimeMs = Math.round(executionEndTime - executionStartTime);
+    const executionTimeMs = Math.round(performance.now() - executionStartTime);
     core.info(`Command completed in ${executionTimeMs}ms: ${fullCommand}`);
-
-    // Join all chunks to create the complete output strings
-    const stdout = commandOutputBuffer.stdout.join('');
-    const stderr = commandOutputBuffer.stderr.join('');
-
-    return { exitCode, stdout, stderr };
+    return {
+      exitCode,
+      stdout: stdoutChunks.join(''),
+      stderr: stderrChunks.join(''),
+    };
   } catch (error) {
-    // Log execution failure
-    const executionEndTime = performance.now();
-    const executionTimeMs = Math.round(executionEndTime - executionStartTime);
+    const executionTimeMs = Math.round(performance.now() - executionStartTime);
     core.error(`Command failed after ${executionTimeMs}ms: ${fullCommand}`);
     throw error;
   }

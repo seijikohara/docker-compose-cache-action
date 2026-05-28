@@ -41,8 +41,12 @@ export function formatFileSize(fileSizeBytes: number | undefined): string {
   }
 
   const rawUnitIndex = Math.floor(Math.log(fileSizeBytes) / Math.log(FILE_SIZE_BASE));
-  const safeUnitIndex = Math.min(rawUnitIndex, FILE_SIZE_UNITS.length - 1);
-  const sizeUnit = FILE_SIZE_UNITS[safeUnitIndex as keyof typeof FILE_SIZE_UNITS] || FILE_SIZE_UNITS[0];
+  // Sub-byte values (0 < fileSizeBytes < 1) produce a negative
+  // logarithm, and `Array.prototype.at()` treats negative indices as
+  // offsets from the end, so a clamp through `Math.max(0, ...)` is
+  // required to keep small sizes pointed at the "Bytes" unit.
+  const safeUnitIndex = Math.max(0, Math.min(rawUnitIndex, FILE_SIZE_UNITS.length - 1));
+  const sizeUnit = FILE_SIZE_UNITS.at(safeUnitIndex) ?? FILE_SIZE_UNITS[0];
 
   return `${(fileSizeBytes / FILE_SIZE_BASE ** safeUnitIndex).toFixed(2).replace(/\.0+$|(\.[0-9]*[1-9])0+$/, '$1')} ${sizeUnit}`;
 }

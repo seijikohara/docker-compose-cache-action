@@ -2,7 +2,7 @@
  * @fileoverview Cache management utilities for Docker images and manifests.
  * Handles cache key generation, file path management, and cache operations.
  */
-import type { DockerImageManifest } from './docker-command';
+import type { DockerImageManifest } from './docker-command.js';
 /**
  * Result of a cache operation.
  * Represents the outcome of cache save or restore operations.

@@ -1,4 +1,5 @@
 import * as core from '@actions/core';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 import {
   type ActionSummary,
@@ -9,7 +10,7 @@ import {
   type ProcessedImageList,
   setActionOutputs,
   type TimedServiceResult,
-} from '../src/action-outputs';
+} from '../src/action-outputs.js';
 
 jest.mock('@actions/core', () => ({
   setOutput: jest.fn(),

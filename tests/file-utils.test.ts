@@ -1,4 +1,5 @@
-import { formatFileSize, sanitizePathComponent } from '../src/file-utils';
+import { describe, expect, it } from '@jest/globals';
+import { formatFileSize, sanitizePathComponent } from '../src/file-utils.js';
 
 describe('file-utils', () => {
   describe('formatFileSize', () => {
@@ -78,6 +79,15 @@ describe('file-utils', () => {
       // Test fractional bytes (should round appropriately)
       expect(formatFileSize(1.7)).toBe('1.7 Bytes');
       expect(formatFileSize(100.1)).toBe('100.1 Bytes');
+    });
+
+    it('should report sub-byte values in the smallest unit', () => {
+      // For 0 < value < 1, log(value) is negative, which previously
+      // caused Array.prototype.at() to wrap around to the end of the
+      // unit list (returning 'PB' instead of 'Bytes'). The unit index
+      // is now clamped to >= 0 so these values stay in 'Bytes'.
+      expect(formatFileSize(0.5)).toBe('0.5 Bytes');
+      expect(formatFileSize(0.001)).toBe('0 Bytes');
     });
   });
 

@@ -46,5 +46,5 @@ outputs:
   image-list:
     description: 'JSON array of image details with information about each image. Example: ''[{"name":"mysql:8.0","platform":"linux/amd64","status":"Cached","size":524288000,"digest":"sha256:abc123...","processingTimeMs":1200.5,"cacheKey":"docker-compose-image-mysql-8.0-linux-amd64-none-abc123def456"},{"name":"redis:alpine","platform":"linux/amd64","status":"Pulled","size":32768000,"digest":"sha256:def456...","processingTimeMs":3500.2,"cacheKey":"docker-compose-image-redis-alpine-linux-amd64-none-def456789abc"}]'''
 runs:
-  using: 'node20'
+  using: 'node24'
   main: 'dist/index.js'

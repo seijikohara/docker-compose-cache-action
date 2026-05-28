@@ -1,4 +1,5 @@
-import { getCurrentPlatformInfo, parseOciPlatformString } from '../src/oci-platform';
+import { afterAll, describe, expect, it } from '@jest/globals';
+import { getCurrentPlatformInfo, parseOciPlatformString } from '../src/oci-platform.js';
 
 describe('platform', () => {
   describe('getCurrentPlatformInfo', () => {

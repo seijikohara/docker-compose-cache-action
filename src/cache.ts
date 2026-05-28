@@ -8,9 +8,9 @@ import * as path from 'node:path';
 import * as cache from '@actions/cache';
 import * as core from '@actions/core';
 
-import type { DockerImageManifest } from './docker-command';
-import { sanitizePathComponent } from './file-utils';
-import { getCurrentPlatformInfo, parseOciPlatformString } from './oci-platform';
+import type { DockerImageManifest } from './docker-command.js';
+import { sanitizePathComponent } from './file-utils.js';
+import { getCurrentPlatformInfo, parseOciPlatformString } from './oci-platform.js';
 
 /**
  * Default temp directory fallback when RUNNER_TEMP is not available.
