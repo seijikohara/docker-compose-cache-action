@@ -9,7 +9,7 @@ inputs:
     description: Git user email used to author the tag objects.
     required: true
   github-token:
-    description: "Token used by the GitHub CLI to publish the Release. Needs `contents: write`."
+    description: 'Token used by the GitHub CLI to publish the Release. Needs `contents: write`.'
     required: true
 
 runs:
@@ -42,13 +42,20 @@ runs:
         git config --global user.name "$BOT_NAME"
         git config --global user.email "$BOT_EMAIL"
 
+        # Caller workflows checkout with `persist-credentials: false` to
+        # keep secrets out of .git/config while running PR-controlled
+        # build steps. By the time this composite runs all that PR code is
+        # behind us, so it is safe to swap the origin URL to one that
+        # carries the App token for the tag pushes below.
+        authed_remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
         if [[ -z "$existing_version_commit" ]]; then
           git tag -a "${version_tag}" "${current_commit}" -m "chore(release): publish ${version_tag}"
-          git push origin "refs/tags/${version_tag}"
+          git push "${authed_remote}" "refs/tags/${version_tag}"
         fi
 
         git tag -fa "${major_tag}" "${current_commit}" -m "chore(release): update ${major_tag} to ${version_tag}"
-        git push --force origin "refs/tags/${major_tag}"
+        git push --force "${authed_remote}" "refs/tags/${major_tag}"
 
         # Publish a GitHub Release for the patch tag the first time it shows
         # up. The major tag is intentionally not promoted to a Release: it

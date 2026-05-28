@@ -6,24 +6,36 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Serialize CI per branch / PR so the bot's dist-commit push (and the
+# subsequent main-side version bump) can't race a still-running earlier
+# run and produce a non-fast-forward `git push`. `cancel-in-progress`
+# leaves only the latest run alive; its checks are what auto-merge and
+# branch protection evaluate against the current HEAD.
+concurrency:
+  group: ci-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-test:
     name: Build & Test
     runs-on: ubuntu-latest
     steps:
-      - name: Generate GitHub App Token
-        id: app-token
-        uses: actions/create-github-app-token@v3
-        with:
-          app-id: ${{ vars.DEV_AUTOMATION_APP_ID }}
-          private-key: ${{ secrets.DEV_AUTOMATION_PRIVATE_KEY }}
-
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
           fetch-tags: true
-          token: ${{ steps.app-token.outputs.token }}
+          # The PR-side commit step pushes back to the PR branch HEAD, so
+          # we need that exact commit instead of the synthetic merge ref
+          # GitHub provides on `pull_request` events. For `push` events
+          # head.sha is empty and we fall back to the pushed commit's SHA.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          # Build steps below execute PR-supplied code (npm scripts, ncc,
+          # tests). Do not leave any privileged credentials behind in
+          # .git/config that those scripts could exfiltrate. The App token
+          # is minted in a later step and only added to the env of the
+          # commit / release steps that need it.
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -32,6 +44,12 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
+        # `--ignore-scripts` would be safer against malicious postinstall
+        # hooks, but biome / similar tools ship their platform binary via
+        # postinstall and lint fails without it. Leaving install scripts
+        # enabled here; the other mitigations (no token in env during the
+        # build, persist-credentials: false on checkout) still keep the
+        # App token out of reach of any script that runs.
         run: npm ci
 
       - name: Lint code
@@ -46,7 +64,46 @@ jobs:
       - name: Package action using ncc
         run: npm run package
 
-      - name: Commit generated files
+      - name: Generate GitHub App Token
+        # Only mint the privileged token after every PR-controlled build
+        # step has run, and only when one of the downstream commit / tag
+        # steps will actually need it. The token is then scoped to the
+        # explicit env of those steps via outputs.
+        if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.DEV_AUTOMATION_APP_ID }}
+          private-key: ${{ secrets.DEV_AUTOMATION_PRIVATE_KEY }}
+
+      - name: Commit dist to PR branch
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != format('{0}[bot]', steps.app-token.outputs.app-slug) }}
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          BOT_NAME: ${{ steps.app-token.outputs.app-slug }}[bot]
+          BOT_EMAIL: ${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com
+          PR_BRANCH: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+
+          git add dist/
+          if git diff --cached --quiet; then
+            echo "No dist/ changes detected"
+            exit 0
+          fi
+
+          git config --global user.name "$BOT_NAME"
+          git config --global user.email "$BOT_EMAIL"
+          git commit -m "build: update generated files"
+
+          # persist-credentials: false above means git has no stored token
+          # for github.com. Authenticate this single push by embedding the
+          # App token in the remote URL; GitHub Actions automatically masks
+          # secrets in logs.
+          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${PR_BRANCH}"
+          echo "Committed dist/ to PR branch ${PR_BRANCH}"
+
+      - name: Bump version on main
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor != format('{0}[bot]', steps.app-token.outputs.app-slug) }}
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -55,20 +112,31 @@ jobs:
         run: |
           set -euo pipefail
 
-          git add dist/
-          if git diff --cached --quiet; then
-            echo "No dist changes detected"
+          # The PR-side workflow already committed any dist regen into the
+          # PR branch, so main's working tree matches HEAD's dist after
+          # checkout + rebuild. Comparing to the latest released patch tag
+          # is the only way to detect whether this push actually changed
+          # build output and therefore warrants a new release.
+          latest_tag=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' | sort -V | tail -1)
+          if [[ -z "$latest_tag" ]]; then
+            echo "No prior release tag found; skipping auto-bump"
+            exit 0
+          fi
+
+          if git diff --quiet "$latest_tag" HEAD -- dist/; then
+            echo "No dist/ changes since $latest_tag; no release needed"
             exit 0
           fi
 
           npm version patch --no-git-tag-version
+          new_version=$(node -p "require('./package.json').version")
           git add package.json package-lock.json
 
           git config --global user.name "$BOT_NAME"
           git config --global user.email "$BOT_EMAIL"
-          git commit -m "build: update generated files"
-          git push
-          echo "Committed generated files"
+          git commit -m "chore(release): bump version to v${new_version}"
+          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/main"
+          echo "Bumped version to v${new_version} and pushed bot commit"
 
       - name: Create release tags
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor == format('{0}[bot]', steps.app-token.outputs.app-slug) }}
