@@ -1,5 +1,5 @@
 name: Sync release tags
-description: Create the v{version} tag for the current commit and force v{major} to point at it.
+description: Create the v{version} tag and matching GitHub Release for the current commit, then force v{major} to point at it.
 
 inputs:
   bot-name:
@@ -7,6 +7,9 @@ inputs:
     required: true
   bot-email:
     description: Git user email used to author the tag objects.
+    required: true
+  github-token:
+    description: "Token used by the GitHub CLI to publish the Release. Needs `contents: write`."
     required: true
 
 runs:
@@ -17,6 +20,7 @@ runs:
       env:
         BOT_NAME: ${{ inputs.bot-name }}
         BOT_EMAIL: ${{ inputs.bot-email }}
+        GH_TOKEN: ${{ inputs.github-token }}
       run: |
         set -euo pipefail
 
@@ -46,6 +50,20 @@ runs:
         git tag -fa "${major_tag}" "${current_commit}" -m "chore(release): update ${major_tag} to ${version_tag}"
         git push --force origin "refs/tags/${major_tag}"
 
+        # Publish a GitHub Release for the patch tag the first time it shows
+        # up. The major tag is intentionally not promoted to a Release: it
+        # is a moving pointer, not a release artifact. The check is idempotent
+        # so re-runs (manual dispatch, retries) don't error.
+        if gh release view "${version_tag}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+          release_status="already existed"
+        else
+          gh release create "${version_tag}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "${version_tag}" \
+            --generate-notes
+          release_status="created"
+        fi
+
         short_sha=$(git rev-parse --short "${current_commit}")
         {
           echo "### 📌 Release Tags"
@@ -54,4 +72,6 @@ runs:
           echo "|-----|------------|"
           echo "| \`${version_tag}\` | \`${short_sha}\` |"
           echo "| \`${major_tag}\` | \`${short_sha}\` |"
+          echo ""
+          echo "GitHub Release \`${version_tag}\`: ${release_status}."
         } >> "$GITHUB_STEP_SUMMARY"
