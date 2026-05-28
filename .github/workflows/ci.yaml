@@ -35,11 +35,13 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        # --ignore-scripts blocks postinstall lifecycle hooks that an
-        # attacker could add to a malicious PR. The package.json scripts
-        # we deliberately invoke (lint / test / build / package) are
-        # listed below so their behaviour stays explicit.
-        run: npm ci --ignore-scripts
+        # `--ignore-scripts` would be safer against malicious postinstall
+        # hooks, but biome / similar tools ship their platform binary via
+        # postinstall and lint fails without it. Leaving install scripts
+        # enabled here; the other mitigations (no token in env during the
+        # build, persist-credentials: false on checkout) still keep the
+        # App token out of reach of any script that runs.
+        run: npm ci
 
       - name: Lint code
         run: npm run lint

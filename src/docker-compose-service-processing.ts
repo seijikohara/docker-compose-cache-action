@@ -307,7 +307,7 @@ export async function processService(
 
   // Get image manifest with digest for cache key generation
   const manifest = await inspectImageRemote(completeImageName);
-  if (!manifest || !manifest.digest) {
+  if (!manifest?.digest) {
     // Registry unavailable - try fallback to cached version if skip-digest-verification is enabled
     if (skipLatestCheck && !forceRefresh) {
       const fallbackResult = await tryRestoreFromCacheWithoutDigest(
