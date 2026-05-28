@@ -23,6 +23,12 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
+          # For pull_request events check out the PR branch HEAD (not the
+          # synthetic merge ref) so the "Commit dist to PR branch" step can
+          # commit on top and push the new commit back to the PR branch via
+          # the App token. For push events head.sha is empty, so the
+          # expression falls through to the pushed commit's SHA.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           token: ${{ steps.app-token.outputs.token }}
 
       - name: Setup Node.js
@@ -46,7 +52,29 @@ jobs:
       - name: Package action using ncc
         run: npm run package
 
-      - name: Commit generated files
+      - name: Commit dist to PR branch
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != format('{0}[bot]', steps.app-token.outputs.app-slug) }}
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          BOT_NAME: ${{ steps.app-token.outputs.app-slug }}[bot]
+          BOT_EMAIL: ${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com
+          PR_BRANCH: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+
+          git add dist/
+          if git diff --cached --quiet; then
+            echo "No dist/ changes detected"
+            exit 0
+          fi
+
+          git config --global user.name "$BOT_NAME"
+          git config --global user.email "$BOT_EMAIL"
+          git commit -m "build: update generated files"
+          git push origin "HEAD:refs/heads/${PR_BRANCH}"
+          echo "Committed dist/ to PR branch ${PR_BRANCH}"
+
+      - name: Bump version on main
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor != format('{0}[bot]', steps.app-token.outputs.app-slug) }}
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -55,9 +83,19 @@ jobs:
         run: |
           set -euo pipefail
 
-          git add dist/
-          if git diff --cached --quiet; then
-            echo "No dist changes detected"
+          # The PR-side workflow already committed any dist regen into the
+          # PR branch, so main's working tree matches HEAD's dist after
+          # checkout + rebuild. Comparing to the latest released patch tag
+          # is the only way to detect whether this push actually changed
+          # build output and therefore warrants a new release.
+          latest_tag=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' | sort -V | tail -1)
+          if [[ -z "$latest_tag" ]]; then
+            echo "No prior release tag found; skipping auto-bump"
+            exit 0
+          fi
+
+          if git diff --quiet "$latest_tag" HEAD -- dist/; then
+            echo "No dist/ changes since $latest_tag; no release needed"
             exit 0
           fi
 
@@ -67,8 +105,8 @@ jobs:
           git config --global user.name "$BOT_NAME"
           git config --global user.email "$BOT_EMAIL"
           git commit -m "build: update generated files"
-          git push
-          echo "Committed generated files"
+          git push origin "HEAD:refs/heads/main"
+          echo "Bumped version and pushed bot commit"
 
       - name: Create release tags
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor == format('{0}[bot]', steps.app-token.outputs.app-slug) }}
