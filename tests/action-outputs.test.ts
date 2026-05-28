@@ -1,18 +1,6 @@
-import * as core from '@actions/core';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
-import {
-  type ActionSummary,
-  buildProcessedImageList,
-  calculateActionSummary,
-  createActionSummary,
-  logActionCompletion,
-  type ProcessedImageList,
-  setActionOutputs,
-  type TimedServiceResult,
-} from '../src/action-outputs.js';
-
-jest.mock('@actions/core', () => ({
+jest.unstable_mockModule('@actions/core', () => ({
   setOutput: jest.fn(),
   info: jest.fn(),
   summary: {
@@ -23,7 +11,7 @@ jest.mock('@actions/core', () => ({
   },
 }));
 
-jest.mock('../src/date-utils', () => ({
+jest.unstable_mockModule('../src/date-utils.js', () => ({
   formatTimeBetween: jest.fn((start: number, end: number) => {
     const duration = end - start;
     if (duration >= 3600000) {
@@ -39,7 +27,7 @@ jest.mock('../src/date-utils', () => ({
   }),
 }));
 
-jest.mock('../src/file-utils', () => ({
+jest.unstable_mockModule('../src/file-utils.js', () => ({
   formatFileSize: jest.fn((size?: number) => {
     if (size === undefined) {
       return 'N/A';
@@ -57,10 +45,23 @@ jest.mock('../src/file-utils', () => ({
   }),
 }));
 
-describe('action-outputs', () => {
-  const mockCoreSetOutput = core.setOutput as jest.Mock;
-  const mockCoreInfo = core.info as jest.Mock;
+const core = await import('@actions/core');
+const {
+  buildProcessedImageList,
+  calculateActionSummary,
+  createActionSummary,
+  logActionCompletion,
+  setActionOutputs,
+} = await import('../src/action-outputs.js');
+type ActionSummary = import('../src/action-outputs.js').ActionSummary;
+type ProcessedImageList = import('../src/action-outputs.js').ProcessedImageList;
+type TimedServiceResult = import('../src/action-outputs.js').TimedServiceResult;
 
+const mockCoreSetOutput = jest.mocked(core.setOutput);
+const mockCoreInfo = jest.mocked(core.info);
+const mockCoreSummary = jest.mocked(core.summary);
+
+describe('action-outputs', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -157,9 +158,9 @@ describe('action-outputs', () => {
 
       const output = buildProcessedImageList(results);
 
-      expect(output[0].status).toBe('Error');
-      expect(output[0].size).toBe(0);
-      expect(output[0].digest).toBe('');
+      expect(output[0]?.status).toBe('Error');
+      expect(output[0]?.size).toBe(0);
+      expect(output[0]?.digest).toBe('');
     });
   });
 
@@ -278,8 +279,6 @@ describe('action-outputs', () => {
   });
 
   describe('createActionSummary', () => {
-    const mockCoreSummary = core.summary as jest.Mocked<typeof core.summary>;
-
     beforeEach(() => {
       jest.clearAllMocks();
     });

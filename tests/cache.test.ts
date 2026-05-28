@@ -1,44 +1,25 @@
-import * as fs from 'node:fs/promises';
-import * as cache from '@actions/cache';
-import * as core from '@actions/core';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
-import {
-  extractDigestPrefix,
-  generateCacheKey,
-  generateCacheKeyPrefix,
-  generateManifestCacheKey,
-  generateManifestPath,
-  generateTarPath,
-  getTempDirectory,
-  readManifestFromFile,
-  restoreFromCache,
-  saveManifestToCache,
-  saveToCache,
-  writeManifestToFile,
-} from '../src/cache.js';
-import type { DockerImageManifest } from '../src/docker-command.js';
-
-jest.mock('@actions/cache', () => ({
+jest.unstable_mockModule('@actions/cache', () => ({
   restoreCache: jest.fn(),
   saveCache: jest.fn(),
 }));
 
-jest.mock('@actions/core', () => ({
+jest.unstable_mockModule('@actions/core', () => ({
   warning: jest.fn(),
   debug: jest.fn(),
 }));
 
-jest.mock('fs/promises', () => ({
+jest.unstable_mockModule('node:fs/promises', () => ({
   writeFile: jest.fn(),
   readFile: jest.fn(),
 }));
 
-jest.mock('../src/file-utils', () => ({
+jest.unstable_mockModule('../src/file-utils.js', () => ({
   sanitizePathComponent: jest.fn((value: string) => value.replace(/[/\\:*?"<>|]/g, '-')),
 }));
 
-jest.mock('../src/oci-platform', () => ({
+jest.unstable_mockModule('../src/oci-platform.js', () => ({
   getCurrentPlatformInfo: jest.fn(() => ({
     os: 'linux',
     arch: 'amd64',
@@ -53,14 +34,33 @@ jest.mock('../src/oci-platform', () => ({
   }),
 }));
 
-describe('cache', () => {
-  const mockCacheRestore = cache.restoreCache as jest.Mock;
-  const mockCacheSave = cache.saveCache as jest.Mock;
-  const mockCoreWarning = core.warning as jest.Mock;
-  const mockCoreDebug = core.debug as jest.Mock;
-  const mockFsWriteFile = fs.writeFile as jest.Mock;
-  const mockFsReadFile = fs.readFile as jest.Mock;
+const fs = await import('node:fs/promises');
+const cache = await import('@actions/cache');
+const core = await import('@actions/core');
+const {
+  extractDigestPrefix,
+  generateCacheKey,
+  generateCacheKeyPrefix,
+  generateManifestCacheKey,
+  generateManifestPath,
+  generateTarPath,
+  getTempDirectory,
+  readManifestFromFile,
+  restoreFromCache,
+  saveManifestToCache,
+  saveToCache,
+  writeManifestToFile,
+} = await import('../src/cache.js');
+type DockerImageManifest = import('../src/docker-command.js').DockerImageManifest;
 
+const mockCacheRestore = jest.mocked(cache.restoreCache);
+const mockCacheSave = jest.mocked(cache.saveCache);
+const mockCoreWarning = jest.mocked(core.warning);
+const mockCoreDebug = jest.mocked(core.debug);
+const mockFsWriteFile = jest.mocked(fs.writeFile);
+const mockFsReadFile = jest.mocked(fs.readFile);
+
+describe('cache', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.RUNNER_TEMP = '/tmp';
