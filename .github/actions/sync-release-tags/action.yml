@@ -1,0 +1,57 @@
+name: Sync release tags
+description: Create the v{version} tag for the current commit and force v{major} to point at it.
+
+inputs:
+  bot-name:
+    description: Git user name used to author the tag objects.
+    required: true
+  bot-email:
+    description: Git user email used to author the tag objects.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Sync release tags
+      shell: bash
+      env:
+        BOT_NAME: ${{ inputs.bot-name }}
+        BOT_EMAIL: ${{ inputs.bot-email }}
+      run: |
+        set -euo pipefail
+
+        current_version=$(node -p "require('./package.json').version")
+        current_commit=$(git rev-parse HEAD)
+        version_tag="v${current_version}"
+        major_tag="v${current_version%%.*}"
+
+        existing_version_commit=""
+        if git rev-parse --verify "refs/tags/${version_tag}" >/dev/null 2>&1; then
+          existing_version_commit=$(git rev-list -n 1 "refs/tags/${version_tag}")
+        fi
+
+        if [[ -n "$existing_version_commit" && "$existing_version_commit" != "$current_commit" ]]; then
+          echo "::error::Release tag ${version_tag} already exists on a different commit (${existing_version_commit})."
+          exit 1
+        fi
+
+        git config --global user.name "$BOT_NAME"
+        git config --global user.email "$BOT_EMAIL"
+
+        if [[ -z "$existing_version_commit" ]]; then
+          git tag -a "${version_tag}" "${current_commit}" -m "chore(release): publish ${version_tag}"
+          git push origin "refs/tags/${version_tag}"
+        fi
+
+        git tag -fa "${major_tag}" "${current_commit}" -m "chore(release): update ${major_tag} to ${version_tag}"
+        git push --force origin "refs/tags/${major_tag}"
+
+        short_sha=$(git rev-parse --short "${current_commit}")
+        {
+          echo "### 📌 Release Tags"
+          echo ""
+          echo "| Tag | Commit SHA |"
+          echo "|-----|------------|"
+          echo "| \`${version_tag}\` | \`${short_sha}\` |"
+          echo "| \`${major_tag}\` | \`${short_sha}\` |"
+        } >> "$GITHUB_STEP_SUMMARY"
