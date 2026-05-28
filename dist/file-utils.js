@@ -1,0 +1,46 @@
+/**
+ * @fileoverview File and path utility functions.
+ * Provides utilities for path sanitization and file size formatting.
+ */
+/**
+ * File size formatting units.
+ */
+const FILE_SIZE_UNITS = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB'];
+/**
+ * File size calculation base.
+ */
+const FILE_SIZE_BASE = 1024;
+/**
+ * Sanitizes a string to make it safe for use in file paths.
+ *
+ * @param value - The string to sanitize.
+ * @returns A sanitized string safe for use in file paths.
+ */
+export function sanitizePathComponent(value) {
+    // Replace all characters that are not safe for filenames across platforms
+    // This includes: / \ : * ? " < > |
+    return value.replace(/[/\\:*?"<>|]/g, '-');
+}
+/**
+ * Formats a file size in bytes to a human-readable string.
+ *
+ * @param fileSizeBytes - Size in bytes.
+ * @returns Human-readable size string (e.g. "10.5 MB").
+ */
+export function formatFileSize(fileSizeBytes) {
+    if (fileSizeBytes === undefined) {
+        return 'N/A';
+    }
+    if (fileSizeBytes === 0) {
+        return '0 Bytes';
+    }
+    const rawUnitIndex = Math.floor(Math.log(fileSizeBytes) / Math.log(FILE_SIZE_BASE));
+    // Sub-byte values (0 < fileSizeBytes < 1) produce a negative
+    // logarithm, and `Array.prototype.at()` treats negative indices as
+    // offsets from the end, so a clamp through `Math.max(0, ...)` is
+    // required to keep small sizes pointed at the "Bytes" unit.
+    const safeUnitIndex = Math.max(0, Math.min(rawUnitIndex, FILE_SIZE_UNITS.length - 1));
+    const sizeUnit = FILE_SIZE_UNITS.at(safeUnitIndex) ?? FILE_SIZE_UNITS[0];
+    return `${(fileSizeBytes / FILE_SIZE_BASE ** safeUnitIndex).toFixed(2).replace(/\.0+$|(\.[0-9]*[1-9])0+$/, '$1')} ${sizeUnit}`;
+}
+//# sourceMappingURL=file-utils.js.map

@@ -30,12 +30,6 @@ module.exports = {
           target: 'ES2024',
           isolatedModules: true,
         },
-        diagnostics: {
-          // The same source is type-checked under verbatimModuleSyntax
-          // by the production `npm run build`; suppressing the import
-          // assertion warnings only affects ts-jest's looser CJS pass.
-          ignoreCodes: [],
-        },
       },
     ],
   },
