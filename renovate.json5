@@ -15,7 +15,7 @@
   timezone: "Asia/Tokyo",
   schedule: ["before 9am on monday"],
   labels: ["dependencies"],
-  // This repository is a composite/JavaScript GitHub Action.
+  // This repository is a JavaScript (Node.js) GitHub Action.
   enabledManagers: ["npm", "github-actions"],
   // Keep update branches rebased on main and merge via rebase once CI passes.
   rebaseWhen: "behind-base-branch",
