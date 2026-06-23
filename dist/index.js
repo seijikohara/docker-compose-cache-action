@@ -57119,26 +57119,6 @@ class MatcherView {
   }
 
   /**
-   * Get the value of a "kept" attribute from the nearest ancestor (or
-   * current node) that declared it via `push(tag, attrs, ns, { keep: [...] })`.
-   * @param {string} attrName
-   * @returns {*}
-   */
-  getAnyParentAttr(attrName) {
-    return this._matcher.getAnyParentAttr(attrName);
-  }
-
-  /**
-   * Check whether any ancestor (or the current node) kept the given
-   * attribute via `push(tag, attrs, ns, { keep: [...] })`.
-   * @param {string} attrName
-   * @returns {boolean}
-   */
-  hasAnyParentAttr(attrName) {
-    return this._matcher.hasAnyParentAttr(attrName);
-  }
-
-  /**
    * Get current node's sibling position (child index in parent).
    * @returns {number}
    */
@@ -57246,9 +57226,6 @@ class Matcher {
     // Each siblingStacks entry: Map<tagName, count> tracking occurrences at each level
     this._pathStringCache = null;
     this._view = new MatcherView(this);
-
-    // Kept-attribute stack: only populated when push() is called with options.keep.
-    this._keptAttrs = [];
   }
 
   /**
@@ -57256,10 +57233,8 @@ class Matcher {
    * @param {string} tagName
    * @param {Object|null} [attrValues=null]
    * @param {string|null} [namespace=null]
-   * @param {Object|null} [options=null]
-   * @param {string[]} [options.keep] - Names of attributes (from attrValues)
    */
-  push(tagName, attrValues = null, namespace = null, options = null) {
+  push(tagName, attrValues = null, namespace = null) {
     this._pathStringCache = null;
 
     // Remove values from previous current node (now becoming ancestor)
@@ -57306,24 +57281,6 @@ class Matcher {
     }
 
     this.path.push(node);
-
-    // Depth of the node we just pushed (1-based, matches this.path.length)
-    const depth = this.path.length;
-
-    // Copy only the requested attributes into the kept-attrs stack. This is
-    // the one part of push() whose cost scales with input (O(keep.length))
-    // rather than being O(1) — by design, since the caller is explicitly
-    // opting in for specific attribute names. No options/keep => zero added
-    // cost beyond the two property reads below.
-    const keep = options !== null ? options.keep : null;
-    if (keep !== null && keep !== undefined && keep.length > 0 && attrValues) {
-      for (let i = 0; i < keep.length; i++) {
-        const name = keep[i];
-        if (attrValues[name] !== undefined) {
-          this._keptAttrs.push({ depth, name, value: attrValues[name] });
-        }
-      }
-    }
   }
 
   /**
@@ -57338,18 +57295,6 @@ class Matcher {
 
     if (this.siblingStacks.length > this.path.length + 1) {
       this.siblingStacks.length = this.path.length + 1;
-    }
-
-    // Drop any kept attributes that belonged to the popped node (or deeper).
-    // _keptAttrs is depth-ordered (push only ever appends increasing depths),
-    // so this is a backward scan that stops at the first surviving entry —
-    // typically O(1) since kept attrs are rare by design.
-    const poppedDepth = this.path.length + 1;
-    while (
-      this._keptAttrs.length > 0 &&
-      this._keptAttrs[this._keptAttrs.length - 1].depth >= poppedDepth
-    ) {
-      this._keptAttrs.pop();
     }
 
     return node;
@@ -57404,38 +57349,6 @@ class Matcher {
     if (this.path.length === 0) return false;
     const current = this.path[this.path.length - 1];
     return current.values !== undefined && attrName in current.values;
-  }
-
-  /**
-   * Get the value of a "kept" attribute from the nearest ancestor (or
-   * current node) that declared it via `push(tag, attrs, ns, { keep: [...] })`.
-   * Unlike getAttrValue(), this works regardless of how deep the path has
-   * gone since the attribute was pushed — but only for attribute names that
-   * were explicitly marked with `keep` at push time. Cost is proportional to
-   * the number of currently-kept attributes (typically 0-3), not path depth.
-   * @param {string} attrName
-   * @returns {*} the value, or undefined if no ancestor kept this attribute
-   */
-  getAnyParentAttr(attrName) {
-    const kept = this._keptAttrs;
-    for (let i = kept.length - 1; i >= 0; i--) {
-      if (kept[i].name === attrName) return kept[i].value;
-    }
-    return undefined;
-  }
-
-  /**
-   * Check whether any ancestor (or the current node) kept the given
-   * attribute via `push(tag, attrs, ns, { keep: [...] })`.
-   * @param {string} attrName
-   * @returns {boolean}
-   */
-  hasAnyParentAttr(attrName) {
-    const kept = this._keptAttrs;
-    for (let i = kept.length - 1; i >= 0; i--) {
-      if (kept[i].name === attrName) return true;
-    }
-    return false;
   }
 
   /**
@@ -57514,7 +57427,6 @@ class Matcher {
     this._pathStringCache = null;
     this.path = [];
     this.siblingStacks = [];
-    this._keptAttrs = [];
   }
 
   /**
@@ -57664,8 +57576,7 @@ class Matcher {
   snapshot() {
     return {
       path: this.path.map(node => ({ ...node })),
-      siblingStacks: this.siblingStacks.map(map => new Map(map)),
-      keptAttrs: this._keptAttrs.map(entry => ({ ...entry }))
+      siblingStacks: this.siblingStacks.map(map => new Map(map))
     };
   }
 
@@ -57677,7 +57588,6 @@ class Matcher {
     this._pathStringCache = null;
     this.path = snapshot.path.map(node => ({ ...node }));
     this.siblingStacks = snapshot.siblingStacks.map(map => new Map(map));
-    this._keptAttrs = (snapshot.keptAttrs || []).map(entry => ({ ...entry }));
   }
 
   /**
@@ -57700,7 +57610,6 @@ class Matcher {
     return this._view;
   }
 }
-
 ;// CONCATENATED MODULE: ./node_modules/fast-xml-builder/src/util.js
 
 
@@ -60576,9 +60485,6 @@ class ExpressionSet {
     /** @type {import('./Expression.js').default[]} expressions containing deep wildcard (..) */
     this._deepWildcards = [];
 
-    /** @type {Map<string, import('./Expression.js').default[]>} terminalTag → deep wildcard expressions */
-    this._deepByTerminalTag = new Map();
-
     /** @type {Set<string>} pattern strings already added — used for deduplication */
     this._patterns = new Set();
 
@@ -60610,14 +60516,7 @@ class ExpressionSet {
     this._patterns.add(expression.pattern);
 
     if (expression.hasDeepWildcard()) {
-      const lastSeg = expression.segments[expression.segments.length - 1];
-      if (lastSeg && lastSeg.type !== 'deep-wildcard' && lastSeg.tag !== '*') {
-        const tag = lastSeg.tag;
-        if (!this._deepByTerminalTag.has(tag)) this._deepByTerminalTag.set(tag, []);
-        this._deepByTerminalTag.get(tag).push(expression);
-      } else {
-        this._deepWildcards.push(expression);
-      }
+      this._deepWildcards.push(expression);
       return this;
     }
 
@@ -60751,13 +60650,7 @@ class ExpressionSet {
       }
     }
 
-    // 3. Deep wildcards — indexed by terminal tag, then unindexed fallback
-    const deepBucket = this._deepByTerminalTag.get(tag);
-    if (deepBucket) {
-      for (let i = 0; i < deepBucket.length; i++) {
-        if (matcher.matches(deepBucket[i])) return deepBucket[i];
-      }
-    }
+    // 3. Deep wildcards — cannot be pre-filtered by depth or tag
     for (let i = 0; i < this._deepWildcards.length; i++) {
       if (matcher.matches(this._deepWildcards[i])) return this._deepWildcards[i];
     }
