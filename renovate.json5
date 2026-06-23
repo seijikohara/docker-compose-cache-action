@@ -1,35 +1,65 @@
 {
-  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
-  extends: ['config:recommended'],
-  enabledManagers: ['npm', 'github-actions'],
-  dependencyDashboard: true,
-  // Default to auto-merging every PR Renovate opens. The packageRules
-  // below opt major updates out so they still require a manual nod
-  // through the dependency dashboard.
-  automerge: true,
+  // Shared Renovate policy across seijikohara repositories.
+  // Schema: https://docs.renovatebot.com/renovate-schema.json
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: [
+    // Maintainer-recommended superset of config:recommended. Pins GitHub Action
+    // and Docker digests, enables config migration, dev-dependency pinning,
+    // weekly lock file maintenance, and the npm minimum-release-age cooldown.
+    "config:best-practices",
+    // Conventional Commits with a unified `chore(deps): ...` subject.
+    ":semanticCommits",
+    ":semanticCommitTypeAll(chore)",
+    ":semanticCommitScope(deps)",
+  ],
+  timezone: "Asia/Tokyo",
+  schedule: ["before 9am on monday"],
+  labels: ["dependencies"],
+  // This repository is a composite/JavaScript GitHub Action.
+  enabledManagers: ["npm", "github-actions"],
+  // Keep update branches rebased on main and merge via rebase once CI passes.
+  rebaseWhen: "behind-base-branch",
   platformAutomerge: true,
-  // Always rebase a Renovate PR when main moves forward so it stays
-  // mergeable without manual intervention.
-  rebaseWhen: 'behind-base-branch',
-  lockFileMaintenance: {
-    enabled: true,
-    automerge: true,
-  },
+  automergeStrategy: "rebase",
+  // Hold every release for 3 days so a hijacked publish cannot ride automerge on day zero.
+  minimumReleaseAge: "3 days",
+  // Auto-merge the weekly lock file refresh together with regular updates.
+  lockFileMaintenance: { automerge: true },
   packageRules: [
     {
-      matchManagers: ['npm'],
-      groupName: 'npm dependencies',
-      matchUpdateTypes: ['patch', 'minor', 'digest'],
+      description: "Auto-merge non-major updates once CI passes",
+      matchUpdateTypes: ["minor", "patch", "pin", "digest"],
+      automerge: true,
     },
     {
-      matchManagers: ['github-actions'],
-      groupName: 'GitHub Actions',
-      matchUpdateTypes: ['patch', 'minor', 'digest'],
-    },
-    {
-      matchUpdateTypes: ['major'],
-      dependencyDashboardApproval: true,
+      description: "Hold major updates for manual review via the dependency dashboard",
+      matchUpdateTypes: ["major"],
       automerge: false,
+      dependencyDashboardApproval: true,
+      addLabels: ["major"],
+    },
+    {
+      description: "Group and label GitHub Actions updates",
+      matchManagers: ["github-actions"],
+      groupName: "github-actions",
+      addLabels: ["github-actions"],
+    },
+    {
+      description: "Group npm dependencies",
+      matchManagers: ["npm"],
+      groupName: "npm dependencies",
+    },
+    {
+      description: "Group TypeScript type definitions",
+      groupName: "type definitions",
+      matchPackageNames: ["@types/*", "@tsconfig/*"],
     },
   ],
+  vulnerabilityAlerts: {
+    description: "Raise security fixes immediately and require manual review",
+    schedule: ["at any time"],
+    minimumReleaseAge: null,
+    addLabels: ["security"],
+    automerge: false,
+  },
 }
