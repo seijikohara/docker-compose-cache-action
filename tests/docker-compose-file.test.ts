@@ -82,11 +82,17 @@ describe('docker-compose-file', () => {
       expect(result).toEqual([{ image: 'nginx:latest' }]);
     });
 
-    it('returns empty if file is empty', () => {
-      readFileSyncMock.mockReturnValue('');
+    it.each([
+      ['empty string', ''],
+      ['whitespace only', '   \n\n  '],
+      ['comment only', '# just a comment\n'],
+      ['explicit null', 'null'],
+    ])('returns empty and debug-logs when YAML has no document (%s)', (_label, content) => {
+      readFileSyncMock.mockReturnValue(content);
       const result = getComposeServicesFromFiles(['docker-compose.yml'], []);
       expect(result).toEqual([]);
       expect(debugMock).toHaveBeenCalledWith(expect.stringContaining('Empty or invalid YAML file'));
+      expect(warningMock).not.toHaveBeenCalled();
     });
 
     it('returns empty if no services section', () => {
