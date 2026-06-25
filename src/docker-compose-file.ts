@@ -5,7 +5,14 @@
 
 import * as fs from 'node:fs';
 import * as core from '@actions/core';
-import * as yaml from 'js-yaml';
+import { CORE_SCHEMA, load, mergeTag } from 'js-yaml';
+
+// docker-compose files routinely use YAML 1.1 merge keys (`<<: *anchor`) to
+// share configuration between services. js-yaml v5's default `CORE_SCHEMA`
+// drops the merge tag, which would leave `<<` as a literal map key and break
+// merged services. Re-enable it so parse results stay compatible with
+// docker-compose semantics.
+const COMPOSE_FILE_SCHEMA = CORE_SCHEMA.withTags(mergeTag);
 
 /**
  * Represents a Docker Compose service definition with an image reference.
@@ -93,8 +100,19 @@ export function getComposeServicesFromFiles(
   const collected = composeFilePaths.flatMap((currentComposeFile) => {
     try {
       const yamlContent = fs.readFileSync(currentComposeFile, 'utf8');
-      const composeDefinition = yaml.load(yamlContent) as ComposeFile | undefined;
 
+      // js-yaml v5's `load()` throws on whitespace-only or comment-only
+      // input rather than returning `undefined`. Treat that as an empty
+      // file (debug, not warning) so user-visible behavior matches v4.
+      if (yamlContent.trim() === '') {
+        core.debug(`Empty or invalid YAML file: ${currentComposeFile}`);
+        return [];
+      }
+
+      const composeDefinition = load(yamlContent, { schema: COMPOSE_FILE_SCHEMA }) as ComposeFile | null;
+
+      // Explicit YAML nulls (`null`, `~`, `---`) still reach this branch
+      // in v5 and should be treated like empty input.
       if (!composeDefinition) {
         core.debug(`Empty or invalid YAML file: ${currentComposeFile}`);
         return [];
