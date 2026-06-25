@@ -5,7 +5,13 @@
 
 import * as fs from 'node:fs';
 import * as core from '@actions/core';
-import { CORE_SCHEMA, load, mergeTag } from 'js-yaml';
+import { CORE_SCHEMA, YAMLException, load, mergeTag } from 'js-yaml';
+
+// js-yaml v5 raises this exact `reason` on any source that contains no
+// document — empty strings, whitespace-only files, and comment-only files
+// all surface here. We treat them all as "empty" so they keep their v4
+// debug-log behavior instead of leaking out as a misleading warning.
+const EMPTY_DOCUMENT_REASON = 'expected a document, but the input is empty';
 
 // docker-compose files routinely use YAML 1.1 merge keys (`<<: *anchor`) to
 // share configuration between services. js-yaml v5's default `CORE_SCHEMA`
@@ -100,19 +106,10 @@ export function getComposeServicesFromFiles(
   const collected = composeFilePaths.flatMap((currentComposeFile) => {
     try {
       const yamlContent = fs.readFileSync(currentComposeFile, 'utf8');
-
-      // js-yaml v5's `load()` throws on whitespace-only or comment-only
-      // input rather than returning `undefined`. Treat that as an empty
-      // file (debug, not warning) so user-visible behavior matches v4.
-      if (yamlContent.trim() === '') {
-        core.debug(`Empty or invalid YAML file: ${currentComposeFile}`);
-        return [];
-      }
-
       const composeDefinition = load(yamlContent, { schema: COMPOSE_FILE_SCHEMA }) as ComposeFile | null;
 
-      // Explicit YAML nulls (`null`, `~`, `---`) still reach this branch
-      // in v5 and should be treated like empty input.
+      // Explicit YAML nulls (`null`, `~`, `---`) parse to `null` in v5 and
+      // should be treated like empty input.
       if (!composeDefinition) {
         core.debug(`Empty or invalid YAML file: ${currentComposeFile}`);
         return [];
@@ -125,6 +122,10 @@ export function getComposeServicesFromFiles(
 
       return Object.values(composeDefinition.services);
     } catch (yamlParsingError) {
+      if (yamlParsingError instanceof YAMLException && yamlParsingError.reason === EMPTY_DOCUMENT_REASON) {
+        core.debug(`Empty or invalid YAML file: ${currentComposeFile}`);
+        return [];
+      }
       core.warning(`Failed to parse ${currentComposeFile}: ${yamlParsingError}`);
       return [];
     }
