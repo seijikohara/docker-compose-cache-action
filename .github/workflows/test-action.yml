@@ -293,3 +293,12 @@ jobs:
             append "## ❌ Some tests failed."
             append "### Check job logs for failure details."
           fi
+      - name: Fail if any upstream job did not succeed
+        # Without this, the job exits 0 even when the summary above says
+        # "Some tests failed", so the required check passes and a red CI
+        # can be merged. Convert any non-success upstream into an explicit
+        # job failure that branch protection will respect.
+        if: needs.test-cache-miss.result != 'success' || needs.test-cache-hit-with-registry-check.result != 'success' || needs.test-cache-hit-skip-registry-check.result != 'success'
+        run: |
+          echo "::error::upstream test jobs concluded with non-success results"
+          exit 1
