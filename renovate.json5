@@ -53,6 +53,21 @@
       groupName: 'npm dependencies',
     },
     {
+      description: 'Group linting and formatting tools',
+      groupName: 'linting and formatting',
+      matchPackageNames: ['oxlint', 'oxfmt', 'oxlint-tsgolint', '@oxlint/*'],
+    },
+    {
+      description: 'Group the test toolchain',
+      groupName: 'testing',
+      matchPackageNames: ['vitest', '@vitest/*'],
+    },
+    {
+      description: 'Group the build toolchain',
+      groupName: 'build toolchain',
+      matchPackageNames: ['typescript', 'tsdown', 'lefthook', 'taze'],
+    },
+    {
       description: 'Group TypeScript type definitions',
       groupName: 'type definitions',
       matchPackageNames: ['@types/*', '@tsconfig/*'],
