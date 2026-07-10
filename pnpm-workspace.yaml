@@ -1,0 +1,7 @@
+# Packages allowed to run install scripts (pnpm 11 blocks build scripts by default).
+# lefthook's postinstall installs its platform binary, which `prepare` (lefthook
+# install) needs. unrs-resolver's postinstall is explicitly denied: its native binary
+# arrives via optional platform packages, so the build script is unnecessary.
+allowBuilds:
+  lefthook: true
+  unrs-resolver: false
