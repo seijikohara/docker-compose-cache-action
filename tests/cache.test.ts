@@ -1,43 +1,9 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import * as fs from 'node:fs/promises';
 
-jest.unstable_mockModule('@actions/cache', () => ({
-  restoreCache: jest.fn(),
-  saveCache: jest.fn(),
-}));
-
-jest.unstable_mockModule('@actions/core', () => ({
-  warning: jest.fn(),
-  debug: jest.fn(),
-}));
-
-jest.unstable_mockModule('node:fs/promises', () => ({
-  writeFile: jest.fn(),
-  readFile: jest.fn(),
-}));
-
-jest.unstable_mockModule('../src/file-utils.js', () => ({
-  sanitizePathComponent: jest.fn((value: string) => value.replace(/[/\\:*?"<>|]/g, '-')),
-}));
-
-jest.unstable_mockModule('../src/oci-platform.js', () => ({
-  getCurrentPlatformInfo: jest.fn(() => ({
-    os: 'linux',
-    arch: 'amd64',
-    variant: undefined,
-  })),
-  parseOciPlatformString: jest.fn((platformString?: string) => {
-    if (!platformString) {
-      return undefined;
-    }
-    const [os, arch, variant] = platformString.split('/');
-    return { os, arch, variant };
-  }),
-}));
-
-const fs = await import('node:fs/promises');
-const cache = await import('@actions/cache');
-const core = await import('@actions/core');
-const {
+import * as cache from '@actions/cache';
+import * as core from '@actions/core';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
   extractDigestPrefix,
   generateCacheKey,
   generateCacheKeyPrefix,
@@ -50,19 +16,53 @@ const {
   saveManifestToCache,
   saveToCache,
   writeManifestToFile,
-} = await import('../src/cache.js');
-type DockerImageManifest = import('../src/docker-command.js').DockerImageManifest;
+} from '../src/cache.js';
+import type { DockerImageManifest } from '../src/docker-command.js';
 
-const mockCacheRestore = jest.mocked(cache.restoreCache);
-const mockCacheSave = jest.mocked(cache.saveCache);
-const mockCoreWarning = jest.mocked(core.warning);
-const mockCoreDebug = jest.mocked(core.debug);
-const mockFsWriteFile = jest.mocked(fs.writeFile);
-const mockFsReadFile = jest.mocked(fs.readFile);
+vi.mock('@actions/cache', () => ({
+  restoreCache: vi.fn(),
+  saveCache: vi.fn(),
+}));
+
+vi.mock('@actions/core', () => ({
+  warning: vi.fn(),
+  debug: vi.fn(),
+}));
+
+vi.mock('node:fs/promises', () => ({
+  writeFile: vi.fn(),
+  readFile: vi.fn(),
+}));
+
+vi.mock('../src/file-utils.js', () => ({
+  sanitizePathComponent: vi.fn((value: string) => value.replace(/[/\\:*?"<>|]/g, '-')),
+}));
+
+vi.mock('../src/oci-platform.js', () => ({
+  getCurrentPlatformInfo: vi.fn(() => ({
+    os: 'linux',
+    arch: 'amd64',
+    variant: undefined,
+  })),
+  parseOciPlatformString: vi.fn((platformString?: string) => {
+    if (!platformString) {
+      return undefined;
+    }
+    const [os, arch, variant] = platformString.split('/');
+    return { os, arch, variant };
+  }),
+}));
+
+const mockCacheRestore = vi.mocked(cache.restoreCache);
+const mockCacheSave = vi.mocked(cache.saveCache);
+const mockCoreWarning = vi.mocked(core.warning);
+const mockCoreDebug = vi.mocked(core.debug);
+const mockFsWriteFile = vi.mocked(fs.writeFile);
+const mockFsReadFile = vi.mocked(fs.readFile);
 
 describe('cache', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     process.env.RUNNER_TEMP = '/tmp';
   });
 

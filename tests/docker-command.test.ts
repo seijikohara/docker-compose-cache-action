@@ -1,30 +1,33 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import * as core from '@actions/core';
+import * as exec from '@actions/exec';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  inspectImageLocal,
+  inspectImageRemote,
+  loadImageFromTar,
+  pullImage,
+  saveImageToTar,
+} from '../src/docker-command.js';
 
-jest.unstable_mockModule('@actions/core', () => ({
-  warning: jest.fn(),
-  info: jest.fn(),
-  debug: jest.fn(),
-  setOutput: jest.fn(),
-  setFailed: jest.fn(),
-  getInput: jest.fn(),
-  error: jest.fn(),
+vi.mock('@actions/core', () => ({
+  warning: vi.fn(),
+  info: vi.fn(),
+  debug: vi.fn(),
+  setOutput: vi.fn(),
+  setFailed: vi.fn(),
+  getInput: vi.fn(),
+  error: vi.fn(),
 }));
 
-jest.unstable_mockModule('@actions/exec', () => ({
-  exec: jest.fn(),
+vi.mock('@actions/exec', () => ({
+  exec: vi.fn(),
 }));
 
-const core = await import('@actions/core');
-const exec = await import('@actions/exec');
-const { inspectImageLocal, inspectImageRemote, loadImageFromTar, pullImage, saveImageToTar } = await import(
-  '../src/docker-command.js'
-);
-
-const execMock = jest.mocked(exec.exec);
+const execMock = vi.mocked(exec.exec);
 
 describe('docker-command', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('pullImage', () => {

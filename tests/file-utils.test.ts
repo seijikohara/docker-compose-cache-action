@@ -1,4 +1,4 @@
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 import { formatFileSize, sanitizePathComponent } from '../src/file-utils.js';
 
 describe('file-utils', () => {

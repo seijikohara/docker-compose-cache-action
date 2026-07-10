@@ -1,30 +1,32 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import * as fs from 'node:fs';
 
-jest.unstable_mockModule('@actions/core', () => ({
-  debug: jest.fn(),
-  warning: jest.fn(),
+import * as core from '@actions/core';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  getComposeFilePathsToProcess,
+  getComposeServicesFromFiles,
+  matchesExcludePattern,
+} from '../src/docker-compose-file.js';
+
+vi.mock('@actions/core', () => ({
+  debug: vi.fn(),
+  warning: vi.fn(),
 }));
 
-jest.unstable_mockModule('node:fs', () => ({
-  existsSync: jest.fn(),
-  readFileSync: jest.fn(),
+vi.mock('node:fs', () => ({
+  existsSync: vi.fn(),
+  readFileSync: vi.fn(),
 }));
 
-const fs = await import('node:fs');
-const core = await import('@actions/core');
-const { getComposeFilePathsToProcess, getComposeServicesFromFiles, matchesExcludePattern } = await import(
-  '../src/docker-compose-file.js'
-);
-
-const existsSyncMock = jest.mocked(fs.existsSync);
-const readFileSyncMock = jest.mocked(fs.readFileSync);
-const warningMock = jest.mocked(core.warning);
-const debugMock = jest.mocked(core.debug);
+const existsSyncMock = vi.mocked(fs.existsSync);
+const readFileSyncMock = vi.mocked(fs.readFileSync);
+const warningMock = vi.mocked(core.warning);
+const debugMock = vi.mocked(core.debug);
 
 describe('docker-compose-file', () => {
   describe('getComposeServicesFromFiles', () => {
     beforeEach(() => {
-      jest.clearAllMocks();
+      vi.clearAllMocks();
       existsSyncMock.mockReturnValue(true);
     });
 
@@ -114,7 +116,7 @@ describe('docker-compose-file', () => {
 
   describe('getComposeFilePathsToProcess', () => {
     beforeEach(() => {
-      jest.clearAllMocks();
+      vi.clearAllMocks();
     });
 
     it('should return provided file paths when they exist', () => {
@@ -265,7 +267,7 @@ describe('docker-compose-file', () => {
 
   describe('getComposeServicesFromFiles with wildcard patterns', () => {
     beforeEach(() => {
-      jest.clearAllMocks();
+      vi.clearAllMocks();
       existsSyncMock.mockReturnValue(true);
     });
 

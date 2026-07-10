@@ -1,7 +1,6 @@
 # Packages allowed to run install scripts (pnpm 11 blocks build scripts by default).
 # lefthook's postinstall installs its platform binary, which `prepare` (lefthook
-# install) needs. unrs-resolver's postinstall is explicitly denied: its native binary
-# arrives via optional platform packages, so the build script is unnecessary.
+# install) needs. No other dependency requires a build (biome 2.x has no install
+# script; unrs-resolver ships its native binary via optional platform packages).
 allowBuilds:
   lefthook: true
-  unrs-resolver: false
