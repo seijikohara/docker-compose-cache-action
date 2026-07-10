@@ -152,7 +152,9 @@ export function createActionSummary(
 ): void {
   const actionHumanReadableDuration = formatTimeBetween(0, summary.executionTimeMs);
 
-  core.summary
+  // `write()` returns a Promise; this summary write is intentionally fire-and-forget
+  // (the function's public contract is synchronous), so the result is explicitly discarded.
+  void core.summary
     .addHeading('Docker Compose Cache Results', 2)
     .addTable([
       [

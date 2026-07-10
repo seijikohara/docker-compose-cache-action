@@ -35,7 +35,7 @@ const rawJson = execFileSync('pnpm', ['licenses', 'list', '--prod', '--json'], {
 
 const packages = Object.values(JSON.parse(rawJson))
   .flat()
-  .sort((left, right) => left.name.localeCompare(right.name));
+  .toSorted((left, right) => left.name.localeCompare(right.name));
 
 const sections = packages.map((pkg) => {
   const version = (pkg.versions ?? []).join(', ');
@@ -51,4 +51,5 @@ const header =
 
 mkdirSync(dirname(outputPath), { recursive: true });
 writeFileSync(outputPath, header + sections.join('\n'));
+// oxlint-disable-next-line no-console -- intentional CLI completion message for this build script
 console.log(`Wrote ${outputPath} covering ${packages.length} production dependencies.`);

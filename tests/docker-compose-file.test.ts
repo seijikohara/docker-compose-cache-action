@@ -23,20 +23,25 @@ const readFileSyncMock = vi.mocked(fs.readFileSync);
 const warningMock = vi.mocked(core.warning);
 const debugMock = vi.mocked(core.debug);
 
+/**
+ * Builds a minimal Compose YAML document from a services map.
+ * Hoisted to module scope: it captures nothing from either describe block
+ * that uses it, so recreating it per suite run would be pointless.
+ */
+const createYaml = (services: Record<string, { image?: string; platform?: string }>) =>
+  `services:\n${Object.entries(services)
+    .map(
+      ([name, conf]) =>
+        `  ${name}:\n    ${conf.image ? `image: ${conf.image}` : ''}${conf.platform ? `\n    platform: ${conf.platform}` : ''}`
+    )
+    .join('\n')}`;
+
 describe('docker-compose-file', () => {
   describe('getComposeServicesFromFiles', () => {
     beforeEach(() => {
       vi.clearAllMocks();
       existsSyncMock.mockReturnValue(true);
     });
-
-    const createYaml = (services: Record<string, { image?: string; platform?: string }>) =>
-      `services:\n${Object.entries(services)
-        .map(
-          ([name, conf]) =>
-            `  ${name}:\n    ${conf.image ? `image: ${conf.image}` : ''}${conf.platform ? `\n    platform: ${conf.platform}` : ''}`
-        )
-        .join('\n')}`;
 
     it('extracts services with image from a single file', () => {
       readFileSyncMock.mockReturnValue(createYaml({ nginx: { image: 'nginx:latest' } }));
@@ -270,14 +275,6 @@ describe('docker-compose-file', () => {
       vi.clearAllMocks();
       existsSyncMock.mockReturnValue(true);
     });
-
-    const createYaml = (services: Record<string, { image?: string; platform?: string }>) =>
-      `services:\n${Object.entries(services)
-        .map(
-          ([name, conf]) =>
-            `  ${name}:\n    ${conf.image ? `image: ${conf.image}` : ''}${conf.platform ? `\n    platform: ${conf.platform}` : ''}`
-        )
-        .join('\n')}`;
 
     it('should exclude images matching wildcard pattern nginx:*', () => {
       readFileSyncMock.mockReturnValue(

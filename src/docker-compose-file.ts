@@ -106,6 +106,9 @@ export function getComposeServicesFromFiles(
   const collected = composeFilePaths.flatMap((currentComposeFile) => {
     try {
       const yamlContent = fs.readFileSync(currentComposeFile, 'utf8');
+      // js-yaml's load() returns `unknown`; narrowing to the expected Compose shape here is the
+      // pre-existing design (no schema-validation library is in scope for this lint-tool migration).
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- pre-existing unvalidated cast, see above
       const composeDefinition = load(yamlContent, { schema: COMPOSE_FILE_SCHEMA }) as ComposeFile | null;
 
       // Explicit YAML nulls (`null`, `~`, `---`) parse to `null` in v5 and
@@ -126,7 +129,7 @@ export function getComposeServicesFromFiles(
         core.debug(`Empty or invalid YAML file: ${currentComposeFile}`);
         return [];
       }
-      core.warning(`Failed to parse ${currentComposeFile}: ${yamlParsingError}`);
+      core.warning(`Failed to parse ${currentComposeFile}: ${String(yamlParsingError)}`);
       return [];
     }
   });

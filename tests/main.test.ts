@@ -160,7 +160,7 @@ describe('main', () => {
       expect(mockCoreSetOutput).toHaveBeenCalledWith('cache-hit', 'false');
       const imageListOutput = mockCoreSetOutput.mock.calls.find((call) => call[0] === 'image-list')?.[1];
       expect(imageListOutput).toBeDefined();
-      const parsedImageList = JSON.parse(imageListOutput as string);
+      const parsedImageList = JSON.parse(imageListOutput);
       expect(Array.isArray(parsedImageList)).toBe(true);
       expect(parsedImageList.length).toBeGreaterThan(0);
       expect(parsedImageList[0]).toHaveProperty('name');
@@ -424,7 +424,7 @@ describe('main', () => {
 
         const imageListCall = mockCoreSetOutput.mock.calls.find((call) => call[0] === 'image-list');
         expect(imageListCall).toBeDefined();
-        const imageList = JSON.parse(imageListCall?.[1] as string);
+        const imageList = JSON.parse(imageListCall?.[1]);
         expect(imageList[0].status).toBe('Cached');
       });
 

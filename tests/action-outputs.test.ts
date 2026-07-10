@@ -320,9 +320,11 @@ describe('action-outputs', () => {
       createActionSummary(results, summary, referencedComposeFiles, skipLatestCheck);
 
       // Verify main heading was added
+      // oxlint-disable-next-line typescript/unbound-method -- vitest mock method reference passed to expect(), never invoked unbound
       expect(mockCoreSummary.addHeading).toHaveBeenCalledWith('Docker Compose Cache Results', 2);
 
       // Verify table structure (header + results rows) - First call to addTable
+      // oxlint-disable-next-line typescript/unbound-method -- vitest mock method reference passed to expect(), never invoked unbound
       expect(mockCoreSummary.addTable).toHaveBeenNthCalledWith(1, [
         [
           { data: 'Image Name', header: true },
@@ -351,7 +353,9 @@ describe('action-outputs', () => {
       ]);
 
       // Verify action summary section
+      // oxlint-disable-next-line typescript/unbound-method -- vitest mock method reference passed to expect(), never invoked unbound
       expect(mockCoreSummary.addHeading).toHaveBeenCalledWith('Action summary', 3);
+      // oxlint-disable-next-line typescript/unbound-method -- vitest mock method reference passed to expect(), never invoked unbound
       expect(mockCoreSummary.addTable).toHaveBeenNthCalledWith(2, [
         [
           { data: 'Metric', header: true },
@@ -364,10 +368,13 @@ describe('action-outputs', () => {
       ]);
 
       // Verify referenced compose files section
+      // oxlint-disable-next-line typescript/unbound-method -- vitest mock method reference passed to expect(), never invoked unbound
       expect(mockCoreSummary.addHeading).toHaveBeenCalledWith('Referenced Compose Files', 3);
+      // oxlint-disable-next-line typescript/unbound-method -- vitest mock method reference passed to expect(), never invoked unbound
       expect(mockCoreSummary.addList).toHaveBeenCalledWith(['docker-compose.yml', 'docker-compose.override.yml']);
 
       // Verify write was called
+      // oxlint-disable-next-line typescript/unbound-method -- vitest mock method reference passed to expect(), never invoked unbound
       expect(mockCoreSummary.write).toHaveBeenCalled();
     });
 
@@ -382,6 +389,7 @@ describe('action-outputs', () => {
 
       createActionSummary([], summary, ['docker-compose.yml'], false);
 
+      // oxlint-disable-next-line typescript/unbound-method -- vitest mock method reference passed to expect(), never invoked unbound
       expect(mockCoreSummary.addTable).toHaveBeenNthCalledWith(1, [
         [
           { data: 'Image Name', header: true },
@@ -405,6 +413,7 @@ describe('action-outputs', () => {
 
       createActionSummary([], summary, ['docker-compose.yml'], false);
 
+      // oxlint-disable-next-line typescript/unbound-method -- vitest mock method reference passed to expect(), never invoked unbound
       expect(mockCoreSummary.addTable).toHaveBeenNthCalledWith(
         2,
         expect.arrayContaining([[{ data: 'Skip Latest Check' }, { data: '🔍 No' }]])
@@ -433,6 +442,7 @@ describe('action-outputs', () => {
 
       createActionSummary(results, summary, ['docker-compose.yml'], false);
 
+      // oxlint-disable-next-line typescript/unbound-method -- vitest mock method reference passed to expect(), never invoked unbound
       expect(mockCoreSummary.addTable).toHaveBeenNthCalledWith(1, [
         [
           { data: 'Image Name', header: true },
@@ -475,6 +485,7 @@ describe('action-outputs', () => {
 
       createActionSummary(results, summary, ['docker-compose.yml'], false);
 
+      // oxlint-disable-next-line typescript/unbound-method -- vitest mock method reference passed to expect(), never invoked unbound
       expect(mockCoreSummary.addTable).toHaveBeenNthCalledWith(1, [
         [
           { data: 'Image Name', header: true },

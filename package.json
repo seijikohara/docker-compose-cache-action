@@ -3,45 +3,32 @@
   "version": "1.8.17",
   "description": "Dynamically caches Docker images defined in a docker-compose.yml file using TypeScript.",
   "keywords": [
-    "github",
     "actions",
+    "cache",
     "docker",
     "docker-compose",
-    "cache"
+    "github"
   ],
   "homepage": "https://github.com/seijikohara/docker-compose-cache-action#readme",
   "bugs": {
     "url": "https://github.com/seijikohara/docker-compose-cache-action/issues"
   },
+  "license": "MIT",
+  "author": "Seiji Kohara <sage.0118@gmail.com> (https://github.com/seijikohara)",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/seijikohara/docker-compose-cache-action.git"
   },
-  "license": "MIT",
-  "packageManager": "pnpm@11.11.0",
-  "devEngines": {
-    "packageManager": {
-      "name": "pnpm",
-      "version": "11.11.0",
-      "onFail": "download"
-    }
-  },
-  "author": "Seiji Kohara <sage.0118@gmail.com> (https://github.com/seijikohara)",
   "type": "module",
-  "engines": {
-    "node": ">=24"
-  },
   "main": "dist/index.js",
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc --noEmit",
     "package": "pnpm run build && node scripts/generate-licenses.mjs",
-    "lint": "biome lint .",
-    "lint:fix": "biome lint --write .",
-    "format": "biome format --write . && prettier --write \"**/*.{yaml,yml,md}\" --ignore-unknown",
-    "format:check": "biome format . && prettier --check \"**/*.{yaml,yml,md}\" --ignore-unknown",
-    "check": "biome check .",
-    "fix": "biome check --write . && prettier --write \"**/*.{yaml,yml,md}\" --ignore-unknown",
+    "lint": "oxlint --type-aware",
+    "lint:fix": "oxlint --type-aware --fix",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
     "test": "vitest run",
     "test:watch": "vitest",
     "prepare": "lefthook install",
@@ -56,13 +43,25 @@
     "js-yaml": "^5.0.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.3.14",
     "@types/node": "^25.9.1",
     "lefthook": "^2.1.10",
-    "prettier": "^3.8.1",
+    "oxfmt": "^0.58.0",
+    "oxlint": "^1.73.0",
+    "oxlint-tsgolint": "^0.24.0",
     "taze": "^19.14.1",
     "tsdown": "^0.22.4",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"
-  }
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "11.11.0",
+      "onFail": "download"
+    }
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@11.11.0"
 }
