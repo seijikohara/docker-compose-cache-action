@@ -7,16 +7,8 @@
     "types": ["node"],
 
     /* Modules */
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "resolveJsonModule": true,
-
-    /* Emit */
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "declaration": true,
-    "sourceMap": true,
-    "noEmitOnError": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
 
     /* Interop Constraints */
     "esModuleInterop": true,
@@ -46,8 +38,11 @@
     "noImplicitOverride": true,
 
     /* Completeness */
-    "skipLibCheck": true
+    "skipLibCheck": true,
+
+    /* Emit */
+    "noEmit": true
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+  "include": ["src/**/*", "tests/**/*", "tsdown.config.ts", "vitest.config.ts"],
+  "exclude": ["node_modules", "dist"]
 }
