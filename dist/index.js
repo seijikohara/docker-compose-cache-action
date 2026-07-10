@@ -21568,7 +21568,7 @@ function getComposeServicesFromFiles(composeFilePaths, excludedImagePatterns) {
 				debug(`Empty or invalid YAML file: ${currentComposeFile}`);
 				return [];
 			}
-			warning(`Failed to parse ${currentComposeFile}: ${yamlParsingError}`);
+			warning(`Failed to parse ${currentComposeFile}: ${String(yamlParsingError)}`);
 			return [];
 		}
 	});
@@ -66020,7 +66020,7 @@ async function writeManifestToFile(manifest, manifestPath) {
 		await fs$1.writeFile(manifestPath, JSON.stringify(manifest, null, 2));
 		return true;
 	} catch (error) {
-		warning(`Failed to save manifest to ${manifestPath}: ${error}`);
+		warning(`Failed to save manifest to ${manifestPath}: ${String(error)}`);
 		return false;
 	}
 }
@@ -66035,7 +66035,7 @@ async function readManifestFromFile(manifestPath) {
 		const manifestJson = await fs$1.readFile(manifestPath, "utf8");
 		return JSON.parse(manifestJson);
 	} catch (error) {
-		debug(`Failed to load manifest from ${manifestPath}: ${error}`);
+		debug(`Failed to load manifest from ${manifestPath}: ${String(error)}`);
 		return;
 	}
 }
@@ -66186,7 +66186,7 @@ async function pullImage(imageName, platform) {
 		}
 		return true;
 	} catch (error) {
-		warning(`Failed to pull image ${imageName}${platform ? ` for platform ${platform}` : ""}: ${error}`);
+		warning(`Failed to pull image ${imageName}${platform ? ` for platform ${platform}` : ""}: ${String(error)}`);
 		return false;
 	}
 }
@@ -66216,11 +66216,11 @@ async function inspectImageRemote(imageName) {
 		try {
 			return JSON.parse(stdout.trim());
 		} catch (manifestJsonParseError) {
-			warning(`Failed to parse manifest JSON for ${imageName}: ${manifestJsonParseError}`);
+			warning(`Failed to parse manifest JSON for ${imageName}: ${String(manifestJsonParseError)}`);
 			return;
 		}
 	} catch (error) {
-		warning(`Error inspecting manifest for ${imageName}: ${error}`);
+		warning(`Error inspecting manifest for ${imageName}: ${String(error)}`);
 		return;
 	}
 }
@@ -66255,11 +66255,11 @@ async function inspectImageLocal(imageName) {
 		try {
 			return JSON.parse(stdout.trim());
 		} catch (inspectJsonParseError) {
-			warning(`Failed to parse inspect JSON for ${imageName}: ${inspectJsonParseError}`);
+			warning(`Failed to parse inspect JSON for ${imageName}: ${String(inspectJsonParseError)}`);
 			return;
 		}
 	} catch (error) {
-		warning(`Error inspecting image ${imageName}: ${error}`);
+		warning(`Error inspecting image ${imageName}: ${String(error)}`);
 		return;
 	}
 }
@@ -66284,7 +66284,7 @@ async function saveImageToTar(imageName, outputPath) {
 		}
 		return true;
 	} catch (error) {
-		warning(`Failed to save image ${imageName}: ${error}`);
+		warning(`Failed to save image ${imageName}: ${String(error)}`);
 		return false;
 	}
 }
@@ -66307,7 +66307,7 @@ async function loadImageFromTar(tarPath) {
 		}
 		return true;
 	} catch (error) {
-		warning(`Failed to load image from ${tarPath}: ${error}`);
+		warning(`Failed to load image from ${tarPath}: ${String(error)}`);
 		return false;
 	}
 }
