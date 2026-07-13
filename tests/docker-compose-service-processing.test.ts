@@ -1,68 +1,67 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import * as core from '@actions/core';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as cache from '../src/cache.js';
+import * as dockerCommand from '../src/docker-command.js';
+import type { ComposeService } from '../src/docker-compose-file.js';
+import { processService } from '../src/docker-compose-service-processing.js';
 
-jest.unstable_mockModule('@actions/core', () => ({
-  info: jest.fn(),
-  warning: jest.fn(),
-  debug: jest.fn(),
+vi.mock('@actions/core', () => ({
+  info: vi.fn(),
+  warning: vi.fn(),
+  debug: vi.fn(),
 }));
 
-jest.unstable_mockModule('../src/cache.js', () => ({
-  generateCacheKey: jest.fn(
+vi.mock('../src/cache.js', () => ({
+  generateCacheKey: vi.fn(
     (prefix: string, name: string, tag: string, platform?: string) =>
       `${prefix}-${name}-${tag}-${platform ?? 'default'}`
   ),
-  generateCacheKeyPrefix: jest.fn(
+  generateCacheKeyPrefix: vi.fn(
     (prefix: string, name: string, tag: string, platform?: string) =>
       `${prefix}-${name}-${tag}-${platform ?? 'default'}`
   ),
-  generateManifestCacheKey: jest.fn(
+  generateManifestCacheKey: vi.fn(
     (prefix: string, name: string, tag: string, platform?: string) =>
       `${prefix}-${name}-${tag}-${platform ?? 'default'}-manifest`
   ),
-  generateTarPath: jest.fn(
+  generateTarPath: vi.fn(
     (name: string, tag: string, platform?: string) => `/tmp/${name}-${tag}-${platform ?? 'default'}.tar`
   ),
-  generateManifestPath: jest.fn(
+  generateManifestPath: vi.fn(
     (name: string, tag: string, platform?: string) => `/tmp/${name}-${tag}-${platform ?? 'default'}-manifest.json`
   ),
-  restoreFromCache: jest.fn(),
-  saveToCache: jest.fn(),
-  saveManifestToCache: jest.fn(),
-  readManifestFromFile: jest.fn(),
+  restoreFromCache: vi.fn(),
+  saveToCache: vi.fn(),
+  saveManifestToCache: vi.fn(),
+  readManifestFromFile: vi.fn(),
 }));
 
-jest.unstable_mockModule('../src/docker-command.js', () => ({
-  inspectImageRemote: jest.fn(),
-  inspectImageLocal: jest.fn(),
-  pullImage: jest.fn(),
-  saveImageToTar: jest.fn(),
-  loadImageFromTar: jest.fn(),
+vi.mock('../src/docker-command.js', () => ({
+  inspectImageRemote: vi.fn(),
+  inspectImageLocal: vi.fn(),
+  pullImage: vi.fn(),
+  saveImageToTar: vi.fn(),
+  loadImageFromTar: vi.fn(),
 }));
 
-const core = await import('@actions/core');
-const cache = await import('../src/cache.js');
-const dockerCommand = await import('../src/docker-command.js');
-const { processService } = await import('../src/docker-compose-service-processing.js');
-type ComposeService = import('../src/docker-compose-file.js').ComposeService;
+const mockCoreInfo = vi.mocked(core.info);
+const mockCoreWarning = vi.mocked(core.warning);
+const mockCoreDebug = vi.mocked(core.debug);
 
-const mockCoreInfo = jest.mocked(core.info);
-const mockCoreWarning = jest.mocked(core.warning);
-const mockCoreDebug = jest.mocked(core.debug);
+const mockCacheRestore = vi.mocked(cache.restoreFromCache);
+const mockCacheSave = vi.mocked(cache.saveToCache);
+const mockSaveManifestToCache = vi.mocked(cache.saveManifestToCache);
+const mockReadManifestFromFile = vi.mocked(cache.readManifestFromFile);
 
-const mockCacheRestore = jest.mocked(cache.restoreFromCache);
-const mockCacheSave = jest.mocked(cache.saveToCache);
-const mockSaveManifestToCache = jest.mocked(cache.saveManifestToCache);
-const mockReadManifestFromFile = jest.mocked(cache.readManifestFromFile);
-
-const mockInspectImageRemote = jest.mocked(dockerCommand.inspectImageRemote);
-const mockInspectImageLocal = jest.mocked(dockerCommand.inspectImageLocal);
-const mockPullImage = jest.mocked(dockerCommand.pullImage);
-const mockSaveImageToTar = jest.mocked(dockerCommand.saveImageToTar);
-const mockLoadImageFromTar = jest.mocked(dockerCommand.loadImageFromTar);
+const mockInspectImageRemote = vi.mocked(dockerCommand.inspectImageRemote);
+const mockInspectImageLocal = vi.mocked(dockerCommand.inspectImageLocal);
+const mockPullImage = vi.mocked(dockerCommand.pullImage);
+const mockSaveImageToTar = vi.mocked(dockerCommand.saveImageToTar);
+const mockLoadImageFromTar = vi.mocked(dockerCommand.loadImageFromTar);
 
 describe('docker-compose-service-processing', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('processService', () => {

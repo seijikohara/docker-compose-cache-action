@@ -1,4 +1,4 @@
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 import { formatTimeBetween } from '../src/date-utils.js';
 
 describe('date-utils', () => {

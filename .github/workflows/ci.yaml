@@ -30,39 +30,44 @@ jobs:
           # GitHub provides on `pull_request` events. For `push` events
           # head.sha is empty and we fall back to the pushed commit's SHA.
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          # Build steps below execute PR-supplied code (npm scripts, ncc,
+          # Build steps below execute PR-supplied code (pnpm scripts, tsdown,
           # tests). Do not leave any privileged credentials behind in
           # .git/config that those scripts could exfiltrate. The App token
           # is minted in a later step and only added to the env of the
           # commit / release steps that need it.
           persist-credentials: false
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+
       - name: Setup Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: '24'
-          cache: 'npm'
+          cache: 'pnpm'
 
       - name: Install dependencies
-        # `--ignore-scripts` would be safer against malicious postinstall
-        # hooks, but biome / similar tools ship their platform binary via
-        # postinstall and lint fails without it. Leaving install scripts
-        # enabled here; the other mitigations (no token in env during the
-        # build, persist-credentials: false on checkout) still keep the
-        # App token out of reach of any script that runs.
-        run: npm ci
+        # pnpm 11 blocks dependency build scripts by default; only lefthook is
+        # allow-listed in pnpm-workspace.yaml (allowBuilds). Combined with
+        # persist-credentials: false on checkout and minting the App token only
+        # after every PR-controlled build step has run, this keeps the token
+        # out of reach of any dependency script.
+        run: pnpm install --frozen-lockfile
 
       - name: Lint code
-        run: npm run lint
+        run: pnpm lint
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Type check
+        run: pnpm typecheck
 
       - name: Run tests
-        run: npm test
+        run: pnpm test
 
-      - name: Build TypeScript
-        run: npm run build
-
-      - name: Package action using ncc
-        run: npm run package
+      - name: Package action
+        run: pnpm run package
 
       - name: Generate GitHub App Token
         # Only mint the privileged token after every PR-controlled build
@@ -128,9 +133,9 @@ jobs:
             exit 0
           fi
 
-          npm version patch --no-git-tag-version
+          pnpm version patch --no-git-tag-version
           new_version=$(node -p "require('./package.json').version")
-          git add package.json package-lock.json
+          git add package.json pnpm-lock.yaml
 
           git config --global user.name "$BOT_NAME"
           git config --global user.email "$BOT_EMAIL"

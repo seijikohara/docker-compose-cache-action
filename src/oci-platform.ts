@@ -61,7 +61,7 @@ const NODE_TO_OCI_VARIANT: Readonly<Record<string, string>> = {
  * @returns OCI OS identifier (e.g., 'linux', 'windows').
  */
 function toOciOs(os: string): string {
-  return NODE_TO_OCI_OS[os as keyof typeof NODE_TO_OCI_OS] ?? os;
+  return NODE_TO_OCI_OS[os] ?? os;
 }
 
 /**
@@ -72,7 +72,7 @@ function toOciOs(os: string): string {
  * @returns OCI architecture identifier (e.g., 'amd64', 'arm64').
  */
 function toOciArch(arch: string): string {
-  return NODE_TO_OCI_ARCH[arch as keyof typeof NODE_TO_OCI_ARCH] ?? arch;
+  return NODE_TO_OCI_ARCH[arch] ?? arch;
 }
 
 /**
@@ -86,7 +86,7 @@ function toOciVariant(variant: string | undefined): string | undefined {
   if (!variant) {
     return undefined;
   }
-  return NODE_TO_OCI_VARIANT[variant as keyof typeof NODE_TO_OCI_VARIANT] ?? variant;
+  return NODE_TO_OCI_VARIANT[variant] ?? variant;
 }
 
 /**

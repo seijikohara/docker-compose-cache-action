@@ -1,46 +1,52 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import * as cache from '@actions/cache';
+import * as core from '@actions/core';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as dockerCommand from '../src/docker-command.js';
+import * as dockerComposeFile from '../src/docker-compose-file.js';
+import { run } from '../src/main.js';
+import * as platform from '../src/oci-platform.js';
 
-jest.unstable_mockModule('@actions/core', () => ({
-  getInput: jest.fn(),
-  getMultilineInput: jest.fn(),
-  getBooleanInput: jest.fn(),
-  setOutput: jest.fn(),
-  info: jest.fn(),
-  warning: jest.fn(),
-  debug: jest.fn(),
-  setFailed: jest.fn(),
+vi.mock('@actions/core', () => ({
+  getInput: vi.fn(),
+  getMultilineInput: vi.fn(),
+  getBooleanInput: vi.fn(),
+  setOutput: vi.fn(),
+  info: vi.fn(),
+  warning: vi.fn(),
+  debug: vi.fn(),
+  setFailed: vi.fn(),
   summary: {
-    addHeading: jest.fn().mockReturnThis(),
-    addTable: jest.fn().mockReturnThis(),
-    addRaw: jest.fn().mockReturnThis(),
-    addList: jest.fn().mockReturnThis(),
-    write: jest.fn().mockResolvedValue(undefined),
+    addHeading: vi.fn().mockReturnThis(),
+    addTable: vi.fn().mockReturnThis(),
+    addRaw: vi.fn().mockReturnThis(),
+    addList: vi.fn().mockReturnThis(),
+    write: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
-jest.unstable_mockModule('@actions/cache', () => ({
-  restoreCache: jest.fn(),
-  saveCache: jest.fn(),
+vi.mock('@actions/cache', () => ({
+  restoreCache: vi.fn(),
+  saveCache: vi.fn(),
 }));
 
-jest.unstable_mockModule('../src/oci-platform.js', () => ({
-  getCurrentOciPlatformString: jest.fn(),
-  getCurrentPlatformInfo: jest.fn(),
-  parseOciPlatformString: jest.fn(),
+vi.mock('../src/oci-platform.js', () => ({
+  getCurrentOciPlatformString: vi.fn(),
+  getCurrentPlatformInfo: vi.fn(),
+  parseOciPlatformString: vi.fn(),
 }));
 
-jest.unstable_mockModule('../src/docker-command.js', () => ({
-  inspectImageRemote: jest.fn(),
-  inspectImageLocal: jest.fn(),
-  pullImage: jest.fn(),
-  saveImageToTar: jest.fn(),
-  loadImageFromTar: jest.fn(),
+vi.mock('../src/docker-command.js', () => ({
+  inspectImageRemote: vi.fn(),
+  inspectImageLocal: vi.fn(),
+  pullImage: vi.fn(),
+  saveImageToTar: vi.fn(),
+  loadImageFromTar: vi.fn(),
 }));
 
-jest.unstable_mockModule('../src/docker-compose-file.js', () => ({
-  getComposeServicesFromFiles: jest.fn(),
-  getComposeFilePathsToProcess: jest.fn(() => ['docker-compose.yml']),
-  matchesExcludePattern: jest.fn(() => false),
+vi.mock('../src/docker-compose-file.js', () => ({
+  getComposeServicesFromFiles: vi.fn(),
+  getComposeFilePathsToProcess: vi.fn(() => ['docker-compose.yml']),
+  matchesExcludePattern: vi.fn(() => false),
 }));
 
 // `../src/action-outputs.js` and `../src/file-utils.js` are intentionally
@@ -49,30 +55,23 @@ jest.unstable_mockModule('../src/docker-compose-file.js', () => ({
 // can let main exercise the real implementations and just assert via
 // the core mocks.
 
-const cache = await import('@actions/cache');
-const core = await import('@actions/core');
-const dockerCommand = await import('../src/docker-command.js');
-const dockerComposeFile = await import('../src/docker-compose-file.js');
-const platform = await import('../src/oci-platform.js');
-const { run } = await import('../src/main.js');
-
-const mockCoreGetInput = jest.mocked(core.getInput);
-const mockCoreGetMultilineInput = jest.mocked(core.getMultilineInput);
-const mockCoreGetBooleanInput = jest.mocked(core.getBooleanInput);
-const mockCoreSetOutput = jest.mocked(core.setOutput);
-const mockCoreInfo = jest.mocked(core.info);
-const mockCoreWarning = jest.mocked(core.warning);
-const mockCoreSetFailed = jest.mocked(core.setFailed);
-const mockCoreDebug = jest.mocked(core.debug);
-const mockCacheRestore = jest.mocked(cache.restoreCache);
-const mockCacheSave = jest.mocked(cache.saveCache);
-const mockGetCurrentPlatformInfo = jest.mocked(platform.getCurrentPlatformInfo);
-const mockGetComposeServicesFromFiles = jest.mocked(dockerComposeFile.getComposeServicesFromFiles);
-const mockInspectImageRemote = jest.mocked(dockerCommand.inspectImageRemote);
-const mockInspectImageLocal = jest.mocked(dockerCommand.inspectImageLocal);
-const mockPullImage = jest.mocked(dockerCommand.pullImage);
-const mockSaveImageToTar = jest.mocked(dockerCommand.saveImageToTar);
-const mockLoadImageFromTar = jest.mocked(dockerCommand.loadImageFromTar);
+const mockCoreGetInput = vi.mocked(core.getInput);
+const mockCoreGetMultilineInput = vi.mocked(core.getMultilineInput);
+const mockCoreGetBooleanInput = vi.mocked(core.getBooleanInput);
+const mockCoreSetOutput = vi.mocked(core.setOutput);
+const mockCoreInfo = vi.mocked(core.info);
+const mockCoreWarning = vi.mocked(core.warning);
+const mockCoreSetFailed = vi.mocked(core.setFailed);
+const mockCoreDebug = vi.mocked(core.debug);
+const mockCacheRestore = vi.mocked(cache.restoreCache);
+const mockCacheSave = vi.mocked(cache.saveCache);
+const mockGetCurrentPlatformInfo = vi.mocked(platform.getCurrentPlatformInfo);
+const mockGetComposeServicesFromFiles = vi.mocked(dockerComposeFile.getComposeServicesFromFiles);
+const mockInspectImageRemote = vi.mocked(dockerCommand.inspectImageRemote);
+const mockInspectImageLocal = vi.mocked(dockerCommand.inspectImageLocal);
+const mockPullImage = vi.mocked(dockerCommand.pullImage);
+const mockSaveImageToTar = vi.mocked(dockerCommand.saveImageToTar);
+const mockLoadImageFromTar = vi.mocked(dockerCommand.loadImageFromTar);
 
 describe('main', () => {
   describe('run', () => {
@@ -83,7 +82,7 @@ describe('main', () => {
     ];
 
     beforeEach(() => {
-      jest.clearAllMocks();
+      vi.clearAllMocks();
 
       mockGetCurrentPlatformInfo.mockReturnValue({
         os: 'linux',
@@ -161,7 +160,7 @@ describe('main', () => {
       expect(mockCoreSetOutput).toHaveBeenCalledWith('cache-hit', 'false');
       const imageListOutput = mockCoreSetOutput.mock.calls.find((call) => call[0] === 'image-list')?.[1];
       expect(imageListOutput).toBeDefined();
-      const parsedImageList = JSON.parse(imageListOutput as string);
+      const parsedImageList = JSON.parse(imageListOutput);
       expect(Array.isArray(parsedImageList)).toBe(true);
       expect(parsedImageList.length).toBeGreaterThan(0);
       expect(parsedImageList[0]).toHaveProperty('name');
@@ -425,7 +424,7 @@ describe('main', () => {
 
         const imageListCall = mockCoreSetOutput.mock.calls.find((call) => call[0] === 'image-list');
         expect(imageListCall).toBeDefined();
-        const imageList = JSON.parse(imageListCall?.[1] as string);
+        const imageList = JSON.parse(imageListCall?.[1]);
         expect(imageList[0].status).toBe('Cached');
       });
 
@@ -494,7 +493,9 @@ describe('main', () => {
 
         await run();
 
-        expect(mockCoreWarning).toHaveBeenCalledWith(expect.stringContaining("'skip-latest-check' input is deprecated"));
+        expect(mockCoreWarning).toHaveBeenCalledWith(
+          expect.stringContaining("'skip-latest-check' input is deprecated")
+        );
         expect(mockInspectImageRemote).toHaveBeenCalledTimes(1);
         expect(mockCoreInfo).toHaveBeenCalledWith(expect.stringContaining('Skipped latest check for nginx:latest'));
       });
@@ -516,7 +517,9 @@ describe('main', () => {
 
         await run();
 
-        expect(mockCoreWarning).toHaveBeenCalledWith(expect.stringContaining("'skip-latest-check' input is deprecated"));
+        expect(mockCoreWarning).toHaveBeenCalledWith(
+          expect.stringContaining("'skip-latest-check' input is deprecated")
+        );
         expect(mockInspectImageRemote).toHaveBeenCalledTimes(2);
       });
 

@@ -194,7 +194,7 @@ export async function writeManifestToFile(manifest: DockerImageManifest, manifes
     await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2));
     return true;
   } catch (error) {
-    core.warning(`Failed to save manifest to ${manifestPath}: ${error}`);
+    core.warning(`Failed to save manifest to ${manifestPath}: ${String(error)}`);
     return false;
   }
 }
@@ -208,9 +208,9 @@ export async function writeManifestToFile(manifest: DockerImageManifest, manifes
 export async function readManifestFromFile(manifestPath: string): Promise<DockerImageManifest | undefined> {
   try {
     const manifestJson = await fs.readFile(manifestPath, 'utf8');
-    return JSON.parse(manifestJson) as DockerImageManifest;
+    return JSON.parse(manifestJson);
   } catch (error) {
-    core.debug(`Failed to load manifest from ${manifestPath}: ${error}`);
+    core.debug(`Failed to load manifest from ${manifestPath}: ${String(error)}`);
     return undefined;
   }
 }

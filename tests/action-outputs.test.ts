@@ -1,18 +1,29 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import * as core from '@actions/core';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  type ActionSummary,
+  buildProcessedImageList,
+  calculateActionSummary,
+  createActionSummary,
+  logActionCompletion,
+  type ProcessedImageList,
+  setActionOutputs,
+  type TimedServiceResult,
+} from '../src/action-outputs.js';
 
-jest.unstable_mockModule('@actions/core', () => ({
-  setOutput: jest.fn(),
-  info: jest.fn(),
+vi.mock('@actions/core', () => ({
+  setOutput: vi.fn(),
+  info: vi.fn(),
   summary: {
-    addHeading: jest.fn().mockReturnThis(),
-    addTable: jest.fn().mockReturnThis(),
-    addList: jest.fn().mockReturnThis(),
-    write: jest.fn().mockResolvedValue(undefined),
+    addHeading: vi.fn().mockReturnThis(),
+    addTable: vi.fn().mockReturnThis(),
+    addList: vi.fn().mockReturnThis(),
+    write: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
-jest.unstable_mockModule('../src/date-utils.js', () => ({
-  formatTimeBetween: jest.fn((start: number, end: number) => {
+vi.mock('../src/date-utils.js', () => ({
+  formatTimeBetween: vi.fn((start: number, end: number) => {
     const duration = end - start;
     if (duration >= 3600000) {
       return '1 hour';
@@ -27,8 +38,8 @@ jest.unstable_mockModule('../src/date-utils.js', () => ({
   }),
 }));
 
-jest.unstable_mockModule('../src/file-utils.js', () => ({
-  formatFileSize: jest.fn((size?: number) => {
+vi.mock('../src/file-utils.js', () => ({
+  formatFileSize: vi.fn((size?: number) => {
     if (size === undefined) {
       return 'N/A';
     }
@@ -45,25 +56,13 @@ jest.unstable_mockModule('../src/file-utils.js', () => ({
   }),
 }));
 
-const core = await import('@actions/core');
-const {
-  buildProcessedImageList,
-  calculateActionSummary,
-  createActionSummary,
-  logActionCompletion,
-  setActionOutputs,
-} = await import('../src/action-outputs.js');
-type ActionSummary = import('../src/action-outputs.js').ActionSummary;
-type ProcessedImageList = import('../src/action-outputs.js').ProcessedImageList;
-type TimedServiceResult = import('../src/action-outputs.js').TimedServiceResult;
-
-const mockCoreSetOutput = jest.mocked(core.setOutput);
-const mockCoreInfo = jest.mocked(core.info);
-const mockCoreSummary = jest.mocked(core.summary);
+const mockCoreSetOutput = vi.mocked(core.setOutput);
+const mockCoreInfo = vi.mocked(core.info);
+const mockCoreSummary = vi.mocked(core.summary);
 
 describe('action-outputs', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('setActionOutputs', () => {
@@ -280,7 +279,7 @@ describe('action-outputs', () => {
 
   describe('createActionSummary', () => {
     beforeEach(() => {
-      jest.clearAllMocks();
+      vi.clearAllMocks();
     });
 
     it('should create GitHub Actions summary with all sections', () => {
@@ -321,9 +320,11 @@ describe('action-outputs', () => {
       createActionSummary(results, summary, referencedComposeFiles, skipLatestCheck);
 
       // Verify main heading was added
+      // oxlint-disable-next-line typescript/unbound-method -- vitest mock method reference passed to expect(), never invoked unbound
       expect(mockCoreSummary.addHeading).toHaveBeenCalledWith('Docker Compose Cache Results', 2);
 
       // Verify table structure (header + results rows) - First call to addTable
+      // oxlint-disable-next-line typescript/unbound-method -- vitest mock method reference passed to expect(), never invoked unbound
       expect(mockCoreSummary.addTable).toHaveBeenNthCalledWith(1, [
         [
           { data: 'Image Name', header: true },
@@ -352,7 +353,9 @@ describe('action-outputs', () => {
       ]);
 
       // Verify action summary section
+      // oxlint-disable-next-line typescript/unbound-method -- vitest mock method reference passed to expect(), never invoked unbound
       expect(mockCoreSummary.addHeading).toHaveBeenCalledWith('Action summary', 3);
+      // oxlint-disable-next-line typescript/unbound-method -- vitest mock method reference passed to expect(), never invoked unbound
       expect(mockCoreSummary.addTable).toHaveBeenNthCalledWith(2, [
         [
           { data: 'Metric', header: true },
@@ -365,10 +368,13 @@ describe('action-outputs', () => {
       ]);
 
       // Verify referenced compose files section
+      // oxlint-disable-next-line typescript/unbound-method -- vitest mock method reference passed to expect(), never invoked unbound
       expect(mockCoreSummary.addHeading).toHaveBeenCalledWith('Referenced Compose Files', 3);
+      // oxlint-disable-next-line typescript/unbound-method -- vitest mock method reference passed to expect(), never invoked unbound
       expect(mockCoreSummary.addList).toHaveBeenCalledWith(['docker-compose.yml', 'docker-compose.override.yml']);
 
       // Verify write was called
+      // oxlint-disable-next-line typescript/unbound-method -- vitest mock method reference passed to expect(), never invoked unbound
       expect(mockCoreSummary.write).toHaveBeenCalled();
     });
 
@@ -383,6 +389,7 @@ describe('action-outputs', () => {
 
       createActionSummary([], summary, ['docker-compose.yml'], false);
 
+      // oxlint-disable-next-line typescript/unbound-method -- vitest mock method reference passed to expect(), never invoked unbound
       expect(mockCoreSummary.addTable).toHaveBeenNthCalledWith(1, [
         [
           { data: 'Image Name', header: true },
@@ -406,6 +413,7 @@ describe('action-outputs', () => {
 
       createActionSummary([], summary, ['docker-compose.yml'], false);
 
+      // oxlint-disable-next-line typescript/unbound-method -- vitest mock method reference passed to expect(), never invoked unbound
       expect(mockCoreSummary.addTable).toHaveBeenNthCalledWith(
         2,
         expect.arrayContaining([[{ data: 'Skip Latest Check' }, { data: '🔍 No' }]])
@@ -434,6 +442,7 @@ describe('action-outputs', () => {
 
       createActionSummary(results, summary, ['docker-compose.yml'], false);
 
+      // oxlint-disable-next-line typescript/unbound-method -- vitest mock method reference passed to expect(), never invoked unbound
       expect(mockCoreSummary.addTable).toHaveBeenNthCalledWith(1, [
         [
           { data: 'Image Name', header: true },
@@ -476,6 +485,7 @@ describe('action-outputs', () => {
 
       createActionSummary(results, summary, ['docker-compose.yml'], false);
 
+      // oxlint-disable-next-line typescript/unbound-method -- vitest mock method reference passed to expect(), never invoked unbound
       expect(mockCoreSummary.addTable).toHaveBeenNthCalledWith(1, [
         [
           { data: 'Image Name', header: true },

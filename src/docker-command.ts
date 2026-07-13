@@ -112,7 +112,7 @@ export async function pullImage(imageName: string, platform: string | undefined)
 
     return true;
   } catch (error) {
-    core.warning(`Failed to pull image ${imageName}${platform ? ` for platform ${platform}` : ''}: ${error}`);
+    core.warning(`Failed to pull image ${imageName}${platform ? ` for platform ${platform}` : ''}: ${String(error)}`);
     return false;
   }
 }
@@ -145,14 +145,14 @@ export async function inspectImageRemote(imageName: string): Promise<DockerImage
 
     try {
       // Parse the JSON output to extract the manifest
-      const manifest = JSON.parse(stdout.trim()) as DockerImageManifest;
+      const manifest = JSON.parse(stdout.trim());
       return manifest;
     } catch (manifestJsonParseError) {
-      core.warning(`Failed to parse manifest JSON for ${imageName}: ${manifestJsonParseError}`);
+      core.warning(`Failed to parse manifest JSON for ${imageName}: ${String(manifestJsonParseError)}`);
       return undefined;
     }
   } catch (error) {
-    core.warning(`Error inspecting manifest for ${imageName}: ${error}`);
+    core.warning(`Error inspecting manifest for ${imageName}: ${String(error)}`);
     return undefined;
   }
 }
@@ -192,14 +192,14 @@ export async function inspectImageLocal(imageName: string): Promise<DockerImageM
 
     try {
       // Parse the JSON output to extract the image information
-      const imageMetadata = JSON.parse(stdout.trim()) as DockerImageMetadata;
+      const imageMetadata = JSON.parse(stdout.trim());
       return imageMetadata;
     } catch (inspectJsonParseError) {
-      core.warning(`Failed to parse inspect JSON for ${imageName}: ${inspectJsonParseError}`);
+      core.warning(`Failed to parse inspect JSON for ${imageName}: ${String(inspectJsonParseError)}`);
       return undefined;
     }
   } catch (error) {
-    core.warning(`Error inspecting image ${imageName}: ${error}`);
+    core.warning(`Error inspecting image ${imageName}: ${String(error)}`);
     return undefined;
   }
 }
@@ -224,7 +224,7 @@ export async function saveImageToTar(imageName: string, outputPath: string): Pro
 
     return true;
   } catch (error) {
-    core.warning(`Failed to save image ${imageName}: ${error}`);
+    core.warning(`Failed to save image ${imageName}: ${String(error)}`);
     return false;
   }
 }
@@ -248,7 +248,7 @@ export async function loadImageFromTar(tarPath: string): Promise<boolean> {
 
     return true;
   } catch (error) {
-    core.warning(`Failed to load image from ${tarPath}: ${error}`);
+    core.warning(`Failed to load image from ${tarPath}: ${String(error)}`);
     return false;
   }
 }

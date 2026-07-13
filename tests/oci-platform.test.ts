@@ -1,19 +1,21 @@
-import { afterAll, describe, expect, it } from '@jest/globals';
+import { afterAll, describe, expect, it } from 'vitest';
 import { getCurrentPlatformInfo, parseOciPlatformString } from '../src/oci-platform.js';
+
+/**
+ * Helper function to mock process.platform and process.arch for testing.
+ * Hoisted to module scope: it does not capture anything from the describe
+ * block, so recreating it per suite run would be pointless.
+ */
+const mockPlatformAndArch = (platformValue: string, archValue: string) => {
+  Object.defineProperty(process, 'platform', { value: platformValue });
+  Object.defineProperty(process, 'arch', { value: archValue });
+};
 
 describe('platform', () => {
   describe('getCurrentPlatformInfo', () => {
     // Store original platform and architecture values
     const originalPlatform = process.platform;
     const originalArch = process.arch;
-
-    /**
-     * Helper function to mock process.platform and process.arch for testing
-     */
-    const mockPlatformAndArch = (platformValue: string, archValue: string) => {
-      Object.defineProperty(process, 'platform', { value: platformValue });
-      Object.defineProperty(process, 'arch', { value: archValue });
-    };
 
     // Restore original values after tests
     afterAll(() => {

@@ -1,40 +1,47 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import * as fs from 'node:fs';
 
-jest.unstable_mockModule('@actions/core', () => ({
-  debug: jest.fn(),
-  warning: jest.fn(),
+import * as core from '@actions/core';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  getComposeFilePathsToProcess,
+  getComposeServicesFromFiles,
+  matchesExcludePattern,
+} from '../src/docker-compose-file.js';
+
+vi.mock('@actions/core', () => ({
+  debug: vi.fn(),
+  warning: vi.fn(),
 }));
 
-jest.unstable_mockModule('node:fs', () => ({
-  existsSync: jest.fn(),
-  readFileSync: jest.fn(),
+vi.mock('node:fs', () => ({
+  existsSync: vi.fn(),
+  readFileSync: vi.fn(),
 }));
 
-const fs = await import('node:fs');
-const core = await import('@actions/core');
-const { getComposeFilePathsToProcess, getComposeServicesFromFiles, matchesExcludePattern } = await import(
-  '../src/docker-compose-file.js'
-);
+const existsSyncMock = vi.mocked(fs.existsSync);
+const readFileSyncMock = vi.mocked(fs.readFileSync);
+const warningMock = vi.mocked(core.warning);
+const debugMock = vi.mocked(core.debug);
 
-const existsSyncMock = jest.mocked(fs.existsSync);
-const readFileSyncMock = jest.mocked(fs.readFileSync);
-const warningMock = jest.mocked(core.warning);
-const debugMock = jest.mocked(core.debug);
+/**
+ * Builds a minimal Compose YAML document from a services map.
+ * Hoisted to module scope: it captures nothing from either describe block
+ * that uses it, so recreating it per suite run would be pointless.
+ */
+const createYaml = (services: Record<string, { image?: string; platform?: string }>) =>
+  `services:\n${Object.entries(services)
+    .map(
+      ([name, conf]) =>
+        `  ${name}:\n    ${conf.image ? `image: ${conf.image}` : ''}${conf.platform ? `\n    platform: ${conf.platform}` : ''}`
+    )
+    .join('\n')}`;
 
 describe('docker-compose-file', () => {
   describe('getComposeServicesFromFiles', () => {
     beforeEach(() => {
-      jest.clearAllMocks();
+      vi.clearAllMocks();
       existsSyncMock.mockReturnValue(true);
     });
-
-    const createYaml = (services: Record<string, { image?: string; platform?: string }>) =>
-      `services:\n${Object.entries(services)
-        .map(
-          ([name, conf]) =>
-            `  ${name}:\n    ${conf.image ? `image: ${conf.image}` : ''}${conf.platform ? `\n    platform: ${conf.platform}` : ''}`
-        )
-        .join('\n')}`;
 
     it('extracts services with image from a single file', () => {
       readFileSyncMock.mockReturnValue(createYaml({ nginx: { image: 'nginx:latest' } }));
@@ -114,7 +121,7 @@ describe('docker-compose-file', () => {
 
   describe('getComposeFilePathsToProcess', () => {
     beforeEach(() => {
-      jest.clearAllMocks();
+      vi.clearAllMocks();
     });
 
     it('should return provided file paths when they exist', () => {
@@ -265,17 +272,9 @@ describe('docker-compose-file', () => {
 
   describe('getComposeServicesFromFiles with wildcard patterns', () => {
     beforeEach(() => {
-      jest.clearAllMocks();
+      vi.clearAllMocks();
       existsSyncMock.mockReturnValue(true);
     });
-
-    const createYaml = (services: Record<string, { image?: string; platform?: string }>) =>
-      `services:\n${Object.entries(services)
-        .map(
-          ([name, conf]) =>
-            `  ${name}:\n    ${conf.image ? `image: ${conf.image}` : ''}${conf.platform ? `\n    platform: ${conf.platform}` : ''}`
-        )
-        .join('\n')}`;
 
     it('should exclude images matching wildcard pattern nginx:*', () => {
       readFileSyncMock.mockReturnValue(
