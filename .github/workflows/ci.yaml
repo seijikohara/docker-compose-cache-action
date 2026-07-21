@@ -163,11 +163,17 @@ jobs:
     if: always()
     steps:
       - name: Fail if build-and-test did not succeed
-        if: needs.build-and-test.result != 'success'
+        # A cancelled push run is expected on main: the version-bump commit
+        # pushed by the bot joins the same concurrency group and supersedes
+        # its own trigger run. Let that surface as `cancelled` instead of
+        # converting it into a failure. PR runs keep failing on cancellation
+        # so the required check stays strict.
+        if: needs.build-and-test.result != 'success' && !(github.event_name == 'push' && needs.build-and-test.result == 'cancelled')
         run: |
           echo "::error::build-and-test concluded with '${{ needs.build-and-test.result }}'"
           exit 1
       - name: Report successful completion
+        if: needs.build-and-test.result == 'success'
         run: |
           echo "### Build and Test Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
