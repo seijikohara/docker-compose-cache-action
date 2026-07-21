@@ -214,41 +214,41 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
-      - name: Run Cache Action with Skip Latest Check True
+      - name: Run Cache Action with Skip Digest Verification True
         id: docker-cache
         uses: ./
         with:
           compose-files: ${{ matrix.files }}
           exclude-images: ${{ matrix.exclude }}
           cache-key-prefix: ${{ needs.generate-run-id.outputs.run_id }}-${{ github.run_attempt }}-${{ matrix.scenario }}
-          skip-latest-check: true
+          skip-digest-verification: true
 
       - name: Output Action Results to Summary
         run: |
-          echo "## Action Outputs for ${{ matrix.scenario }} (Third Run - Skip Latest Check: True)" >> $GITHUB_STEP_SUMMARY
+          echo "## Action Outputs for ${{ matrix.scenario }} (Third Run - Skip Digest Verification: True)" >> $GITHUB_STEP_SUMMARY
           echo "| Output | Value |" >> $GITHUB_STEP_SUMMARY
           echo "| ------ | ----- |" >> $GITHUB_STEP_SUMMARY
           echo "| Cache Hit | ${{ steps.docker-cache.outputs.cache-hit }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Image List | ${{ steps.docker-cache.outputs.image-list }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-      - name: Validate Skip Latest Check True Behavior
+      - name: Validate Skip Digest Verification True Behavior
         id: validate
         run: |
           hit="${{ steps.docker-cache.outputs.cache-hit }}"
           list='${{ steps.docker-cache.outputs.image-list }}'
           echo "Scenario: ${{ matrix.scenario }}"
           echo "Cache Hit: $hit"
-          echo "Skip Latest Check: true"
+          echo "Skip Digest Verification: true"
 
           # Parse image list to verify behavior
           IMAGE_LIST='${{ steps.docker-cache.outputs.image-list }}'
           if [[ -n "$IMAGE_LIST" ]]; then
-            echo "Images processed with skip-latest-check: true"
+            echo "Images processed with skip-digest-verification: true"
             echo "$IMAGE_LIST" | jq -r '.[] | "- \(.name) [\(.status)]: \(.size) bytes processed in \(.processingTimeMs)ms"'
 
             # Verify that registry checks were skipped (faster processing expected)
-            echo "✅ Skip latest check enabled - registry digest verification should have been skipped"
+            echo "✅ Skip digest verification enabled - registry digest verification should have been skipped"
           else
             echo "No images processed"
           fi
