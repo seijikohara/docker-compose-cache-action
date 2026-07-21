@@ -23,7 +23,14 @@ function readLicenseText(packageDir) {
     return '';
   }
   const licenseFile = readdirSync(packageDir).find((name) => LICENSE_FILE_RE.test(name));
-  return licenseFile ? readFileSync(join(packageDir, licenseFile), 'utf8').trimEnd() : '';
+  if (!licenseFile) {
+    return '';
+  }
+  // Some packages ship CRLF license files (e.g. tslib). Normalize to LF so the
+  // regenerated output stays byte-identical to the committed file, which the
+  // repo-wide `* text=auto eol=lf` attribute normalizes on checkin. A mismatch
+  // here leaves the CI working tree dirty and blocks the release version bump.
+  return readFileSync(join(packageDir, licenseFile), 'utf8').replace(/\r\n?/g, '\n').trimEnd();
 }
 
 // `pnpm licenses list` groups production dependencies by SPDX identifier and reports
