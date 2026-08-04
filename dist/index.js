@@ -60,7 +60,7 @@ var __copyProps = (to, from, except, desc) => {
 	}
 	return to;
 };
-var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", {
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(isNodeMode || !mod || !mod.__esModule || !__hasOwnProp.call(mod, "default") ? __defProp(target, "default", {
 	value: mod,
 	enumerable: true
 }) : target, mod));
@@ -1929,7 +1929,7 @@ var require_dispatcher_base = /* @__PURE__ */ __commonJSMin(((exports, module) =
 		get webSocketOptions() {
 			return {
 				maxFragments: this[kWebSocketOptions].maxFragments ?? 131072,
-				maxPayloadSize: this[kWebSocketOptions].maxPayloadSize ?? 128 * 1024 * 1024
+				maxPayloadSize: this[kWebSocketOptions].maxPayloadSize ?? 134217728
 			};
 		}
 		get destroyed() {
@@ -1981,7 +1981,7 @@ var require_dispatcher_base = /* @__PURE__ */ __commonJSMin(((exports, module) =
 			}
 			if (callback === void 0) return new Promise((resolve, reject) => {
 				this.destroy(err, (err, data) => {
-					return err ? reject(err) : resolve(data);
+					return err ? /* istanbul ignore next: should never error */ reject(err) : resolve(data);
 				});
 			});
 			if (typeof callback !== "function") throw new InvalidArgumentError("invalid callback");
@@ -2451,7 +2451,7 @@ var require_connect = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 				assert$25(!httpSocket, "httpSocket can only be sent on TLS update");
 				port = port || 80;
 				socket = net$4.connect({
-					highWaterMark: 64 * 1024,
+					highWaterMark: 65536,
 					...options,
 					localAddress,
 					port,
@@ -3930,10 +3930,7 @@ var require_util$6 = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 				case "strict-origin-when-cross-origin":
 					if (request.origin && urlHasHttpsScheme(request.origin) && !urlHasHttpsScheme(requestCurrentURL(request))) serializedOrigin = null;
 					break;
-				case "same-origin":
-					if (!sameOrigin(request, requestCurrentURL(request))) serializedOrigin = null;
-					break;
-				default:
+				case "same-origin": if (!sameOrigin(request, requestCurrentURL(request))) serializedOrigin = null;
 			}
 			request.headersList.append("origin", serializedOrigin, true);
 		}
@@ -4215,9 +4212,7 @@ var require_util$6 = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 					case "value":
 						result = value;
 						break;
-					case "key+value":
-						result = [key, value];
-						break;
+					case "key+value": result = [key, value];
 				}
 				return {
 					value: result,
@@ -7013,7 +7008,7 @@ var require_client = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 //#region node_modules/.pnpm/undici@6.28.0/node_modules/undici/lib/dispatcher/fixed-queue.js
 var require_fixed_queue = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	const kSize = 2048;
-	const kMask = kSize - 1;
+	const kMask = 2047;
 	var FixedCircularBuffer = class {
 		constructor() {
 			this.bottom = 0;
@@ -7810,7 +7805,7 @@ var require_retry_handler = /* @__PURE__ */ __commonJSMin(((exports, module) => 
 			this.retryOpts = {
 				retry: retryFn ?? RetryHandler[kRetryHandlerDefaultRetry],
 				retryAfter: retryAfter ?? true,
-				maxTimeout: maxTimeout ?? 30 * 1e3,
+				maxTimeout: maxTimeout ?? 3e4,
 				minTimeout: minTimeout ?? 500,
 				timeoutFactor: timeoutFactor ?? 2,
 				maxRetries: maxRetries ?? 5,
@@ -8064,7 +8059,7 @@ var require_readable = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	const kContentLength = Symbol("kContentLength");
 	const noop = () => {};
 	var BodyReadable = class extends Readable$4 {
-		constructor({ resume, abort, contentType = "", contentLength, highWaterMark = 64 * 1024 }) {
+		constructor({ resume, abort, contentType = "", contentLength, highWaterMark = 65536 }) {
 			super({
 				autoDestroy: true,
 				read: resume,
@@ -8143,7 +8138,7 @@ var require_readable = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 			return this[kBody];
 		}
 		async dump(opts) {
-			let limit = Number.isFinite(opts?.limit) ? opts.limit : 128 * 1024;
+			let limit = Number.isFinite(opts?.limit) ? opts.limit : 131072;
 			const signal = opts?.signal;
 			if (signal != null && (typeof signal !== "object" || !("aborted" in signal))) throw new InvalidArgumentError("signal must be an AbortSignal");
 			signal?.throwIfAborted();
@@ -8282,7 +8277,7 @@ var require_util$5 = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	const assert$14 = __require("node:assert");
 	const { ResponseStatusCodeError } = require_errors();
 	const { chunksDecode } = require_readable();
-	const CHUNK_LIMIT = 128 * 1024;
+	const CHUNK_LIMIT = 131072;
 	async function getResolveErrorBodyCallback({ callback, body, contentType, statusCode, statusMessage, headers }) {
 		assert$14(body);
 		let chunks = [];
@@ -9781,7 +9776,7 @@ var require_dump = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	const { InvalidArgumentError, RequestAbortedError } = require_errors();
 	const DecoratorHandler = require_decorator_handler();
 	var DumpHandler = class extends DecoratorHandler {
-		#maxSize = 1024 * 1024;
+		#maxSize = 1048576;
 		#abort = null;
 		#dumped = false;
 		#aborted = false;
@@ -9831,7 +9826,7 @@ var require_dump = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 			this.#handler.onComplete(trailers);
 		}
 	};
-	function createDumpInterceptor({ maxSize: defaultMaxSize } = { maxSize: 1024 * 1024 }) {
+	function createDumpInterceptor({ maxSize: defaultMaxSize } = { maxSize: 1048576 }) {
 		return (dispatch) => {
 			return function Intercept(opts, handler) {
 				const { dumpMaxSize = defaultMaxSize } = opts;
@@ -10002,9 +9997,7 @@ var require_dns = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 					this.#handler.onError(err);
 					return;
 				case "ENOTFOUND": this.#state.deleteRecord(this.#origin);
-				default:
-					this.#handler.onError(err);
-					break;
+				default: this.#handler.onError(err);
 			}
 		}
 	};
@@ -15447,7 +15440,6 @@ var require_eventsource_stream = /* @__PURE__ */ __commonJSMin(((exports, module
 				default:
 					if (this.buffer[0] === BOM[0] && this.buffer[1] === BOM[1] && this.buffer[2] === BOM[2]) this.buffer = this.buffer.subarray(3);
 					this.checkBOM = false;
-					break;
 			}
 			while (this.pos < this.buffer.length) {
 				if (this.eventEndCheck) {
@@ -15513,9 +15505,7 @@ var require_eventsource_stream = /* @__PURE__ */ __commonJSMin(((exports, module
 				case "id":
 					if (isValidLastEventId(value)) event[field] = value;
 					break;
-				case "event":
-					if (value.length > 0) event[field] = value;
-					break;
+				case "event": if (value.length > 0) event[field] = value;
 			}
 		}
 		/**
@@ -16310,7 +16300,7 @@ var HttpClient = class {
 		req.on("socket", (sock) => {
 			socket = sock;
 		});
-		req.setTimeout(this._socketTimeout || 3 * 6e4, () => {
+		req.setTimeout(this._socketTimeout || 18e4, () => {
 			if (socket) socket.end();
 			handleResult(/* @__PURE__ */ new Error(`Request timeout: ${info.options.path}`));
 		});
@@ -19387,8 +19377,8 @@ function logActionCompletion(summary) {
 	else info("Docker Compose Cache action completed with some services not fully processed");
 }
 //#endregion
-//#region node_modules/.pnpm/js-yaml@5.2.2/node_modules/js-yaml/dist/js-yaml.mjs
-/*! js-yaml 5.2.2 https://github.com/nodeca/js-yaml @license MIT */
+//#region node_modules/.pnpm/js-yaml@5.2.3/node_modules/js-yaml/dist/js-yaml.mjs
+/*! js-yaml 5.2.3 https://github.com/nodeca/js-yaml @license MIT */
 var NOT_RESOLVED = Symbol("NOT_RESOLVED");
 var MERGE_KEY = Symbol("MERGE_KEY");
 function defineScalarTag(tagName, options) {
@@ -19810,6 +19800,11 @@ var binaryTag = defineScalarTag("tag:yaml.org,2002:binary", {
 });
 var YAML_DATE_REGEXP = /* @__PURE__ */ new RegExp("^([0-9][0-9][0-9][0-9])-([0-9][0-9])-([0-9][0-9])$");
 var YAML_TIMESTAMP_REGEXP = /* @__PURE__ */ new RegExp("^([0-9][0-9][0-9][0-9])-([0-9][0-9]?)-([0-9][0-9]?)(?:[Tt]|[ \\t]+)([0-9][0-9]?):([0-9][0-9]):([0-9][0-9])(?:\\.([0-9]*))?(?:[ \\t]*(Z|([-+])([0-9][0-9]?)(?::([0-9][0-9]))?))?$");
+function makeUtcDate(year, month, day, hour = 0, minute = 0, second = 0, fraction = 0) {
+	const date = new Date(Date.UTC(year, month, day, hour, minute, second, fraction));
+	date.setUTCFullYear(year, month, day);
+	return date;
+}
 function resolveYamlTimestamp(source) {
 	let match = YAML_DATE_REGEXP.exec(source);
 	if (match === null) match = YAML_TIMESTAMP_REGEXP.exec(source);
@@ -19818,7 +19813,7 @@ function resolveYamlTimestamp(source) {
 	const month = +match[2] - 1;
 	const day = +match[3];
 	if (!match[4]) {
-		const date = new Date(Date.UTC(year, month, day));
+		const date = makeUtcDate(year, month, day);
 		if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month || date.getUTCDate() !== day) return NOT_RESOLVED;
 		return date;
 	}
@@ -19832,7 +19827,7 @@ function resolveYamlTimestamp(source) {
 		while (value.length < 3) value += "0";
 		fraction = +value;
 	}
-	const date = new Date(Date.UTC(year, month, day, hour, minute, second, fraction));
+	const date = makeUtcDate(year, month, day, hour, minute, second, fraction);
 	if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month || date.getUTCDate() !== day) return NOT_RESOLVED;
 	if (match[9]) {
 		const offsetHour = +match[10];
@@ -19930,7 +19925,11 @@ var mapTag = defineMappingTag("tag:yaml.org,2002:map", {
 		return Object.prototype.hasOwnProperty.call(container, String(key));
 	},
 	keys: (container) => Object.keys(container),
-	get: (container, key) => container[String(key)]
+	get: (container, key) => {
+		const normalizedKey = String(key);
+		if (!Object.prototype.hasOwnProperty.call(container, normalizedKey)) return null;
+		return container[normalizedKey];
+	}
 });
 var setTag = defineMappingTag("tag:yaml.org,2002:set", {
 	create: () => /* @__PURE__ */ new Set(),
@@ -19951,9 +19950,9 @@ var setTag = defineMappingTag("tag:yaml.org,2002:set", {
 });
 function createTagDefinitionMap() {
 	return {
-		scalar: {},
-		sequence: {},
-		mapping: {}
+		scalar: Object.create(null),
+		sequence: Object.create(null),
+		mapping: Object.create(null)
 	};
 }
 function createTagDefinitionListMap() {
@@ -20007,10 +20006,8 @@ var Schema = class Schema {
 					if (tag.matchByTagPrefix) prefix.sequence.push(tag);
 					else exact.sequence[tag.tagName] = tag;
 					break;
-				case "mapping":
-					if (tag.matchByTagPrefix) prefix.mapping.push(tag);
-					else exact.mapping[tag.tagName] = tag;
-					break;
+				case "mapping": if (tag.matchByTagPrefix) prefix.mapping.push(tag);
+				else exact.mapping[tag.tagName] = tag;
 			}
 		}
 		const implicitScalarAnyFirstChar = implicitScalarTags.filter((tag) => tag.implicitFirstChars === null);
@@ -20123,7 +20120,11 @@ defineMappingTag("tag:yaml.org,2002:map", {
 		return normalizedKey !== null && Object.prototype.hasOwnProperty.call(container, normalizedKey);
 	},
 	keys: (container) => Object.keys(container),
-	get: (container, key) => container[String(key)]
+	get: (container, key) => {
+		const normalizedKey = String(key);
+		if (!Object.prototype.hasOwnProperty.call(container, normalizedKey)) return null;
+		return container[normalizedKey];
+	}
 });
 var DEFAULT_SNIPPET_OPTIONS = {
 	maxLength: 79,
@@ -20429,10 +20430,10 @@ function getScalarValue(input, scalar) {
 		default: return getPlainValue(input, valueStart, valueEnd);
 	}
 }
-var DEFAULT_TAG_HANDLERS = {
+var DEFAULT_TAG_HANDLERS = Object.assign(Object.create(null), {
 	"!": "!",
 	"!!": "tag:yaml.org,2002:"
-};
+});
 function tagNameFull(rawTag, tagHandlers) {
 	if (rawTag.startsWith("!<") && rawTag.endsWith(">")) return decodeURIComponent(rawTag.slice(2, -1));
 	const handleEnd = rawTag.indexOf("!", 1);
@@ -20673,6 +20674,10 @@ function constructFromEvents(events, options) {
 			}
 			case 6: {
 				const frame = state.frames.pop();
+				if (frame.kind === "mapping" && frame.hasKey) {
+					state.position = frame.keyPosition;
+					throwError$1(state, "incomplete mapping pair in event stream");
+				}
 				if (frame.kind === "document") state.documents.push(frame.value);
 				else {
 					const value = frame.tag.carrierIsResult ? frame.value : finalizeCollection(state, frame.position, frame.tag, frame.value);
@@ -21343,10 +21348,6 @@ function parseNode(state, parentIndent, nodeContext, allowToSeek, allowCompact, 
 		else if (state.lineIndent === parentIndent) indentStatus = 0;
 		else indentStatus = -1;
 	}
-	if (state.position === state.lineStart && testDocumentSeparator(state)) {
-		state.depth--;
-		return false;
-	}
 	if (indentStatus === 1) while (true) {
 		const ch = state.input.charCodeAt(state.position);
 		const propertyState = snapshotState(state);
@@ -21937,9 +21938,9 @@ var require_balanced_match = /* @__PURE__ */ __commonJSMin(((exports, module) =>
 	}
 }));
 //#endregion
-//#region node_modules/.pnpm/brace-expansion@1.1.16/node_modules/brace-expansion/index.js
+//#region node_modules/.pnpm/brace-expansion@1.1.18/node_modules/brace-expansion/index.js
 var require_brace_expansion = /* @__PURE__ */ __commonJSMin(((exports, module) => {
-	var concatMap = require_concat_map();
+	require_concat_map();
 	var balanced = require_balanced_match();
 	module.exports = expandTop;
 	var escSlash = "\0SLASH" + Math.random() + "\0";
@@ -21947,6 +21948,8 @@ var require_brace_expansion = /* @__PURE__ */ __commonJSMin(((exports, module) =
 	var escClose = "\0CLOSE" + Math.random() + "\0";
 	var escComma = "\0COMMA" + Math.random() + "\0";
 	var escPeriod = "\0PERIOD" + Math.random() + "\0";
+	var EXPANSION_MAX = 1e5;
+	var EXPANSION_MAX_LENGTH = 4e6;
 	function numeric(str) {
 		return parseInt(str, 10) == str ? parseInt(str, 10) : str.charCodeAt(0);
 	}
@@ -21977,9 +21980,10 @@ var require_brace_expansion = /* @__PURE__ */ __commonJSMin(((exports, module) =
 	function expandTop(str, options) {
 		if (!str) return [];
 		options = options || {};
-		var max = options.max == null ? Infinity : options.max;
+		var max = options.max == null ? EXPANSION_MAX : options.max;
+		var maxLength = options.maxLength == null ? EXPANSION_MAX_LENGTH : options.maxLength;
 		if (str.substr(0, 2) === "{}") str = "\\{\\}" + str.substr(2);
-		return expand(escapeBraces(str), max, true).map(unescapeBraces);
+		return expand(escapeBraces(str), max, maxLength, true).map(unescapeBraces);
 	}
 	function embrace(str) {
 		return "{" + str + "}";
@@ -21993,11 +21997,70 @@ var require_brace_expansion = /* @__PURE__ */ __commonJSMin(((exports, module) =
 	function gte(i, y) {
 		return i >= y;
 	}
-	function expand(str, max, isTop) {
-		var expansions = [];
+	function combine(acc, base, pre, values, max, maxLength, dropEmpties, outBase) {
+		var out = [];
+		var length = 0;
+		for (var a = 0; a < acc.length; a++) for (var v = 0; v < values.length; v++) {
+			if (out.length >= max) return out;
+			var expansion = acc[a] + pre + values[v];
+			if (dropEmpties && expansion.length === base[a]) continue;
+			if (length + expansion.length > maxLength) return out;
+			out.push(expansion);
+			outBase.push(base[a]);
+			length += expansion.length;
+		}
+		return out;
+	}
+	function expandSequence(body, isAlphaSequence, max, maxLength) {
+		var n = body.split(/\.\./);
+		var N = [];
+		/* c8 ignore start */
+		if (n[0] === void 0 || n[1] === void 0) return N;
+		/* c8 ignore stop */
+		var x = numeric(n[0]);
+		var y = numeric(n[1]);
+		var width = Math.max(n[0].length, n[1].length);
+		var incr = n.length === 3 && n[2] !== void 0 ? Math.max(Math.abs(numeric(n[2])), 1) : 1;
+		var test = lte;
+		if (y < x) {
+			incr *= -1;
+			test = gte;
+		}
+		var pad = n.some(isPadded);
+		var length = 0;
+		for (var i = x; test(i, y) && N.length < max; i += incr) {
+			var c;
+			if (isAlphaSequence) {
+				c = String.fromCharCode(i);
+				if (c === "\\") c = "";
+			} else {
+				c = String(i);
+				if (pad) {
+					var need = width - c.length;
+					if (need > 0) {
+						var z = new Array(need + 1).join("0");
+						if (i < 0) c = "-" + z + c.slice(1);
+						else c = z + c;
+					}
+				}
+			}
+			if (length + c.length > maxLength) break;
+			N.push(c);
+			length += c.length;
+		}
+		return N;
+	}
+	function expand(str, max, maxLength, isTop) {
+		var acc = [""];
+		var accBase = [0];
+		var dropEmpties = false;
+		var firstGroup = true;
+		var nextBase;
 		for (;;) {
 			var m = balanced("{", "}", str);
-			if (!m || /\$$/.test(m.pre)) return [str];
+			if (!m) return combine(acc, accBase, str, [""], max, maxLength, dropEmpties, []);
+			var pre = m.pre;
+			if (/\$$/.test(pre)) return combine(acc, accBase, str, [""], max, maxLength, dropEmpties, []);
 			var isNumericSequence = /^-?\d+\.\.-?\d+(?:\.\.-?\d+)?$/.test(m.body);
 			var isAlphaSequence = /^[a-zA-Z]\.\.[a-zA-Z](?:\.\.-?\d+)?$/.test(m.body);
 			var isSequence = isNumericSequence || isAlphaSequence;
@@ -22006,66 +22069,56 @@ var require_brace_expansion = /* @__PURE__ */ __commonJSMin(((exports, module) =
 				if (m.post.match(/,(?!,).*\}/)) {
 					str = m.pre + "{" + m.body + escClose + m.post;
 					isTop = true;
+					firstGroup = true;
+					dropEmpties = false;
+					accBase = [];
+					for (var b = 0; b < acc.length; b++) accBase.push(acc[b].length);
 					continue;
 				}
-				return [str];
+				return combine(acc, accBase, pre + "{" + m.body + "}" + m.post, [""], max, maxLength, dropEmpties, []);
 			}
-			var n;
-			if (isSequence) n = m.body.split(/\.\./);
+			if (firstGroup) {
+				dropEmpties = isTop && !isSequence;
+				firstGroup = false;
+			}
+			var values;
+			if (isSequence) values = expandSequence(m.body, isAlphaSequence, max, maxLength);
 			else {
-				n = parseCommaParts(m.body);
-				if (n.length === 1) {
-					n = expand(n[0], max, false).map(embrace);
+				var n = parseCommaParts(m.body);
+				if (n.length === 1 && n[0] !== void 0) {
+					n = expand(n[0], max, maxLength, false).map(embrace);
+					/* c8 ignore start */
 					if (n.length === 1) {
-						var post = m.post.length ? expand(m.post, max, false) : [""];
-						return post.map(function(p) {
-							return m.pre + n[0] + p;
-						});
+						nextBase = [];
+						acc = combine(acc, accBase, pre + n[0], [""], max, maxLength, dropEmpties && !m.post.length, nextBase);
+						accBase = nextBase;
+						if (!m.post.length) break;
+						str = m.post;
+						continue;
+					}
+				}
+				var dropsEmpties = dropEmpties && !m.post.length && !pre;
+				for (var d = 0; dropsEmpties && d < acc.length; d++) if (acc[d].length !== accBase[d]) dropsEmpties = false;
+				values = [];
+				var valuesLength = 0;
+				outer: for (var j = 0; j < n.length; j++) {
+					var expanded = expand(n[j], max, maxLength, false);
+					for (var k = 0; k < expanded.length; k++) {
+						var v = expanded[k];
+						if (dropsEmpties && !v) continue;
+						if (values.length >= max || valuesLength + v.length > maxLength) break outer;
+						values.push(v);
+						valuesLength += v.length;
 					}
 				}
 			}
-			var pre = m.pre;
-			var post = m.post.length ? expand(m.post, max, false) : [""];
-			var N;
-			if (isSequence) {
-				var x = numeric(n[0]);
-				var y = numeric(n[1]);
-				var width = Math.max(n[0].length, n[1].length);
-				var incr = n.length == 3 ? Math.max(Math.abs(numeric(n[2])), 1) : 1;
-				var test = lte;
-				if (y < x) {
-					incr *= -1;
-					test = gte;
-				}
-				var pad = n.some(isPadded);
-				N = [];
-				for (var i = x; test(i, y) && N.length < max; i += incr) {
-					var c;
-					if (isAlphaSequence) {
-						c = String.fromCharCode(i);
-						if (c === "\\") c = "";
-					} else {
-						c = String(i);
-						if (pad) {
-							var need = width - c.length;
-							if (need > 0) {
-								var z = new Array(need + 1).join("0");
-								if (i < 0) c = "-" + z + c.slice(1);
-								else c = z + c;
-							}
-						}
-					}
-					N.push(c);
-				}
-			} else N = concatMap(n, function(el) {
-				return expand(el, max, false);
-			});
-			for (var j = 0; j < N.length; j++) for (var k = 0; k < post.length && expansions.length < max; k++) {
-				var expansion = pre + N[j] + post[k];
-				if (!isTop || isSequence || expansion) expansions.push(expansion);
-			}
-			return expansions;
+			nextBase = [];
+			acc = combine(acc, accBase, pre, values, max, maxLength, dropEmpties && !m.post.length, nextBase);
+			accBase = nextBase;
+			if (!m.post.length) break;
+			str = m.post;
 		}
+		return acc;
 	}
 }));
 //#endregion
@@ -22247,7 +22300,7 @@ var import_minimatch = /* @__PURE__ */ __toESM((/* @__PURE__ */ __commonJSMin(((
 		if (options.nobrace || !/\{(?:(?!\{).)*\}/.test(pattern)) return [pattern];
 		return expand(pattern);
 	}
-	var MAX_PATTERN_LENGTH = 1024 * 64;
+	var MAX_PATTERN_LENGTH = 65536;
 	var assertValidPattern = function(pattern) {
 		if (typeof pattern !== "string") throw new TypeError("invalid pattern");
 		if (pattern.length > MAX_PATTERN_LENGTH) throw new TypeError("pattern is too long");
@@ -22282,9 +22335,7 @@ var import_minimatch = /* @__PURE__ */ __toESM((/* @__PURE__ */ __commonJSMin(((
 						re += qmark;
 						hasMagic = true;
 						break;
-					default:
-						re += "\\" + stateChar;
-						break;
+					default: re += "\\" + stateChar;
 				}
 				self.debug("clearStateChar %j %j", stateChar, re);
 				stateChar = false;
@@ -22449,7 +22500,7 @@ var import_minimatch = /* @__PURE__ */ __toESM((/* @__PURE__ */ __commonJSMin(((
 		var flags = options.nocase ? "i" : "";
 		try {
 			var regExp = new RegExp("^" + re + "$", flags);
-		} catch (er) 		/* istanbul ignore next - should be impossible */ {
+		} catch (er) /* istanbul ignore next - should be impossible */ {
 			return /* @__PURE__ */ new RegExp("$.");
 		}
 		regExp._glob = pattern;
@@ -22479,7 +22530,7 @@ var import_minimatch = /* @__PURE__ */ __toESM((/* @__PURE__ */ __commonJSMin(((
 		if (this.negate) re = "^(?!" + re + ").*$";
 		try {
 			this.regexp = new RegExp(re, flags);
-		} catch (ex) 		/* istanbul ignore next - should be impossible */ {
+		} catch (ex) /* istanbul ignore next - should be impossible */ {
 			this.regexp = false;
 		}
 		return this.regexp;
@@ -23109,14 +23160,12 @@ function create(patterns, options) {
 //#endregion
 //#region node_modules/.pnpm/semver@7.8.5/node_modules/semver/internal/constants.js
 var require_constants = /* @__PURE__ */ __commonJSMin(((exports, module) => {
-	const SEMVER_SPEC_VERSION = "2.0.0";
-	const MAX_LENGTH = 256;
-	const MAX_SAFE_INTEGER = Number.MAX_SAFE_INTEGER || 9007199254740991;
 	module.exports = {
-		MAX_LENGTH,
+		MAX_LENGTH: 256,
 		MAX_SAFE_COMPONENT_LENGTH: 16,
-		MAX_SAFE_BUILD_LENGTH: MAX_LENGTH - 6,
-		MAX_SAFE_INTEGER,
+		MAX_SAFE_BUILD_LENGTH: 250,
+		MAX_SAFE_INTEGER: Number.MAX_SAFE_INTEGER || 
+		/* istanbul ignore next */ 9007199254740991,
 		RELEASE_TYPES: [
 			"major",
 			"premajor",
@@ -23126,7 +23175,7 @@ var require_constants = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 			"prepatch",
 			"prerelease"
 		],
-		SEMVER_SPEC_VERSION,
+		SEMVER_SPEC_VERSION: "2.0.0",
 		FLAG_INCLUDE_PRERELEASE: 1,
 		FLAG_LOOSE: 2
 	};
@@ -23719,9 +23768,7 @@ var require_truncate = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 				version.minor = 0;
 				version.patch = 0;
 				break;
-			case "minor":
-				version.patch = 0;
-				break;
+			case "minor": version.patch = 0;
 		}
 		return version.format();
 	};
@@ -24680,7 +24727,7 @@ function getRuntimeToken() {
 	return token;
 }
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/abort-controller/AbortError.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/abort-controller/AbortError.js
 /**
 * This error is thrown when an asynchronous operation has been aborted.
 * Check for this error by testing the `name` that the name property of the
@@ -24717,12 +24764,12 @@ var AbortError$1 = class extends Error {
 	}
 };
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/logger/log.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/logger/log.js
 function log(message, ...args) {
 	process$1.stderr.write(`${util.format(message, ...args)}${EOL$1}`);
 }
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/env.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/env.js
 /**
 * Returns the value of the specified environment variable.
 *
@@ -24734,7 +24781,7 @@ function getEnvironmentVariable(name) {
 typeof process$1.versions.deno === "string" && process$1.versions.deno.length;
 typeof process$1.versions.bun === "string" && process$1.versions.bun.length;
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/logger/debug.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/logger/debug.js
 const debugEnvVariable = getEnvironmentVariable("DEBUG");
 let enabledString;
 let enabledNamespaces = [];
@@ -24856,7 +24903,7 @@ function extend(namespace) {
 	return newDebugger;
 }
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/logger/logger.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/logger/logger.js
 const TYPESPEC_RUNTIME_LOG_LEVELS = [
 	"verbose",
 	"info",
@@ -24946,7 +24993,7 @@ function createClientLogger$1(namespace) {
 	return context$1.createClientLogger(namespace);
 }
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/httpHeaders.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/httpHeaders.js
 function normalizeName(name) {
 	return name.toLowerCase();
 }
@@ -25031,7 +25078,7 @@ function createHttpHeaders$1(rawHeaders) {
 	return new HttpHeadersImpl(rawHeaders);
 }
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/util/uuidUtils.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/util/uuidUtils.js
 /**
 * Generated Universally Unique Identifier
 *
@@ -25041,7 +25088,7 @@ function randomUUID$1() {
 	return globalThis.crypto.randomUUID();
 }
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/pipelineRequest.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/pipelineRequest.js
 var PipelineRequestImpl = class {
 	url;
 	method;
@@ -25093,7 +25140,7 @@ function createPipelineRequest$1(options) {
 	return new PipelineRequestImpl(options);
 }
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/pipeline.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/pipeline.js
 const ValidPhaseNames = /* @__PURE__ */ new Set([
 	"Deserialize",
 	"Serialize",
@@ -25292,7 +25339,7 @@ function createEmptyPipeline$1() {
 	return HttpPipeline.create();
 }
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/util/object.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/util/object.js
 /**
 * Helper to determine when an input is a generic JS object.
 * @returns true when input is an object type that is not null, Array, RegExp, or Date.
@@ -25301,7 +25348,7 @@ function isObject(input) {
 	return typeof input === "object" && input !== null && !Array.isArray(input) && !(input instanceof RegExp) && !(input instanceof Date);
 }
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/util/error.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/util/error.js
 /**
 * Typeguard for an error object shape (has name and message)
 * @param e - Something caught by a catch clause.
@@ -25315,10 +25362,10 @@ function isError$1(e) {
 	return false;
 }
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/util/inspect.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/util/inspect.js
 const custom = inspect.custom;
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/util/sanitizer.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/util/sanitizer.js
 const RedactedString = "REDACTED";
 const defaultAllowedHeaderNames = [
 	"x-ms-client-request-id",
@@ -25427,7 +25474,7 @@ var Sanitizer = class {
 	}
 };
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/restError.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/restError.js
 const errorSanitizer = new Sanitizer();
 /**
 * A custom error type for failed pipeline requests.
@@ -25508,7 +25555,7 @@ function isRestError$1(e) {
 	return isError$1(e) && e.name === "RestError";
 }
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/util/bytesEncoding.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/util/bytesEncoding.js
 /**
 * The helper that transforms bytes with specific character encoding into string
 * @param bytes - the uint8array bytes
@@ -25528,10 +25575,10 @@ function stringToUint8Array$1(value, format) {
 	return Buffer.from(value, format);
 }
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/log.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/log.js
 const logger$4 = createClientLogger$1("ts-http-runtime");
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/nodeHttpClient.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/nodeHttpClient.js
 const DEFAULT_TLS_SETTINGS = {};
 function isReadableStream(body) {
 	return body && typeof body.pipe === "function";
@@ -25769,7 +25816,7 @@ function createNodeHttpClient() {
 	return new NodeHttpClient();
 }
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/defaultHttpClient.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/defaultHttpClient.js
 /**
 * Create the correct HttpClient for the current environment.
 */
@@ -25777,7 +25824,7 @@ function createDefaultHttpClient$1() {
 	return createNodeHttpClient();
 }
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/policies/logPolicy.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/policies/logPolicy.js
 /**
 * The programmatic identifier of the logPolicy.
 */
@@ -25805,7 +25852,7 @@ function logPolicy$1(options = {}) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/util/random.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/util/random.js
 /**
 * Returns a random integer value between a lower and upper bound,
 * inclusive of both bounds.
@@ -25820,7 +25867,7 @@ function getRandomIntegerInclusive(min, max) {
 	return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/util/delay.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/util/delay.js
 /**
 * Calculates the delay interval for retry attempts using exponential delay with jitter.
 * @param retryAttempt - The current retry attempt number.
@@ -25833,7 +25880,7 @@ function calculateRetryDelay(retryAttempt, config) {
 	return { retryAfterInMs: clampedDelay / 2 + getRandomIntegerInclusive(0, clampedDelay / 2) };
 }
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/util/helpers.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/util/helpers.js
 const StandardAbortMessage$1 = "The operation was aborted.";
 /**
 * A wrapper for setTimeout that resolves a promise after delayInMs milliseconds.
@@ -25879,7 +25926,7 @@ function parseHeaderValueAsNumber(response, headerName) {
 	return valueAsNum;
 }
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/retryStrategies/throttlingRetryStrategy.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/retryStrategies/throttlingRetryStrategy.js
 /**
 * The header that comes back from services representing
 * the amount of time (minimum) to wait to retry (in seconds or timestamp after which we can retry).
@@ -25939,9 +25986,9 @@ function throttlingRetryStrategy() {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/retryStrategies/exponentialRetryStrategy.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/retryStrategies/exponentialRetryStrategy.js
 const DEFAULT_CLIENT_RETRY_INTERVAL = 1e3;
-const DEFAULT_CLIENT_MAX_RETRY_INTERVAL = 1e3 * 64;
+const DEFAULT_CLIENT_MAX_RETRY_INTERVAL = 64e3;
 /**
 * A retry strategy that retries with an exponentially increasing delay in these two cases:
 * - When there are errors in the underlying transport layer (e.g. DNS lookup failures).
@@ -25982,7 +26029,7 @@ function isSystemError(err) {
 	return err.code === "ETIMEDOUT" || err.code === "ESOCKETTIMEDOUT" || err.code === "ECONNREFUSED" || err.code === "ECONNRESET" || err.code === "ENOENT" || err.code === "ENOTFOUND";
 }
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/policies/retryPolicy.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/policies/retryPolicy.js
 const retryPolicyLogger = createClientLogger$1("ts-http-runtime retryPolicy");
 /**
 * The programmatic identifier of the retryPolicy.
@@ -26065,7 +26112,7 @@ function retryPolicy(strategies, options = { maxRetries: 3 }) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/policies/defaultRetryPolicy.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/policies/defaultRetryPolicy.js
 /**
 * Name of the {@link defaultRetryPolicy}
 */
@@ -26083,7 +26130,7 @@ function defaultRetryPolicy$1(options = {}) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/formData.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/formData.js
 /**
 * If the request body is a native FormData, convert it to our FormDataMap
 * representation and clear the body. Node.js's HTTP stack doesn't handle
@@ -26103,7 +26150,7 @@ function convertBodyToFormDataMap(body) {
 	}
 }
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/policies/formDataPolicy.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/policies/formDataPolicy.js
 /**
 * The programmatic identifier of the formDataPolicy.
 */
@@ -26159,7 +26206,7 @@ async function prepareFormData(formData, request) {
 	request.multipartBody = { parts };
 }
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/policies/agentPolicy.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/policies/agentPolicy.js
 /**
 * Name of the Agent Policy
 */
@@ -26177,7 +26224,7 @@ function agentPolicy$1(agent) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/policies/tlsPolicy.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/policies/tlsPolicy.js
 /**
 * Name of the TLS Policy
 */
@@ -27475,7 +27522,7 @@ var require_dist = /* @__PURE__ */ __commonJSMin(((exports) => {
 	}
 }));
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/policies/proxyPolicy.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/policies/proxyPolicy.js
 var import_dist = require_dist$1();
 var import_dist$1 = require_dist();
 const HTTPS_PROXY = "HTTPS_PROXY";
@@ -27601,7 +27648,7 @@ function proxyPolicy$1(proxySettings, options) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/policies/decompressResponsePolicy.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/policies/decompressResponsePolicy.js
 /**
 * The programmatic identifier of the decompressResponsePolicy.
 */
@@ -27620,7 +27667,7 @@ function decompressResponsePolicy$1() {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/policies/redirectPolicy.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/policies/redirectPolicy.js
 /**
 * The programmatic identifier of the redirectPolicy.
 */
@@ -27668,12 +27715,12 @@ async function handleRedirect(next, response, maxRetries, allowCrossOriginRedire
 	return response;
 }
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/util/typeGuards.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/util/typeGuards.js
 function isBlob(x) {
 	return x instanceof Blob;
 }
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/util/concat.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/util/concat.js
 async function* streamAsyncIterator() {
 	const reader = this.getReader();
 	try {
@@ -27719,7 +27766,7 @@ async function concat(sources) {
 	};
 }
 //#endregion
-//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.7/node_modules/@typespec/ts-http-runtime/dist/esm/policies/multipartPolicy.js
+//#region node_modules/.pnpm/@typespec+ts-http-runtime@0.3.8/node_modules/@typespec/ts-http-runtime/dist/esm/policies/multipartPolicy.js
 function generateBoundary() {
 	return `----AzSDKFormBoundary${randomUUID$1()}`;
 }
@@ -28608,7 +28655,7 @@ function createPipelineRequest(options) {
 const DEFAULT_CYCLER_OPTIONS = {
 	forcedRefreshWindowInMs: 1e3,
 	retryIntervalInMs: 3e3,
-	refreshWindowInMs: 1e3 * 60 * 2
+	refreshWindowInMs: 12e4
 };
 /**
 * Converts an an unreliable access token getter (which may resolve with null)
@@ -29771,7 +29818,8 @@ function handleErrorResponse(parsedResponse, operationSpec, responseSpec, option
 		shouldReturnResponse: false
 	};
 	const errorResponseSpec = responseSpec ?? operationSpec.responses.default;
-	const error = new RestError(parsedResponse.request.streamResponseStatusCodes?.has(parsedResponse.status) ? `Unexpected status code: ${parsedResponse.status}` : parsedResponse.bodyAsText, {
+	const initialErrorMessage = parsedResponse.request.streamResponseStatusCodes?.has(parsedResponse.status) ? `Unexpected status code: ${parsedResponse.status}` : parsedResponse.bodyAsText;
+	const error = new RestError(initialErrorMessage, {
 		statusCode: parsedResponse.status,
 		request: parsedResponse.request,
 		response: parsedResponse
@@ -29821,8 +29869,10 @@ async function parse(jsonContentTypes, xmlContentTypes, operationResponse, opts,
 				return operationResponse;
 			}
 		} catch (err) {
-			throw new RestError(`Error "${err}" occurred while parsing the response body - ${operationResponse.bodyAsText}.`, {
-				code: err.code || RestError.PARSE_ERROR,
+			const msg = `Error "${err}" occurred while parsing the response body - ${operationResponse.bodyAsText}.`;
+			const errCode = err.code || RestError.PARSE_ERROR;
+			throw new RestError(msg, {
+				code: errCode,
 				statusCode: operationResponse.status,
 				request: operationResponse.request,
 				response: operationResponse
@@ -34658,7 +34708,8 @@ function toXml(jArray, options) {
 		if (typeof node === "string") stopNodeExpressions.push(new Expression(node));
 		else if (node instanceof Expression) stopNodeExpressions.push(node);
 	}
-	const qNameValidator = createValidator("qName", { xmlVersion: detectXmlVersionFromArray(jArray, options) });
+	const xmlVersion = detectXmlVersionFromArray(jArray, options);
+	const qNameValidator = createValidator("qName", { xmlVersion });
 	const matcher = new Matcher();
 	return arrToStr(jArray, options, indentation, matcher, stopNodeExpressions, qNameValidator);
 }
@@ -34970,7 +35021,8 @@ Builder.prototype.build = function(jObj) {
 	else {
 		if (Array.isArray(jObj) && this.options.arrayNodeName && this.options.arrayNodeName.length > 1) jObj = { [this.options.arrayNodeName]: jObj };
 		const matcher = new Matcher();
-		const qNameValidator = createValidator("qName", { xmlVersion: detectXmlVersionFromObj(jObj, this.options) });
+		const xmlVersion = detectXmlVersionFromObj(jObj, this.options);
+		const qNameValidator = createValidator("qName", { xmlVersion });
 		return this.j2x(jObj, 0, matcher, qNameValidator).val;
 	}
 };
@@ -37474,9 +37526,7 @@ var NativeCRC64 = (() => {
 					case 4:
 						offset >>>= 2;
 						break;
-					case 8:
-						offset >>>= 3;
-						break;
+					case 8: offset >>>= 3;
 				}
 				for (var i = 0; i < array.length; i++) view[offset + i] = array[i];
 			}
@@ -37582,7 +37632,7 @@ var StorageCRC64Calculator = class StorageCRC64Calculator {
 function signalStreamEnd(pushData) {
 	pushData(null);
 }
-const MAX_SEGMENT_CONTENT_LENGTH = 4 * 1024 * 1024;
+const MAX_SEGMENT_CONTENT_LENGTH = 4194304;
 var SMRegion$1;
 (function(SMRegion) {
 	SMRegion[SMRegion["StreamHeader"] = 0] = "StreamHeader";
@@ -38940,9 +38990,9 @@ var StorageRetryPolicyType;
 //#endregion
 //#region node_modules/.pnpm/@azure+storage-common@12.4.1_@azure+core-client@1.11.0/node_modules/@azure/storage-common/dist/esm/policies/StorageRetryPolicy.js
 const DEFAULT_RETRY_OPTIONS$1 = {
-	maxRetryDelayInMs: 120 * 1e3,
+	maxRetryDelayInMs: 12e4,
 	maxTries: 4,
-	retryDelayInMs: 4 * 1e3,
+	retryDelayInMs: 4e3,
 	retryPolicyType: StorageRetryPolicyType.EXPONENTIAL,
 	secondaryHost: "",
 	tryTimeoutInMs: void 0
@@ -39080,9 +39130,7 @@ var StorageRetryPolicy = class extends BaseRequestPolicy {
 			case StorageRetryPolicyType.EXPONENTIAL:
 				delayTimeInMs = Math.min((Math.pow(2, attempt - 1) - 1) * this.retryOptions.retryDelayInMs, this.retryOptions.maxRetryDelayInMs);
 				break;
-			case StorageRetryPolicyType.FIXED:
-				delayTimeInMs = this.retryOptions.retryDelayInMs;
-				break;
+			case StorageRetryPolicyType.FIXED: delayTimeInMs = this.retryOptions.retryDelayInMs;
 		}
 		else delayTimeInMs = Math.random() * 1e3;
 		logger.info(`RetryPolicy: Delay for ${delayTimeInMs}ms`);
@@ -39161,9 +39209,9 @@ function storageCorrectContentLengthPolicy() {
 */
 const storageRetryPolicyName = "storageRetryPolicy";
 const DEFAULT_RETRY_OPTIONS = {
-	maxRetryDelayInMs: 120 * 1e3,
+	maxRetryDelayInMs: 12e4,
 	maxTries: 4,
-	retryDelayInMs: 4 * 1e3,
+	retryDelayInMs: 4e3,
 	retryPolicyType: StorageRetryPolicyType.EXPONENTIAL,
 	secondaryHost: "",
 	tryTimeoutInMs: void 0
@@ -39234,9 +39282,7 @@ function storageRetryPolicy(options = {}) {
 			case StorageRetryPolicyType.EXPONENTIAL:
 				delayTimeInMs = Math.min((Math.pow(2, attempt - 1) - 1) * retryDelayInMs, maxRetryDelayInMs);
 				break;
-			case StorageRetryPolicyType.FIXED:
-				delayTimeInMs = retryDelayInMs;
-				break;
+			case StorageRetryPolicyType.FIXED: delayTimeInMs = retryDelayInMs;
 		}
 		else delayTimeInMs = Math.random() * 1e3;
 		logger.info(`RetryPolicy: Delay for ${delayTimeInMs}ms`);
@@ -39454,12 +39500,12 @@ var UserDelegationKeyCredential = class {
 //#region node_modules/.pnpm/@azure+storage-blob@12.33.0/node_modules/@azure/storage-blob/dist/esm/utils/constants.js
 const SDK_VERSION = "12.33.0";
 const SERVICE_VERSION = "2026-06-06";
-const BLOCK_BLOB_MAX_UPLOAD_BLOB_BYTES = 256 * 1024 * 1024;
-const BLOCK_BLOB_MAX_STAGE_BLOCK_BYTES = 4e3 * 1024 * 1024;
+const BLOCK_BLOB_MAX_UPLOAD_BLOB_BYTES = 268435456;
+const BLOCK_BLOB_MAX_STAGE_BLOCK_BYTES = 4194304e3;
 const BLOCK_BLOB_MAX_BLOCKS = 5e4;
-const DEFAULT_BLOCK_BUFFER_SIZE_BYTES = 8 * 1024 * 1024;
-const DEFAULT_BLOB_DOWNLOAD_BLOCK_BYTES = 4 * 1024 * 1024;
-const REQUEST_TIMEOUT = 100 * 1e3;
+const DEFAULT_BLOCK_BUFFER_SIZE_BYTES = 8388608;
+const DEFAULT_BLOB_DOWNLOAD_BLOCK_BYTES = 4194304;
+const REQUEST_TIMEOUT = 1e5;
 const URLConstants = { Parameters: {
 	FORCE_BROWSER_NO_CACHE: "_",
 	SIGNATURE: "sig",
@@ -51642,7 +51688,7 @@ function base64encode(content) {
 */
 function generateBlockID(blockIDPrefix, blockIndex) {
 	const maxSourceStringLength = 48;
-	const maxAllowedBlockIDPrefixLength = maxSourceStringLength - 6;
+	const maxAllowedBlockIDPrefixLength = 42;
 	if (blockIDPrefix.length > maxAllowedBlockIDPrefixLength) blockIDPrefix = blockIDPrefix.slice(0, maxAllowedBlockIDPrefixLength);
 	return base64encode(blockIDPrefix + padStart(blockIndex.toString(), maxSourceStringLength - blockIDPrefix.length, "0"));
 }
@@ -52606,9 +52652,7 @@ var SASQueryParameters = class {
 			case "srq":
 				this.tryAppendQueryParameter(queries, param, this.requestQueryParameterKeys);
 				break;
-			case "sdd":
-				this.tryAppendQueryParameter(queries, param, this.directoryDepth !== void 0 ? this.directoryDepth.toString() : "");
-				break;
+			case "sdd": this.tryAppendQueryParameter(queries, param, this.directoryDepth !== void 0 ? this.directoryDepth.toString() : "");
 		}
 		return queries.join("&");
 	}
@@ -58292,7 +58336,7 @@ var UploadProgress = class {
 		const transferredBytes = this.sentBytes;
 		const percentage = (100 * (transferredBytes / this.contentLength)).toFixed(1);
 		const elapsedTime = Date.now() - this.startTime;
-		const uploadSpeed = (transferredBytes / (1024 * 1024) / (elapsedTime / 1e3)).toFixed(1);
+		const uploadSpeed = (transferredBytes / 1048576 / (elapsedTime / 1e3)).toFixed(1);
 		info(`Sent ${transferredBytes} of ${this.contentLength} (${percentage}%), ${uploadSpeed} MBs/sec`);
 		if (this.isDone()) this.displayedComplete = true;
 	}
@@ -58348,7 +58392,7 @@ function uploadCacheArchiveSDK(signedUploadURL, archivePath, options) {
 		const uploadOptions = {
 			blockSize: options === null || options === void 0 ? void 0 : options.uploadChunkSize,
 			concurrency: options === null || options === void 0 ? void 0 : options.uploadConcurrency,
-			maxSingleShotSize: 128 * 1024 * 1024,
+			maxSingleShotSize: 134217728,
 			onProgress: uploadProgress.onProgress()
 		};
 		try {
@@ -58562,7 +58606,7 @@ var DownloadProgress = class {
 		const transferredBytes = this.segmentOffset + this.receivedBytes;
 		const percentage = (100 * (transferredBytes / this.contentLength)).toFixed(1);
 		const elapsedTime = Date.now() - this.startTime;
-		const downloadSpeed = (transferredBytes / (1024 * 1024) / (elapsedTime / 1e3)).toFixed(1);
+		const downloadSpeed = (transferredBytes / 1048576 / (elapsedTime / 1e3)).toFixed(1);
 		info(`Received ${transferredBytes} of ${this.contentLength} (${percentage}%), ${downloadSpeed} MBs/sec`);
 		if (this.isDone()) this.displayedComplete = true;
 	}
@@ -58647,7 +58691,7 @@ function downloadCacheHttpClientConcurrent(archiveLocation, archivePath, options
 			const length = parseInt(lengthHeader);
 			if (Number.isNaN(length)) throw new Error(`Could not interpret Content-Length: ${length}`);
 			const downloads = [];
-			const blockSize = 4 * 1024 * 1024;
+			const blockSize = 4194304;
 			for (let offset = 0; offset < length; offset += blockSize) {
 				const count = Math.min(blockSize, length - offset);
 				downloads.push({
@@ -58778,7 +58822,7 @@ function getUploadOptions(copy) {
 	const result = {
 		useAzureSdk: false,
 		uploadConcurrency: 4,
-		uploadChunkSize: 32 * 1024 * 1024
+		uploadChunkSize: 33554432
 	};
 	if (copy) {
 		if (typeof copy.useAzureSdk === "boolean") result.useAzureSdk = copy.useAzureSdk;
@@ -58789,7 +58833,7 @@ function getUploadOptions(copy) {
 	* Add env var overrides
 	*/
 	result.uploadConcurrency = !isNaN(Number(process.env["CACHE_UPLOAD_CONCURRENCY"])) ? Math.min(32, Number(process.env["CACHE_UPLOAD_CONCURRENCY"])) : result.uploadConcurrency;
-	result.uploadChunkSize = !isNaN(Number(process.env["CACHE_UPLOAD_CHUNK_SIZE"])) ? Math.min(128 * 1024 * 1024, Number(process.env["CACHE_UPLOAD_CHUNK_SIZE"]) * 1024 * 1024) : result.uploadChunkSize;
+	result.uploadChunkSize = !isNaN(Number(process.env["CACHE_UPLOAD_CHUNK_SIZE"])) ? Math.min(134217728, Number(process.env["CACHE_UPLOAD_CHUNK_SIZE"]) * 1024 * 1024) : result.uploadChunkSize;
 	debug(`Use Azure SDK: ${result.useAzureSdk}`);
 	debug(`Upload concurrency: ${result.uploadConcurrency}`);
 	debug(`Upload chunk size: ${result.uploadChunkSize}`);
@@ -59117,7 +59161,7 @@ function saveCache$1(cacheId, archivePath, signedUploadURL, options) {
 			yield uploadFile(httpClient, cacheId, archivePath, options);
 			debug("Commiting cache");
 			const cacheSize = getArchiveFileSizeInBytes(archivePath);
-			info(`Cache Size: ~${Math.round(cacheSize / (1024 * 1024))} MB (${cacheSize} B)`);
+			info(`Cache Size: ~${Math.round(cacheSize / 1048576)} MB (${cacheSize} B)`);
 			const commitCacheResponse = yield commitCache(httpClient, cacheId, cacheSize);
 			if (!isSuccessStatusCode(commitCacheResponse.statusCode)) throw new Error(`Cache service responded with ${commitCacheResponse.statusCode} during commit cache.`);
 			info("Cache saved successfully");
@@ -59204,7 +59248,6 @@ var require_base64 = /* @__PURE__ */ __commonJSMin(((exports) => {
 				case 3:
 					bytes[bytePos++] = (p & 3) << 6 | b;
 					groupPos = 0;
-					break;
 			}
 		}
 		if (groupPos == 1) throw Error(`invalid base64 string.`);
@@ -59235,7 +59278,6 @@ var require_base64 = /* @__PURE__ */ __commonJSMin(((exports) => {
 					base64 += encTable[p | b >> 6];
 					base64 += encTable[b & 63];
 					groupPos = 0;
-					break;
 			}
 		}
 		if (groupPos) {
@@ -59453,7 +59495,7 @@ var require_goog_varint = /* @__PURE__ */ __commonJSMin(((exports) => {
 		bytes.push(hi >>> 31 & 1);
 	}
 	exports.varint64write = varint64write;
-	const TWO_PWR_32_DBL = 65536 * 65536;
+	const TWO_PWR_32_DBL = 4294967296;
 	/**
 	* Parse decimal string of 64 bit integer value as two JS numbers.
 	*
@@ -60547,9 +60589,7 @@ var require_reflection_type_check = /* @__PURE__ */ __commonJSMin(((exports) => 
 					case "message":
 						if (field.repeat) req.push(field.localName);
 						break;
-					case "map":
-						req.push(field.localName);
-						break;
+					case "map": req.push(field.localName);
 				}
 			}
 			this.data = {
@@ -60626,7 +60666,6 @@ var require_reflection_type_check = /* @__PURE__ */ __commonJSMin(((exports) => 
 						case "enum": return this.scalars(Object.values(arg), reflection_info_1.ScalarType.INT32, depth);
 						case "message": return this.messages(Object.values(arg), field.V.T(), allowExcessProperties, depth);
 					}
-					break;
 			}
 			return true;
 		}
@@ -60787,9 +60826,7 @@ var require_reflection_json_reader = /* @__PURE__ */ __commonJSMin(((exports) =>
 								val = this.enum(field.V.T(), jsonObjValue, field.name, options.ignoreUnknownFields);
 								if (val === false) continue;
 								break;
-							case "scalar":
-								val = this.scalar(jsonObjValue, field.V.T, field.V.L, field.name);
-								break;
+							case "scalar": val = this.scalar(jsonObjValue, field.V.T, field.V.L, field.name);
 						}
 						this.assert(val !== void 0, field.name + " map value", jsonObjValue);
 						let key = jsonObjKey;
@@ -60812,9 +60849,7 @@ var require_reflection_json_reader = /* @__PURE__ */ __commonJSMin(((exports) =>
 								val = this.enum(field.T(), jsonItem, field.name, options.ignoreUnknownFields);
 								if (val === false) continue;
 								break;
-							case "scalar":
-								val = this.scalar(jsonItem, field.T, field.L, field.name);
-								break;
+							case "scalar": val = this.scalar(jsonItem, field.T, field.L, field.name);
 						}
 						this.assert(val !== void 0, field.name, jsonValue);
 						fieldArr.push(val);
@@ -60836,7 +60871,6 @@ var require_reflection_json_reader = /* @__PURE__ */ __commonJSMin(((exports) =>
 					case "scalar":
 						if (jsonValue === null) continue;
 						target[localName] = this.scalar(jsonValue, field.T, field.L, field.name);
-						break;
 				}
 			}
 		}
@@ -61011,7 +61045,6 @@ var require_reflection_json_writer = /* @__PURE__ */ __commonJSMin(((exports) =>
 							assert_1.assert(val !== void 0);
 							jsonObj[entryKey.toString()] = val;
 						}
-						break;
 				}
 				if (options.emitDefaultValues || Object.keys(jsonObj).length > 0) jsonValue = jsonObj;
 			} else if (field.repeat) {
@@ -61041,7 +61074,6 @@ var require_reflection_json_writer = /* @__PURE__ */ __commonJSMin(((exports) =>
 							assert_1.assert(val !== void 0);
 							jsonArr.push(val);
 						}
-						break;
 				}
 				if (options.emitDefaultValues || jsonArr.length > 0 || options.emitDefaultValues) jsonValue = jsonArr;
 			} else switch (field.kind) {
@@ -61051,9 +61083,7 @@ var require_reflection_json_writer = /* @__PURE__ */ __commonJSMin(((exports) =>
 				case "enum":
 					jsonValue = this.enum(field.T(), value, field.name, field.opt, options.emitDefaultValues, options.enumAsInteger);
 					break;
-				case "message":
-					jsonValue = this.message(field.T(), value, field.name, options);
-					break;
+				case "message": jsonValue = this.message(field.T(), value, field.name, options);
 			}
 			return jsonValue;
 		}
@@ -61235,7 +61265,6 @@ var require_reflection_binary_reader = /* @__PURE__ */ __commonJSMin(((exports) 
 					case "map":
 						let [mapKey, mapVal] = this.mapEntry(field, reader, options);
 						target[localName][mapKey] = mapVal;
-						break;
 				}
 			}
 		}
@@ -61262,9 +61291,7 @@ var require_reflection_binary_reader = /* @__PURE__ */ __commonJSMin(((exports) 
 							case "enum":
 								val = reader.int32();
 								break;
-							case "message":
-								val = field.V.T().internalBinaryRead(reader, reader.uint32(), options);
-								break;
+							case "message": val = field.V.T().internalBinaryRead(reader, reader.uint32(), options);
 						}
 						break;
 					default: throw new Error(`Unknown field ${fieldNo} (wire type ${wireType}) in map entry for ${this.info.typeName}#${field.name}`);
@@ -61369,7 +61396,6 @@ var require_reflection_binary_writer = /* @__PURE__ */ __commonJSMin(((exports) 
 					case "map":
 						assert_1.assert(typeof value == "object" && value !== null);
 						for (const [key, val] of Object.entries(value)) this.mapEntry(writer, options, field, key, val);
-						break;
 				}
 			}
 			let u = options.writeUnknownFields;
@@ -61390,7 +61416,6 @@ var require_reflection_binary_writer = /* @__PURE__ */ __commonJSMin(((exports) 
 				case reflection_info_1.ScalarType.BOOL:
 					assert_1.assert(key == "true" || key == "false");
 					keyValue = key == "true";
-					break;
 			}
 			this.scalar(writer, field.K, 1, keyValue, true);
 			switch (field.V.kind) {
@@ -61400,9 +61425,7 @@ var require_reflection_binary_writer = /* @__PURE__ */ __commonJSMin(((exports) 
 				case "enum":
 					this.scalar(writer, reflection_info_1.ScalarType.INT32, 2, value, true);
 					break;
-				case "message":
-					this.message(writer, options, field.V.T(), 2, value);
-					break;
+				case "message": this.message(writer, options, field.V.T(), 2, value);
 			}
 			writer.join();
 		}
@@ -61509,7 +61532,6 @@ var require_reflection_binary_writer = /* @__PURE__ */ __commonJSMin(((exports) 
 				case reflection_info_1.ScalarType.SINT64:
 					d = i || pb_long_1.PbLong.from(value).isZero();
 					m = "sint64";
-					break;
 			}
 			return [
 				t,
@@ -61623,18 +61645,15 @@ var require_reflection_merge_partial = /* @__PURE__ */ __commonJSMin(((exports) 
 					else if (output[name] === void 0) output[name] = T.create(fieldValue);
 					else T.mergePartial(output[name], fieldValue);
 					break;
-				case "map":
-					switch (field.V.kind) {
-						case "scalar":
-						case "enum":
-							Object.assign(output[name], fieldValue);
-							break;
-						case "message":
-							let T = field.V.T();
-							for (let k of Object.keys(fieldValue)) output[name][k] = T.create(fieldValue[k]);
-							break;
-					}
-					break;
+				case "map": switch (field.V.kind) {
+					case "scalar":
+					case "enum":
+						Object.assign(output[name], fieldValue);
+						break;
+					case "message":
+						let T = field.V.T();
+						for (let k of Object.keys(fieldValue)) output[name][k] = T.create(fieldValue[k]);
+				}
 			}
 		}
 	}
@@ -61671,7 +61690,6 @@ var require_reflection_equals = /* @__PURE__ */ __commonJSMin(((exports) => {
 				case "message":
 					let T = field.T();
 					if (!(field.repeat ? repeatedMsgEq(T, val_a, val_b) : T.equals(val_a, val_b))) return false;
-					break;
 			}
 		}
 		return true;
@@ -62447,9 +62465,7 @@ var require_rpc_options = /* @__PURE__ */ __commonJSMin(((exports) => {
 					copy(defaults.meta, o.meta);
 					copy(options.meta, o.meta);
 					break;
-				case "interceptors":
-					o.interceptors = defaults.interceptors ? defaults.interceptors.concat(val) : val.concat();
-					break;
+				case "interceptors": o.interceptors = defaults.interceptors ? defaults.interceptors.concat(val) : val.concat();
 			}
 		}
 		return o;
@@ -64389,7 +64405,6 @@ function getTarPath() {
 					type: ArchiveToolType.BSD
 				};
 			}
-			default: break;
 		}
 		return {
 			path: yield which("tar", true),
@@ -64411,17 +64426,13 @@ function getTarArgs(tarPath_1, compressionMethod_1, type_1) {
 			case "extract":
 				args.push("-xf", BSD_TAR_ZSTD ? tarFile : archivePath.replace(new RegExp(`\\${path$2.sep}`, "g"), "/"), "-P", "-C", workingDirectory.replace(new RegExp(`\\${path$2.sep}`, "g"), "/"));
 				break;
-			case "list":
-				args.push("-tf", BSD_TAR_ZSTD ? tarFile : archivePath.replace(new RegExp(`\\${path$2.sep}`, "g"), "/"), "-P");
-				break;
+			case "list": args.push("-tf", BSD_TAR_ZSTD ? tarFile : archivePath.replace(new RegExp(`\\${path$2.sep}`, "g"), "/"), "-P");
 		}
 		if (tarPath.type === ArchiveToolType.GNU) switch (process.platform) {
 			case "win32":
 				args.push("--force-local");
 				break;
-			case "darwin":
-				args.push("--delay-directory-restore");
-				break;
+			case "darwin": args.push("--delay-directory-restore");
 		}
 		return args;
 	});
@@ -64664,15 +64675,15 @@ function restoreCacheV1(paths_1, primaryKey_1, restoreKeys_1, options_1) {
 			yield downloadCache(cacheEntry.archiveLocation, archivePath, options);
 			if (isDebug()) yield listTar(archivePath, compressionMethod);
 			const archiveFileSize = getArchiveFileSizeInBytes(archivePath);
-			info(`Cache Size: ~${Math.round(archiveFileSize / (1024 * 1024))} MB (${archiveFileSize} B)`);
+			info(`Cache Size: ~${Math.round(archiveFileSize / 1048576)} MB (${archiveFileSize} B)`);
 			yield extractTar(archivePath, compressionMethod);
 			info("Cache restored successfully");
 			return cacheEntry.cacheKey;
-		} catch (error$4) {
-			const typedError = error$4;
-			if (typedError.name === ValidationError.name) throw error$4;
-			else if (typedError instanceof HttpClientError && typeof typedError.statusCode === "number" && typedError.statusCode >= 500) error(`Failed to restore: ${error$4.message}`);
-			else warning(`Failed to restore: ${error$4.message}`);
+		} catch (error$2) {
+			const typedError = error$2;
+			if (typedError.name === ValidationError.name) throw error$2;
+			else if (typedError instanceof HttpClientError && typeof typedError.statusCode === "number" && typedError.statusCode >= 500) error(`Failed to restore: ${error$2.message}`);
+			else warning(`Failed to restore: ${error$2.message}`);
 		} finally {
 			try {
 				yield unlinkFile(archivePath);
@@ -64734,7 +64745,7 @@ function restoreCacheV2(paths_1, primaryKey_1, restoreKeys_1, options_1) {
 			debug(`Starting download of archive to: ${archivePath}`);
 			yield downloadCache(response.signedDownloadUrl, archivePath, options);
 			const archiveFileSize = getArchiveFileSizeInBytes(archivePath);
-			info(`Cache Size: ~${Math.round(archiveFileSize / (1024 * 1024))} MB (${archiveFileSize} B)`);
+			info(`Cache Size: ~${Math.round(archiveFileSize / 1048576)} MB (${archiveFileSize} B)`);
 			if (isDebug()) yield listTar(archivePath, compressionMethod);
 			yield extractTar(archivePath, compressionMethod);
 			info("Cache restored successfully");
@@ -64804,10 +64815,10 @@ function saveCacheV1(paths_1, key_1, options_1) {
 		try {
 			yield createTar(archiveFolder, cachePaths, compressionMethod);
 			if (isDebug()) yield listTar(archivePath, compressionMethod);
-			const fileSizeLimit = 10 * 1024 * 1024 * 1024;
+			const fileSizeLimit = 10737418240;
 			const archiveFileSize = getArchiveFileSizeInBytes(archivePath);
 			debug(`File Size: ${archiveFileSize}`);
-			if (archiveFileSize > fileSizeLimit && !isGhes()) throw new Error(`Cache size of ~${Math.round(archiveFileSize / (1024 * 1024))} MB (${archiveFileSize} B) is over the 10GB limit, not saving cache.`);
+			if (archiveFileSize > fileSizeLimit && !isGhes()) throw new Error(`Cache size of ~${Math.round(archiveFileSize / 1048576)} MB (${archiveFileSize} B) is over the 10GB limit, not saving cache.`);
 			debug("Reserving Cache");
 			const reserveCacheResponse = yield reserveCache(key, paths, {
 				compressionMethod,
@@ -64815,7 +64826,7 @@ function saveCacheV1(paths_1, key_1, options_1) {
 				cacheSize: archiveFileSize
 			});
 			if ((_a = reserveCacheResponse === null || reserveCacheResponse === void 0 ? void 0 : reserveCacheResponse.result) === null || _a === void 0 ? void 0 : _a.cacheId) cacheId = (_b = reserveCacheResponse === null || reserveCacheResponse === void 0 ? void 0 : reserveCacheResponse.result) === null || _b === void 0 ? void 0 : _b.cacheId;
-			else if ((reserveCacheResponse === null || reserveCacheResponse === void 0 ? void 0 : reserveCacheResponse.statusCode) === 400) throw new Error((_d = (_c = reserveCacheResponse === null || reserveCacheResponse === void 0 ? void 0 : reserveCacheResponse.error) === null || _c === void 0 ? void 0 : _c.message) !== null && _d !== void 0 ? _d : `Cache size of ~${Math.round(archiveFileSize / (1024 * 1024))} MB (${archiveFileSize} B) is over the data cap limit, not saving cache.`);
+			else if ((reserveCacheResponse === null || reserveCacheResponse === void 0 ? void 0 : reserveCacheResponse.statusCode) === 400) throw new Error((_d = (_c = reserveCacheResponse === null || reserveCacheResponse === void 0 ? void 0 : reserveCacheResponse.error) === null || _c === void 0 ? void 0 : _c.message) !== null && _d !== void 0 ? _d : `Cache size of ~${Math.round(archiveFileSize / 1048576)} MB (${archiveFileSize} B) is over the data cap limit, not saving cache.`);
 			else {
 				const detailMessage = (_e = reserveCacheResponse === null || reserveCacheResponse === void 0 ? void 0 : reserveCacheResponse.error) === null || _e === void 0 ? void 0 : _e.message;
 				if (detailMessage === null || detailMessage === void 0 ? void 0 : detailMessage.startsWith("cache write denied:")) throw new CacheWriteDeniedError(`Unable to reserve cache with key ${key}. More details: ${detailMessage}`);
@@ -64823,9 +64834,9 @@ function saveCacheV1(paths_1, key_1, options_1) {
 			}
 			debug(`Saving Cache (ID: ${cacheId})`);
 			yield saveCache$1(cacheId, archivePath, "", options);
-		} catch (error$2) {
-			const typedError = error$2;
-			if (typedError.name === ValidationError.name) throw error$2;
+		} catch (error$4) {
+			const typedError = error$4;
+			if (typedError.name === ValidationError.name) throw error$4;
 			else if (typedError.name === ReserveCacheError.name) info(`Failed to save: ${typedError.message}`);
 			else if (typedError instanceof HttpClientError && typeof typedError.statusCode === "number" && typedError.statusCode >= 500) error(`Failed to save: ${typedError.message}`);
 			else warning(`Failed to save: ${typedError.message}`);
@@ -64852,7 +64863,7 @@ function saveCacheV2(paths_1, key_1, options_1) {
 	return __awaiter(this, arguments, void 0, function* (paths, key, options, enableCrossOsArchive = false) {
 		var _a;
 		options = Object.assign(Object.assign({}, options), {
-			uploadChunkSize: 64 * 1024 * 1024,
+			uploadChunkSize: 67108864,
 			uploadConcurrency: 8,
 			useAzureSdk: true
 		});
