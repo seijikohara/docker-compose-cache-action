@@ -798,7 +798,7 @@ https://github.com/timostamm/protobuf-ts
       of your accepting any such warranty or additional liability.
 
 ================================================================================
-@typespec/ts-http-runtime@0.3.7 — MIT
+@typespec/ts-http-runtime@0.3.8 — MIT
 https://github.com/Azure/azure-sdk-for-js/tree/main/sdk/core/ts-http-runtime/README.md
 
 Copyright (c) Microsoft Corporation.
@@ -1162,7 +1162,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-brace-expansion@1.1.16 — MIT
+brace-expansion@1.1.18 — MIT
 https://github.com/juliangruber/brace-expansion
 
 MIT License
@@ -1420,7 +1420,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-js-yaml@5.2.2 — MIT
+js-yaml@5.2.3 — MIT
 https://github.com/nodeca/js-yaml#readme
 
 (The MIT License)
