@@ -410,7 +410,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-@azure/storage-common@12.4.1 — MIT
+@azure/storage-common@12.5.0 — MIT
 https://github.com/Azure/azure-sdk-for-js/tree/main/sdk/storage/storage-common/README.md
 
 The MIT License (MIT)
