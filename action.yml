@@ -35,6 +35,15 @@ inputs:
     description: 'Ignore existing cache and pull all images fresh from the registry. Pulled images will still be saved to cache for future runs. Useful for security updates or debugging cache issues.'
     required: false
     default: 'false'
+  add-job-summary:
+    description: >
+      When to write the GitHub Actions job summary.
+        always: Always write the summary.
+        never: Never write the summary.
+        on-failure: Write the summary only when at least one image fails to process.
+      An image processing error does not fail the job itself, so 'on-failure' still applies to jobs that succeed.
+    required: false
+    default: 'always'
   skip-latest-check:
     description: '[DEPRECATED] Use skip-digest-verification instead. This option will be removed in a future major version.'
     required: false
