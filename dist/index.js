@@ -66130,6 +66130,10 @@ async function processService(serviceDefinition, cacheKeyPrefix, skipLatestCheck
 */
 const DEFAULT_CACHE_KEY_PREFIX = "docker-compose-image";
 /**
+* Job summary mode used when the input is not provided.
+*/
+const DEFAULT_JOB_SUMMARY_MODE = "always";
+/**
 * Gets the skip digest verification setting from action inputs.
 * Handles both the new 'skip-digest-verification' and deprecated 'skip-latest-check' inputs.
 * If the deprecated input is used, a warning is logged.
@@ -66145,6 +66149,32 @@ function getSkipDigestVerification() {
 	return false;
 }
 /**
+* Gets the job summary mode from action inputs.
+* Accepts the value in any letter case, and rejects unknown values so that a typo
+* surfaces immediately instead of silently falling back to the default.
+*
+* @returns the requested job summary mode
+* @throws Error when the input holds a value other than the accepted ones
+*/
+function getJobSummaryMode() {
+	const jobSummaryInput = getInput("add-job-summary").toLowerCase();
+	if (jobSummaryInput === "") return DEFAULT_JOB_SUMMARY_MODE;
+	if (jobSummaryInput === "always" || jobSummaryInput === "never" || jobSummaryInput === "on-failure") return jobSummaryInput;
+	throw new Error(`Invalid 'add-job-summary' input: '${jobSummaryInput}'. Expected one of: always, never, on-failure`);
+}
+/**
+* Decides whether the job summary should be written for this run.
+*
+* @param jobSummaryMode - Requested job summary mode
+* @param allServicesSuccessful - Whether every service was processed without error
+* @returns boolean indicating whether to write the job summary
+*/
+function shouldWriteJobSummary(jobSummaryMode, allServicesSuccessful) {
+	if (jobSummaryMode === "never") return false;
+	if (jobSummaryMode === "on-failure") return !allServicesSuccessful;
+	return true;
+}
+/**
 * Gets action configuration from GitHub Actions environment.
 */
 function getActionConfig() {
@@ -66153,7 +66183,8 @@ function getActionConfig() {
 		excludeImageNames: getMultilineInput("exclude-images"),
 		cacheKeyPrefix: getInput("cache-key-prefix") || DEFAULT_CACHE_KEY_PREFIX,
 		skipDigestVerification: getSkipDigestVerification(),
-		forceRefresh: getBooleanInput("force-refresh")
+		forceRefresh: getBooleanInput("force-refresh"),
+		jobSummaryMode: getJobSummaryMode()
 	};
 }
 /**
@@ -66186,7 +66217,7 @@ async function run() {
 		const summary = calculateActionSummary(serviceProcessingResults, performance.now() - actionStartTime);
 		const imageListOutput = buildProcessedImageList(serviceProcessingResults);
 		setActionOutputs(summary.allServicesFromCache, imageListOutput);
-		createActionSummary(serviceProcessingResults, summary, discoveredComposeFiles, actionConfig.skipDigestVerification);
+		if (shouldWriteJobSummary(actionConfig.jobSummaryMode, summary.allServicesSuccessful)) createActionSummary(serviceProcessingResults, summary, discoveredComposeFiles, actionConfig.skipDigestVerification);
 		logActionCompletion(summary);
 	} catch (executionError) {
 		if (executionError instanceof Error) setFailed(executionError.message);
