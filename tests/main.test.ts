@@ -62,6 +62,7 @@ const mockCoreSetOutput = vi.mocked(core.setOutput);
 const mockCoreInfo = vi.mocked(core.info);
 const mockCoreWarning = vi.mocked(core.warning);
 const mockCoreSetFailed = vi.mocked(core.setFailed);
+const mockCoreSummary = vi.mocked(core.summary);
 const mockCoreDebug = vi.mocked(core.debug);
 const mockCacheRestore = vi.mocked(cache.restoreCache);
 const mockCacheSave = vi.mocked(cache.saveCache);
@@ -630,6 +631,118 @@ describe('main', () => {
         await run();
 
         expect(mockCoreSetOutput).toHaveBeenCalledWith('cache-hit', 'false');
+      });
+    });
+
+    describe('add-job-summary option', () => {
+      const setJobSummaryInput = (inputValue: string) => {
+        mockCoreGetInput.mockImplementation((inputName) => {
+          switch (inputName) {
+            case 'cache-key-prefix':
+              return 'test-cache';
+            case 'add-job-summary':
+              return inputValue;
+            default:
+              return '';
+          }
+        });
+      };
+
+      const failOnlyService = (failingImageName: string) => {
+        mockInspectImageRemote.mockImplementation(async (imageName) =>
+          imageName === failingImageName
+            ? undefined
+            : {
+                digest: 'sha256:digest',
+                schemaVersion: 2,
+                mediaType: 'application/vnd.docker.distribution.manifest.v2+json',
+              }
+        );
+      };
+
+      it('should write the job summary when the input is not set', async () => {
+        await run();
+
+        // oxlint-disable-next-line typescript/unbound-method -- vitest mock method reference passed to expect(), never invoked unbound
+        expect(mockCoreSummary.write).toHaveBeenCalled();
+      });
+
+      it('should write the job summary when set to always', async () => {
+        setJobSummaryInput('always');
+
+        await run();
+
+        // oxlint-disable-next-line typescript/unbound-method -- vitest mock method reference passed to expect(), never invoked unbound
+        expect(mockCoreSummary.write).toHaveBeenCalled();
+      });
+
+      it('should not write the job summary when set to never', async () => {
+        setJobSummaryInput('never');
+
+        await run();
+
+        // oxlint-disable-next-line typescript/unbound-method -- vitest mock method reference passed to expect(), never invoked unbound
+        expect(mockCoreSummary.write).not.toHaveBeenCalled();
+      });
+
+      it('should not write the job summary when set to on-failure and every service succeeds', async () => {
+        setJobSummaryInput('on-failure');
+
+        await run();
+
+        // oxlint-disable-next-line typescript/unbound-method -- vitest mock method reference passed to expect(), never invoked unbound
+        expect(mockCoreSummary.write).not.toHaveBeenCalled();
+      });
+
+      it('should write the job summary when set to on-failure and a single service fails', async () => {
+        setJobSummaryInput('on-failure');
+        failOnlyService('redis:alpine');
+
+        await run();
+
+        // oxlint-disable-next-line typescript/unbound-method -- vitest mock method reference passed to expect(), never invoked unbound
+        expect(mockCoreSummary.write).toHaveBeenCalled();
+      });
+
+      it('should write the job summary when set to on-failure and every service fails', async () => {
+        setJobSummaryInput('on-failure');
+        mockInspectImageRemote.mockResolvedValue(undefined);
+
+        await run();
+
+        // oxlint-disable-next-line typescript/unbound-method -- vitest mock method reference passed to expect(), never invoked unbound
+        expect(mockCoreSummary.write).toHaveBeenCalled();
+      });
+
+      it('should not write the job summary when set to never and a service fails', async () => {
+        setJobSummaryInput('never');
+        failOnlyService('redis:alpine');
+
+        await run();
+
+        // oxlint-disable-next-line typescript/unbound-method -- vitest mock method reference passed to expect(), never invoked unbound
+        expect(mockCoreSummary.write).not.toHaveBeenCalled();
+      });
+
+      it('should accept the value regardless of letter case', async () => {
+        setJobSummaryInput('NEVER');
+
+        await run();
+
+        // oxlint-disable-next-line typescript/unbound-method -- vitest mock method reference passed to expect(), never invoked unbound
+        expect(mockCoreSummary.write).not.toHaveBeenCalled();
+      });
+
+      it('should fail with the accepted values when the input is invalid', async () => {
+        setJobSummaryInput('bogus');
+
+        await run();
+
+        expect(mockCoreSetFailed).toHaveBeenCalledWith(expect.stringContaining("Invalid 'add-job-summary' input"));
+        expect(mockCoreSetFailed).toHaveBeenCalledWith(expect.stringContaining('always, never, on-failure'));
+        // oxlint-disable-next-line typescript/unbound-method -- vitest mock method reference passed to expect(), never invoked unbound
+        expect(mockCoreSummary.write).not.toHaveBeenCalled();
+        expect(mockCoreSetOutput).not.toHaveBeenCalled();
       });
     });
   });

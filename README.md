@@ -57,7 +57,9 @@ sequenceDiagram
         end
     end
     Action->>Workflow: Set outputs (cache-hit, image-list)
-    Action->>Workflow: Write summary
+    opt add-job-summary allows it
+        Action->>Workflow: Write job summary
+    end
 ```
 
 ## Usage
@@ -277,6 +279,38 @@ When `force-refresh: true`:
 
 This differs from changing `cache-key-prefix` in that the new images are still saved with the standard cache key, so subsequent runs without `force-refresh` will use the newly cached images.
 
+## Job Summary Control
+
+By default, the action writes a job summary describing every processed image. A workflow that uses this action in many steps produces a long summary, which makes the job page harder to scan. The `add-job-summary` input controls when the summary is written:
+
+```yaml
+- uses: seijikohara/docker-compose-cache-action@v1
+  with:
+    add-job-summary: never
+```
+
+### Behavior
+
+| Value                         | Behavior                                                                    |
+| ----------------------------- | --------------------------------------------------------------------------- |
+| `add-job-summary: always`     | Always writes the job summary. This is the default.                         |
+| `add-job-summary: never`      | Never writes the job summary. Action outputs and log output are unaffected. |
+| `add-job-summary: on-failure` | Writes the job summary only when at least one image fails to process.       |
+
+An unknown value fails the action, so a typo such as `add-job-summary: false` surfaces immediately instead of being ignored.
+
+### When to Use on-failure
+
+`on-failure` suppresses the summary for routine runs and keeps it for runs that need investigation.
+
+```yaml
+- uses: seijikohara/docker-compose-cache-action@v1
+  with:
+    add-job-summary: on-failure
+```
+
+The failure that `on-failure` reacts to is an image processing error, such as a digest that cannot be retrieved. The action reports such an error as a warning and continues, so the job itself still succeeds. A job that ends green can therefore still produce a summary under `on-failure`.
+
 ## Exclude Images with Patterns
 
 The `exclude-images` input supports glob-style patterns for flexible image exclusion:
@@ -332,6 +366,7 @@ exclude-images: |
 | `cache-key-prefix`         | Prefix for the generated cache key for each image. Change to invalidate existing caches.                                                             | `false`  | `docker-compose-image`                                                              |
 | `skip-digest-verification` | Skip verifying image digests against the remote registry. When enabled, cached images will be used without checking if newer versions are available. | `false`  | `false`                                                                             |
 | `force-refresh`            | Ignore existing cache and pull all images fresh from the registry. Pulled images will still be saved to cache for future runs.                       | `false`  | `false`                                                                             |
+| `add-job-summary`          | When to write the job summary. Accepts `always`, `never`, or `on-failure`. An unknown value fails the action.                                        | `false`  | `always`                                                                            |
 | `skip-latest-check`        | **[DEPRECATED]** Use `skip-digest-verification` instead. This option will be removed in a future major version.                                      | `false`  | `false`                                                                             |
 
 ### Outputs
