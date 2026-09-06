@@ -22903,8 +22903,8 @@ var import_minimatch = /* @__PURE__ */ __toESM((/* @__PURE__ */ __commonJSMin(((
 		var set = this.set;
 		this.debug(this.pattern, "set", set);
 		var filename;
-		var i;
-		for (i = f.length - 1; i >= 0; i--) {
+		var i = f.length - 1;
+		for (; i >= 0; i--) {
 			filename = f[i];
 			if (filename) break;
 		}
@@ -23009,8 +23009,8 @@ var import_minimatch = /* @__PURE__ */ __toESM((/* @__PURE__ */ __commonJSMin(((
 		return partial || null;
 	};
 	Minimatch.prototype._matchOne = function(file, pattern, partial, fileIndex, patternIndex) {
-		var fi, pi, fl, pl;
-		for (fi = fileIndex, pi = patternIndex, fl = file.length, pl = pattern.length; fi < fl && pi < pl; fi++, pi++) {
+		var fi = fileIndex, pi = patternIndex, fl = file.length, pl = pattern.length;
+		for (; fi < fl && pi < pl; fi++, pi++) {
 			this.debug("matchOne loop");
 			var p = pattern[pi];
 			var f = file[fi];
@@ -31123,8 +31123,6 @@ function convertHttpClient(requestPolicyClient) {
 		return toPipelineResponse(await requestPolicyClient.sendRequest(toWebResourceLike(request, { createProxy: true })));
 	} };
 }
-//#endregion
-//#region node_modules/.pnpm/fast-xml-parser@5.10.1/node_modules/fast-xml-parser/src/util.js
 const regexName = /* @__PURE__ */ new RegExp("^[:A-Za-z_\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD][:A-Za-z_\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD\\-.\\d\\u00B7\\u0300-\\u036F\\u203F-\\u2040]*$");
 function getAllMatches(string, regex) {
 	const matches = [];
@@ -32089,9 +32087,9 @@ var XmlNode = class {
 * XML NS spec:  https://www.w3.org/TR/xml-names/#NT-NCName
 */
 const nameStartChar10 = ":A-Za-z_À-ÖØ-öø-˿Ͱ-ͽͿ-҆҈-῿‌-‍⁰-↏Ⰰ-⿯、-퟿豈-﷏ﷰ-�";
-const nameChar10 = ":A-Za-z_À-ÖØ-öø-˿Ͱ-ͽͿ-҆҈-῿‌-‍⁰-↏Ⰰ-⿯、-퟿豈-﷏ﷰ-�\\-\\.\\d·̀-ͯ‿-⁀";
+const nameChar10 = nameStartChar10 + "\\-\\.\\d" + "·" + "̀-ͯ" + "‿-⁀";
 const nameStartChar11 = ":A-Za-z_À-˿Ͱ-ͽͿ-҆҈-῿‌-‍⁰-↏Ⰰ-⿯、-퟿豈-﷏ﷰ-�𐀀-󯿿";
-const nameChar11 = ":A-Za-z_À-˿Ͱ-ͽͿ-҆҈-῿‌-‍⁰-↏Ⰰ-⿯、-퟿豈-﷏ﷰ-�𐀀-󯿿\\-\\.\\d·̀-ͯ҇‿-⁀";
+const nameChar11 = nameStartChar11 + "\\-\\.\\d" + "·" + "̀-ͯ" + "҇" + "‿-⁀";
 const buildRegexes = (startChar, char, flags = "") => {
 	const ncNamePat = `[${startChar.replace(":", "")}][${char.replace(":", "")}]*`;
 	return {
@@ -61739,9 +61737,7 @@ var require_reflection_binary_reader = /* @__PURE__ */ __commonJSMin(((exports) 
 				case "enum":
 					val = 0;
 					break;
-				case "message":
-					val = field.V.T().create();
-					break;
+				case "message": val = field.V.T().create();
 			}
 			return [key, val];
 		}
@@ -62008,9 +62004,7 @@ var require_reflection_create = /* @__PURE__ */ __commonJSMin(((exports) => {
 				case "enum":
 					msg[name] = 0;
 					break;
-				case "map":
-					msg[name] = {};
-					break;
+				case "map": msg[name] = {};
 			}
 		}
 		return msg;
