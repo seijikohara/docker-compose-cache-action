@@ -74,6 +74,31 @@ const mockPullImage = vi.mocked(dockerCommand.pullImage);
 const mockSaveImageToTar = vi.mocked(dockerCommand.saveImageToTar);
 const mockLoadImageFromTar = vi.mocked(dockerCommand.loadImageFromTar);
 
+const setJobSummaryInput = (inputValue: string) => {
+  mockCoreGetInput.mockImplementation((inputName) => {
+    switch (inputName) {
+      case 'cache-key-prefix':
+        return 'test-cache';
+      case 'add-job-summary':
+        return inputValue;
+      default:
+        return '';
+    }
+  });
+};
+
+const failOnlyService = (failingImageName: string) => {
+  mockInspectImageRemote.mockImplementation(async (imageName) =>
+    imageName === failingImageName
+      ? undefined
+      : {
+          digest: 'sha256:digest',
+          schemaVersion: 2,
+          mediaType: 'application/vnd.docker.distribution.manifest.v2+json',
+        }
+  );
+};
+
 describe('main', () => {
   describe('run', () => {
     const mockServiceDefinitions = [
@@ -635,31 +660,6 @@ describe('main', () => {
     });
 
     describe('add-job-summary option', () => {
-      const setJobSummaryInput = (inputValue: string) => {
-        mockCoreGetInput.mockImplementation((inputName) => {
-          switch (inputName) {
-            case 'cache-key-prefix':
-              return 'test-cache';
-            case 'add-job-summary':
-              return inputValue;
-            default:
-              return '';
-          }
-        });
-      };
-
-      const failOnlyService = (failingImageName: string) => {
-        mockInspectImageRemote.mockImplementation(async (imageName) =>
-          imageName === failingImageName
-            ? undefined
-            : {
-                digest: 'sha256:digest',
-                schemaVersion: 2,
-                mediaType: 'application/vnd.docker.distribution.manifest.v2+json',
-              }
-        );
-      };
-
       it('should write the job summary when the input is not set', async () => {
         await run();
 
