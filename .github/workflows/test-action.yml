@@ -81,6 +81,22 @@ jobs:
           echo "| Image List | ${{ steps.docker-cache.outputs.image-list }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
+      # The second run compares its digests with this list. A floating tag such as
+      # postgres:16 can move between the two jobs, and a long runner queue widens that gap.
+      - name: Save First Run Image List
+        env:
+          IMAGE_LIST: ${{ steps.docker-cache.outputs.image-list }}
+        run: printf '%s' "${IMAGE_LIST:-[]}" > first-run-image-list.json
+
+      - name: Upload First Run Image List
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: first-run-image-list-${{ matrix.scenario }}
+          path: first-run-image-list.json
+          retention-days: 1
+          # Artifacts are immutable, so a full re-run must replace the earlier attempt's list.
+          overwrite: true
+
       - name: Assert Cache Miss
         id: validate
         run: |
@@ -156,11 +172,18 @@ jobs:
           echo "| Image List | ${{ steps.docker-cache.outputs.image-list }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
+      - name: Download First Run Image List
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: first-run-image-list-${{ matrix.scenario }}
+          path: first-run
+
       - name: Assert Cache Hit
         id: validate
+        env:
+          IMAGE_LIST: ${{ steps.docker-cache.outputs.image-list }}
         run: |
           hit="${{ steps.docker-cache.outputs.cache-hit }}"
-          list='${{ steps.docker-cache.outputs.image-list }}'
           echo "Scenario: ${{ matrix.scenario }}"
           echo "Cache Hit: $hit"
 
@@ -172,9 +195,26 @@ jobs:
 
           # For normal scenarios, cache-hit should be true
           if [[ "$hit" != "true" ]]; then
-            echo "::error::Expected cache hit on second run but got miss"
-            echo "result=failure" >> $GITHUB_OUTPUT
-            exit 1
+            # When a tag moves to a new digest between the two runs, the action correctly
+            # pulls the new image instead of restoring the stale one. Accept a miss only
+            # when every uncached image was pulled at a digest that differs from the first run.
+            report=$(jq -c --slurpfile first first-run/first-run-image-list.json '
+              [ .[]
+                | select(.status != "Cached")
+                | . as $img
+                | ([$first[0][] | select(.name == $img.name and .platform == $img.platform) | .digest] | first // "") as $before
+                | {
+                    label: "\($img.name) (\($img.platform)): \($img.status), digest \($before) -> \($img.digest)",
+                    moved: ($img.status == "Pulled" and $before != "" and $img.digest != "" and $before != $img.digest)
+                  }
+              ]' <<< "$IMAGE_LIST")
+            jq -r '.[] | select(.moved) | "::warning::Tag moved between runs, so the cache miss is expected: \(.label)"' <<< "$report"
+            if jq -e 'length == 0 or any(.[]; .moved | not)' <<< "$report" > /dev/null; then
+              echo "::error::Expected cache hit on second run but got miss"
+              jq -r '.[] | select(.moved | not) | "Unexplained miss: \(.label)"' <<< "$report"
+              echo "result=failure" >> $GITHUB_OUTPUT
+              exit 1
+            fi
           fi
 
           echo "result=success" >> $GITHUB_OUTPUT
