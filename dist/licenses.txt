@@ -436,7 +436,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-@nodable/entities@3.0.0 — MIT
+@nodable/entities@3.1.0 — MIT
 https://github.com/nodable/val-parsers#readme
 
 ================================================================================
@@ -1088,7 +1088,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-fast-xml-parser@5.11.1 — MIT
+fast-xml-parser@5.12.0 — MIT
 https://github.com/NaturalIntelligence/fast-xml-parser#readme
 
 MIT License
@@ -1168,7 +1168,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-is-unsafe@2.0.2 — MIT
+is-unsafe@2.0.3 — MIT
 https://github.com/NaturalIntelligence/is-unsafe#readme
 
 MIT License
@@ -1332,7 +1332,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-semver@7.8.5 — ISC
+semver@7.8.6 — ISC
 https://github.com/npm/node-semver#readme
 
 The ISC License
@@ -1352,7 +1352,7 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
 IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ================================================================================
-strnum@2.4.2 — MIT
+strnum@2.5.1 — MIT
 https://github.com/NaturalIntelligence/strnum#readme
 
 MIT License
@@ -1378,7 +1378,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-tslib@2.8.1 — 0BSD
+tslib@2.9.1 — 0BSD
 https://www.typescriptlang.org/
 
 Copyright (c) Microsoft Corporation.
@@ -1421,7 +1421,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 ================================================================================
-undici@6.28.1 — MIT
+undici@6.29.1 — MIT
 https://undici.nodejs.org
 
 MIT License
