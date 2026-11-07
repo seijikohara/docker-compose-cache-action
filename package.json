@@ -43,7 +43,7 @@
     "js-yaml": "^5.0.0"
   },
   "devDependencies": {
-    "@types/node": "^25.9.1",
+    "@types/node": "^26.0.0",
     "lefthook": "^2.1.10",
     "oxfmt": "^0.74.0",
     "oxlint": "^1.73.0",
