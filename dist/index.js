@@ -1,37 +1,37 @@
 import { createRequire } from "node:module";
-import * as os$2 from "os";
-import os, { EOL } from "os";
+import * as os from "os";
+import os$1, { EOL as EOL$1 } from "os";
 import * as crypto from "crypto";
-import * as fs$3 from "fs";
+import * as fs$2 from "fs";
 import { constants, existsSync, promises, writeFileSync } from "fs";
 import * as path$2 from "path";
-import * as http$1 from "http";
-import * as https$1 from "https";
-import { Agent } from "https";
+import * as http from "http";
+import * as https from "https";
+import { Agent as Agent$1 } from "https";
 import * as net from "net";
 import * as tls from "tls";
 import * as events from "events";
 import { EventEmitter, once } from "events";
 import assert, { ok } from "assert";
-import * as util$1 from "util";
-import http from "node:http";
+import * as util from "util";
+import http$1 from "node:http";
 import { Readable, Transform, finished } from "node:stream";
-import buffer from "node:buffer";
-import util, { inspect, types } from "node:util";
+import buffer$1 from "node:buffer";
+import util$1, { inspect, types as types$1 } from "node:util";
 import zlib from "node:zlib";
 import { createHmac } from "node:crypto";
 import * as child from "child_process";
 import { setTimeout as setTimeout$1 } from "timers";
-import fs, * as fs$2 from "node:fs";
-import * as fs$1 from "node:fs/promises";
+import fs$3, * as fs$1 from "node:fs";
+import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as stream from "stream";
 import { Readable as Readable$1 } from "stream";
 import { URL as URL$1 } from "url";
-import os$1, { EOL as EOL$1 } from "node:os";
+import os$2, { EOL as EOL$2 } from "node:os";
 import process$1 from "node:process";
-import https from "node:https";
-import * as buffer$1 from "buffer";
+import https$1 from "node:https";
+import * as buffer from "buffer";
 import { Buffer as Buffer$1 } from "buffer";
 // \0rolldown/runtime.js
 var __create = Object.create;
@@ -128,7 +128,7 @@ function toCommandProperties(annotationProperties) {
 */
 function issueCommand(command, properties, message) {
 	const cmd = new Command(command, properties, message);
-	process.stdout.write(cmd.toString() + os$2.EOL);
+	process.stdout.write(cmd.toString() + os.EOL);
 }
 const CMD_STRING = "::";
 var Command = class {
@@ -166,15 +166,15 @@ function escapeProperty(s) {
 function issueFileCommand(command, message) {
 	const filePath = process.env[`GITHUB_${command}`];
 	if (!filePath) throw new Error(`Unable to find environment variable for file command ${command}`);
-	if (!fs$3.existsSync(filePath)) throw new Error(`Missing file at path: ${filePath}`);
-	fs$3.appendFileSync(filePath, `${toCommandValue(message)}${os$2.EOL}`, { encoding: "utf8" });
+	if (!fs$2.existsSync(filePath)) throw new Error(`Missing file at path: ${filePath}`);
+	fs$2.appendFileSync(filePath, `${toCommandValue(message)}${os.EOL}`, { encoding: "utf8" });
 }
 function prepareKeyValueMessage(key, value) {
 	const delimiter = `ghadelimiter_${crypto.randomUUID()}`;
 	const convertedValue = toCommandValue(value);
 	if (key.includes(delimiter)) throw new Error(`Unexpected input: name should not contain the delimiter "${delimiter}"`);
 	if (convertedValue.includes(delimiter)) throw new Error(`Unexpected input: value should not contain the delimiter "${delimiter}"`);
-	return `${key}<<${delimiter}${os$2.EOL}${convertedValue}${os$2.EOL}${delimiter}`;
+	return `${key}<<${delimiter}${os.EOL}${convertedValue}${os.EOL}${delimiter}`;
 }
 // node_modules/.pnpm/@actions+http-client@4.0.1/node_modules/@actions/http-client/lib/proxy.js
 function getProxyUrl(reqUrl) {
@@ -6277,7 +6277,7 @@ var require_client_h2 = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 		});
 		return {
 			version: "h2",
-			defaultPipelining: Infinity,
+			defaultPipelining: 1e400,
 			write(...args) {
 				return writeH2(client, ...args);
 			},
@@ -9666,7 +9666,7 @@ var require_pending_interceptors_formatter = /* @__PURE__ */ __commonJSMin(((exp
 				"Status code": statusCode,
 				Persistent: persist ? PERSISTENT : NOT_PERSISTENT,
 				Invocations: timesInvoked,
-				Remaining: persist ? Infinity : times - timesInvoked
+				Remaining: persist ? 1e400 : times - timesInvoked
 			}));
 			this.logger.table(withPrettyHeaders);
 			return this.transform.read().toString();
@@ -10116,7 +10116,7 @@ var require_dns = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 			pick: interceptorOpts?.pick ?? null,
 			dualStack,
 			affinity,
-			maxItems: interceptorOpts?.maxItems ?? Infinity
+			maxItems: interceptorOpts?.maxItems ?? 1e400
 		});
 		return (dispatch) => {
 			return function dnsInterceptor(origDispatchOpts, handler) {
@@ -13197,7 +13197,7 @@ var require_cache = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 			}
 			return true;
 		}
-		#internalMatchAll(request, options, maxResponses = Infinity) {
+		#internalMatchAll(request, options, maxResponses = 1e400) {
 			let r = null;
 			if (request !== void 0) {
 				if (request instanceof Request) {
@@ -16585,7 +16585,7 @@ var HttpClient = class {
 		const info = {};
 		info.parsedUrl = requestUrl;
 		const usingSsl = info.parsedUrl.protocol === "https:";
-		info.httpModule = usingSsl ? https$1 : http$1;
+		info.httpModule = usingSsl ? https : http;
 		const defaultPort = usingSsl ? 443 : 80;
 		info.options = {};
 		info.options.host = info.parsedUrl.hostname;
@@ -16655,7 +16655,7 @@ var HttpClient = class {
 		if (agent) return agent;
 		const usingSsl = parsedUrl.protocol === "https:";
 		let maxSockets = 100;
-		if (this.requestOptions) maxSockets = this.requestOptions.maxSockets || http$1.globalAgent.maxSockets;
+		if (this.requestOptions) maxSockets = this.requestOptions.maxSockets || http.globalAgent.maxSockets;
 		if (proxyUrl && proxyUrl.hostname) {
 			const agentOptions = {
 				maxSockets,
@@ -16677,7 +16677,7 @@ var HttpClient = class {
 				keepAlive: this._keepAlive,
 				maxSockets
 			};
-			agent = usingSsl ? new https$1.Agent(options) : new http$1.Agent(options);
+			agent = usingSsl ? new https.Agent(options) : new http.Agent(options);
 			this._agent = agent;
 		}
 		if (usingSsl && this._ignoreSslError) agent.options = Object.assign(agent.options || {}, { rejectUnauthorized: false });
@@ -16932,7 +16932,7 @@ var Summary = class {
 	* @returns {Summary} summary instance
 	*/
 	addEOL() {
-		return this.addRaw(EOL);
+		return this.addRaw(EOL$1);
 	}
 	/**
 	* Adds an HTML codeblock to the summary buffer
@@ -17106,9 +17106,9 @@ var __awaiter$16 = function(thisArg, _arguments, P, generator) {
 		step((generator = generator.apply(thisArg, _arguments || [])).next());
 	});
 };
-const { chmod, copyFile, lstat, mkdir, open, readdir, rename, rm, rmdir, stat, symlink, unlink } = fs$3.promises;
+const { chmod, copyFile, lstat, mkdir, open, readdir, rename, rm, rmdir, stat, symlink, unlink } = fs$2.promises;
 const IS_WINDOWS$7 = process.platform === "win32";
-fs$3.constants.O_RDONLY;
+fs$2.constants.O_RDONLY;
 function exists(fsPath) {
 	return __awaiter$16(this, void 0, void 0, function* () {
 		try {
@@ -17370,11 +17370,11 @@ var ToolRunner = class extends events.EventEmitter {
 	_processLineBuffer(data, strBuffer, onLine) {
 		try {
 			let s = strBuffer + data.toString();
-			let n = s.indexOf(os$2.EOL);
+			let n = s.indexOf(os.EOL);
 			while (n > -1) {
 				onLine(s.substring(0, n));
-				s = s.substring(n + os$2.EOL.length);
-				n = s.indexOf(os$2.EOL);
+				s = s.substring(n + os.EOL.length);
+				n = s.indexOf(os.EOL);
 			}
 			return s;
 		} catch (err) {
@@ -17514,7 +17514,7 @@ var ToolRunner = class extends events.EventEmitter {
 				this._debug("arguments:");
 				for (const arg of this.args) this._debug(`   ${arg}`);
 				const optionsNonNull = this._cloneExecOptions(this.options);
-				if (!optionsNonNull.silent && optionsNonNull.outStream) optionsNonNull.outStream.write(this._getCommandString(optionsNonNull) + os$2.EOL);
+				if (!optionsNonNull.silent && optionsNonNull.outStream) optionsNonNull.outStream.write(this._getCommandString(optionsNonNull) + os.EOL);
 				const state = new ExecState(optionsNonNull, this.toolPath);
 				state.on("debug", (message) => {
 					this._debug(message);
@@ -17710,8 +17710,8 @@ function exec(commandLine, args, options) {
 		return new ToolRunner(toolPath, args, options).exec();
 	});
 }
-os.platform();
-os.arch();
+os$1.platform();
+os$1.arch();
 /**
 * The code to exit an action
 */
@@ -17820,7 +17820,7 @@ function getBooleanInput(name, options) {
 */
 function setOutput(name, value) {
 	if (process.env["GITHUB_OUTPUT"] || "") return issueFileCommand("OUTPUT", prepareKeyValueMessage(name, value));
-	process.stdout.write(os$2.EOL);
+	process.stdout.write(os.EOL);
 	issueCommand("set-output", { name }, toCommandValue(value));
 }
 /**
@@ -17866,7 +17866,7 @@ function warning(message, properties = {}) {
 * @param message info message
 */
 function info(message) {
-	process.stdout.write(message + os$2.EOL);
+	process.stdout.write(message + os.EOL);
 }
 -(Math.pow(10, 8) * 24 * 60 * 60 * 1e3);
 /**
@@ -22313,7 +22313,7 @@ function matchesExcludePattern(imageName, patterns) {
 * @returns Array of existing Docker Compose file paths to process.
 */
 function getComposeFilePathsToProcess(candidateComposeFilePaths) {
-	return candidateComposeFilePaths.length > 0 ? candidateComposeFilePaths.filter((filePath) => fs$2.existsSync(filePath)) : DEFAULT_COMPOSE_FILE_NAMES.filter((fileName) => fs$2.existsSync(fileName));
+	return candidateComposeFilePaths.length > 0 ? candidateComposeFilePaths.filter((filePath) => fs$1.existsSync(filePath)) : DEFAULT_COMPOSE_FILE_NAMES.filter((fileName) => fs$1.existsSync(fileName));
 }
 /**
 * Extracts Docker Compose services from specified files and filters them based on exclusion patterns.
@@ -22326,7 +22326,7 @@ function getComposeFilePathsToProcess(candidateComposeFilePaths) {
 function getComposeServicesFromFiles(composeFilePaths, excludedImagePatterns) {
 	const collected = composeFilePaths.flatMap((currentComposeFile) => {
 		try {
-			const composeDefinition = load(fs$2.readFileSync(currentComposeFile, "utf8"), { schema: COMPOSE_FILE_SCHEMA });
+			const composeDefinition = load(fs$1.readFileSync(currentComposeFile, "utf8"), { schema: COMPOSE_FILE_SCHEMA });
 			if (!composeDefinition) {
 				debug$3(`Empty or invalid YAML file: ${currentComposeFile}`);
 				return [];
@@ -22554,22 +22554,6 @@ function partialMatch(patterns, itemPath) {
 	return patterns.some((x) => !x.negate && x.partialMatch(itemPath));
 }
 // node_modules/.pnpm/balanced-match@4.0.4/node_modules/balanced-match/dist/esm/index.js
-const balanced = (a, b, str) => {
-	const ma = a instanceof RegExp ? maybeMatch(a, str) : a;
-	const mb = b instanceof RegExp ? maybeMatch(b, str) : b;
-	const r = ma !== null && mb != null && range$1(ma, mb, str);
-	return r && {
-		start: r[0],
-		end: r[1],
-		pre: str.slice(0, r[0]),
-		body: str.slice(r[0] + ma.length, r[1]),
-		post: str.slice(r[1] + mb.length)
-	};
-};
-const maybeMatch = (reg, str) => {
-	const m = str.match(reg);
-	return m ? m[0] : null;
-};
 const range$1 = (a, b, str) => {
 	let begs, beg, left, right = void 0, result;
 	let ai = str.indexOf(a);
@@ -22600,12 +22584,12 @@ const range$1 = (a, b, str) => {
 	}
 	return result;
 };
-// node_modules/.pnpm/brace-expansion@5.0.12/node_modules/brace-expansion/dist/esm/index.js
-const escSlash = "\0SLASH" + Math.random() + "\0";
-const escOpen = "\0OPEN" + Math.random() + "\0";
-const escClose = "\0CLOSE" + Math.random() + "\0";
-const escComma = "\0COMMA" + Math.random() + "\0";
-const escPeriod = "\0PERIOD" + Math.random() + "\0";
+// node_modules/.pnpm/brace-expansion@5.0.13/node_modules/brace-expansion/dist/esm/index.js
+const escSlash = "\0SLASH" + Math.random().toFixed(16) + "\0";
+const escOpen = "\0OPEN" + Math.random().toFixed(16) + "\0";
+const escClose = "\0CLOSE" + Math.random().toFixed(16) + "\0";
+const escComma = "\0COMMA" + Math.random().toFixed(16) + "\0";
+const escPeriod = "\0PERIOD" + Math.random().toFixed(16) + "\0";
 const escSlashPattern = new RegExp(escSlash, "g");
 const escOpenPattern = new RegExp(escOpen, "g");
 const escClosePattern = new RegExp(escClose, "g");
@@ -22620,6 +22604,8 @@ const EXPANSION_MAX = 1e5;
 const EXPANSION_MAX_LENGTH = 4e6;
 const EXPANSION_MAX_DEPTH = 1e3;
 const EXPANSION_MAX_REWRITES = 1e3;
+const EXPANSION_MAX_STEPS = 2e7;
+const CALL_STEPS = 16;
 function numeric(str) {
 	return !isNaN(str) ? parseInt(str, 10) : str.charCodeAt(0);
 }
@@ -22632,16 +22618,64 @@ function unescapeBraces(str) {
 function pushAll(target, items) {
 	for (let i = 0; i < items.length; i++) target.push(items[i]);
 }
+function balancedWithBudget(str, masked, budget) {
+	if (budget.remaining < 0) return;
+	const r = range$1("{", "}", masked);
+	const unmatched = r !== void 0 && masked.indexOf("{") < r[0];
+	budget.remaining -= r && !unmatched ? r[1] + 1 : str.length;
+	if (!r || budget.remaining < 0) return;
+	return {
+		end: r[1],
+		pre: str.slice(0, r[0]),
+		body: str.slice(r[0] + 1, r[1]),
+		post: str.slice(r[1] + 1),
+		unmatched
+	};
+}
+function maskUnmatchedOpens(masked, budget) {
+	budget.remaining -= masked.length;
+	const open = [];
+	for (let i = 0; i < masked.length; i++) {
+		const c = masked.charCodeAt(i);
+		if (c === 123) open.push(i);
+		else if (c === 125 && open.length) open.pop();
+	}
+	let out = "";
+	let last = 0;
+	for (let i = 0; i < open.length; i++) {
+		const at = open[i];
+		out += masked.slice(last, at) + "\0";
+		last = at + 1;
+	}
+	return out + masked.slice(last);
+}
+function commaSetFollows(str, budget) {
+	budget.remaining -= str.length;
+	if (budget.remaining < 0) return false;
+	let close = false;
+	for (let i = str.length - 1; i >= 0; i--) {
+		const c = str.charCodeAt(i);
+		if (c === 125) close = true;
+		else if (c === 10 || c === 13 || c === 8232 || c === 8233) close = false;
+		else if (c === 44 && close && str.charCodeAt(i + 1) !== 44) return true;
+	}
+	return false;
+}
 /**
 * Basically just str.split(","), but handling cases
 * where we have nested braced sections, which should be
 * treated as individual members, like {a,{b,c},d}
+*
+* Returns `undefined` if the step budget runs out before the whole set is
+* split, since splitting what is left on every comma would tear apart the
+* nested sets it still holds.
 */
-function parseCommaParts(str) {
+function parseCommaParts(str, budget) {
 	const parts = [];
 	let carry = "";
 	for (;;) {
-		const m = balanced("{", "}", str);
+		const m = balancedWithBudget(str, str, budget);
+		if (budget.remaining < 0) return;
 		if (!m) {
 			const tail = str.split(",");
 			tail[0] = carry + tail[0];
@@ -22661,11 +22695,18 @@ function parseCommaParts(str) {
 		str = post;
 	}
 }
+function bound(value, fallback) {
+	return value === void 0 || isNaN(value) ? fallback : value;
+}
 function expand(str, options = {}) {
 	if (!str) return [];
-	const { max = EXPANSION_MAX, maxLength = EXPANSION_MAX_LENGTH, maxDepth = EXPANSION_MAX_DEPTH, maxRewrites = EXPANSION_MAX_REWRITES } = options;
+	const max = bound(options.max, EXPANSION_MAX);
+	const maxLength = bound(options.maxLength, EXPANSION_MAX_LENGTH);
+	const maxDepth = bound(options.maxDepth, EXPANSION_MAX_DEPTH);
+	const maxRewrites = bound(options.maxRewrites, EXPANSION_MAX_REWRITES);
+	const maxSteps = bound(options.maxSteps, EXPANSION_MAX_STEPS);
 	if (str.slice(0, 2) === "{}") str = "\\{\\}" + str.slice(2);
-	return expand_(escapeBraces(str), max, maxLength, maxDepth, 0, maxRewrites, true).map(unescapeBraces);
+	return expand_(escapeBraces(str), max, maxLength, maxDepth, 0, maxRewrites, { remaining: maxSteps }, true).map(unescapeBraces);
 }
 function embrace(str) {
 	return "{" + str + "}";
@@ -22679,20 +22720,29 @@ function lte(i, y) {
 function gte(i, y) {
 	return i >= y;
 }
-function combine(acc, pre, values, max, maxLength, dropEmpties) {
+function combine(acc, pre, values, max, maxLength, dropEmpties, budget) {
 	const out = [];
 	let length = 0;
-	for (let a = 0; a < acc.length; a++) for (let v = 0; v < values.length; v++) {
-		if (out.length >= max) return out;
-		const expansion = acc[a] + pre + values[v];
-		if (dropEmpties && !expansion) continue;
-		if (length + expansion.length > maxLength) return out;
-		out.push(expansion);
-		length += expansion.length;
+	let nonEmpty;
+	outer: for (let a = 0; a < acc.length; a++) {
+		const prefix = acc[a] + pre;
+		let vs = values;
+		if (dropEmpties && !prefix) {
+			if (!nonEmpty) nonEmpty = values.filter((v) => v);
+			vs = nonEmpty;
+		}
+		for (let v = 0; v < vs.length; v++) {
+			if (out.length >= max) break outer;
+			const expansion = prefix + vs[v];
+			if (length + expansion.length > maxLength) break outer;
+			out.push(expansion);
+			length += expansion.length;
+		}
 	}
+	budget.remaining -= out.length;
 	return out;
 }
-function expandSequence(body, isAlphaSequence, max, maxLength) {
+function expandSequence(body, isAlphaSequence, max, maxLength, budget) {
 	const n = body.split(/\.\./);
 	const N = [];
 	/* c8 ignore start */
@@ -22708,8 +22758,11 @@ function expandSequence(body, isAlphaSequence, max, maxLength) {
 		test = gte;
 	}
 	const pad = n.some(isPadded);
+	const cost = pad ? width : 1;
 	let length = 0;
 	for (let i = x; test(i, y) && N.length < max; i += incr) {
+		budget.remaining -= cost;
+		if (budget.remaining < 0) return;
 		let c;
 		if (isAlphaSequence) {
 			c = String.fromCharCode(i);
@@ -22731,21 +22784,26 @@ function expandSequence(body, isAlphaSequence, max, maxLength) {
 	}
 	return N;
 }
-function expand_(str, max, maxLength, maxDepth, depth, maxRewrites, isTop) {
+function expand_(str, max, maxLength, maxDepth, depth, maxRewrites, budget, isTop) {
+	budget.remaining -= CALL_STEPS;
 	if (depth > maxDepth) return [str];
 	let acc = [""];
 	let rewrites = 0;
 	let dropEmpties = false;
 	let firstGroup = true;
+	let masked = str;
 	for (;;) {
-		const m = balanced("{", "}", str);
-		if (!m) return combine(acc, str, [""], max, maxLength, dropEmpties);
+		const m = balancedWithBudget(str, masked, budget);
+		if (!m) return combine(acc, str, [""], max, maxLength, dropEmpties, budget);
+		if (m.unmatched) masked = maskUnmatchedOpens(masked, budget);
 		const pre = m.pre;
+		const literal = () => combine(acc, pre + "{" + m.body + "}" + m.post, [""], max, maxLength, dropEmpties, budget);
 		if (/\$$/.test(pre)) {
-			acc = combine(acc, pre + "{" + m.body + "}", [""], max, maxLength, dropEmpties && !m.post.length);
+			acc = combine(acc, pre + "{" + m.body + "}", [""], max, maxLength, dropEmpties && !m.post.length, budget);
 			firstGroup = false;
 			if (!m.post.length) break;
 			str = m.post;
+			masked = masked.slice(m.end + 1);
 			continue;
 		}
 		const isNumericSequence = /^-?\d+\.\.-?\d+(?:\.\.-?\d+)?$/.test(m.body);
@@ -22753,29 +22811,37 @@ function expand_(str, max, maxLength, maxDepth, depth, maxRewrites, isTop) {
 		const isSequence = isNumericSequence || isAlphaSequence;
 		const isOptions = m.body.indexOf(",") >= 0;
 		if (!isSequence && !isOptions) {
-			if (rewrites < maxRewrites && m.post.match(/,(?!,).*\}/)) {
+			if (rewrites < maxRewrites && commaSetFollows(m.post, budget)) {
 				rewrites++;
 				str = m.pre + "{" + m.body + escClose + m.post;
+				masked = masked.slice(0, m.end) + escClose + masked.slice(m.end + 1);
 				isTop = true;
 				continue;
 			}
-			return combine(acc, pre + "{" + m.body + "}" + m.post, [""], max, maxLength, dropEmpties);
+			return literal();
 		}
 		if (firstGroup) {
 			dropEmpties = isTop && !isSequence;
 			firstGroup = false;
 		}
 		let values;
-		if (isSequence) values = expandSequence(m.body, isAlphaSequence, max, maxLength);
-		else {
-			let n = parseCommaParts(m.body);
+		if (isSequence) {
+			values = expandSequence(m.body, isAlphaSequence, max, maxLength, budget);
+			if (!values) return literal();
+		} else {
+			let n = parseCommaParts(m.body, budget);
+			if (!n) return literal();
 			if (n.length === 1 && n[0] !== void 0) {
-				n = expand_(n[0], max, maxLength, maxDepth, depth + 1, maxRewrites, false).map(embrace);
+				n = expand_(n[0], max, maxLength, maxDepth, depth + 1, maxRewrites, budget, false).map(embrace);
+				if (budget.remaining < 0) return literal();
 				/* c8 ignore start */
 				if (n.length === 1) {
-					acc = combine(acc, pre + n[0], [""], max, maxLength, dropEmpties && !m.post.length);
+					const next = combine(acc, pre + n[0], [""], max, maxLength, dropEmpties && !m.post.length, budget);
+					if (budget.remaining < 0) return literal();
+					acc = next;
 					if (!m.post.length) break;
 					str = m.post;
+					masked = masked.slice(m.end + 1);
 					continue;
 				}
 			}
@@ -22784,7 +22850,8 @@ function expand_(str, max, maxLength, maxDepth, depth, maxRewrites, isTop) {
 			values = [];
 			let valuesLength = 0;
 			outer: for (let j = 0; j < n.length; j++) {
-				const expanded = expand_(n[j], max, maxLength, maxDepth, depth + 1, maxRewrites, false);
+				const expanded = expand_(n[j], max, maxLength, maxDepth, depth + 1, maxRewrites, budget, false);
+				if (budget.remaining < 0) return literal();
 				for (let k = 0; k < expanded.length; k++) {
 					const v = expanded[k];
 					if (dropsEmpties && !v) continue;
@@ -22794,9 +22861,12 @@ function expand_(str, max, maxLength, maxDepth, depth, maxRewrites, isTop) {
 				}
 			}
 		}
-		acc = combine(acc, pre, values, max, maxLength, dropEmpties && !m.post.length);
+		const next = combine(acc, pre, values, max, maxLength, dropEmpties && !m.post.length, budget);
+		if (budget.remaining < 0) return literal();
+		acc = next;
 		if (!m.post.length) break;
 		str = m.post;
+		masked = masked.slice(m.end + 1);
 	}
 	return acc;
 }
@@ -22955,14 +23025,14 @@ const unescape = (s, { windowsPathsNoEscape = false, magicalBraces = true } = {}
 };
 // node_modules/.pnpm/minimatch@10.2.6/node_modules/minimatch/dist/esm/ast.js
 var _a;
-const types$1 = /* @__PURE__ */ new Set([
+const types = /* @__PURE__ */ new Set([
 	"!",
 	"?",
 	"+",
 	"*",
 	"@"
 ]);
-const isExtglobType = (c) => types$1.has(c);
+const isExtglobType = (c) => types.has(c);
 const isExtglobAST = (c) => isExtglobType(c.type);
 const adoptionMap = /* @__PURE__ */ new Map([
 	["!", ["@"]],
@@ -24233,7 +24303,7 @@ var Pattern = class Pattern {
 		pattern = normalizeSeparators(pattern);
 		if (pattern === "." || pattern.startsWith(`.${path$2.sep}`)) pattern = Pattern.globEscape(process.cwd()) + pattern.substr(1);
 		else if (pattern === "~" || pattern.startsWith(`~${path$2.sep}`)) {
-			homedir = homedir || os$2.homedir();
+			homedir = homedir || os.homedir();
 			assert(homedir, "Unable to determine HOME directory");
 			assert(hasAbsoluteRoot(homedir), `Expected HOME directory to be a rooted path. Actual '${homedir}'`);
 			pattern = Pattern.globEscape(homedir) + pattern.substr(1);
@@ -24445,7 +24515,7 @@ var DefaultGlobber = class DefaultGlobber {
 			for (const searchPath of getSearchPaths(patterns)) {
 				debug$3(`Search path '${searchPath}'`);
 				try {
-					yield __await(fs$3.promises.lstat(searchPath));
+					yield __await(fs$2.promises.lstat(searchPath));
 				} catch (err) {
 					if (err.code === "ENOENT") continue;
 					throw err;
@@ -24465,7 +24535,7 @@ var DefaultGlobber = class DefaultGlobber {
 					if (match & MatchKind.Directory && options.matchDirectories) yield yield __await(item.path);
 					else if (!partialMatch$1) continue;
 					const childLevel = item.level + 1;
-					const childItems = (yield __await(fs$3.promises.readdir(item.path))).map((x) => new SearchState(path$2.join(item.path, x), childLevel));
+					const childItems = (yield __await(fs$2.promises.readdir(item.path))).map((x) => new SearchState(path$2.join(item.path, x), childLevel));
 					stack.push(...childItems.reverse());
 				} else if (match & MatchKind.File) yield yield __await(item.path);
 			}
@@ -24492,7 +24562,7 @@ var DefaultGlobber = class DefaultGlobber {
 		return __awaiter$10(this, void 0, void 0, function* () {
 			let stats;
 			if (options.followSymbolicLinks) try {
-				stats = yield fs$3.promises.stat(item.path);
+				stats = yield fs$2.promises.stat(item.path);
 			} catch (err) {
 				if (err.code === "ENOENT") {
 					if (options.omitBrokenSymbolicLinks) {
@@ -24503,9 +24573,9 @@ var DefaultGlobber = class DefaultGlobber {
 				}
 				throw err;
 			}
-			else stats = yield fs$3.promises.lstat(item.path);
+			else stats = yield fs$2.promises.lstat(item.path);
 			if (stats.isDirectory() && options.followSymbolicLinks) {
-				const realPath = yield fs$3.promises.realpath(item.path);
+				const realPath = yield fs$2.promises.realpath(item.path);
 				while (traversalChain.length >= item.level) traversalChain.pop();
 				if (traversalChain.some((x) => x === realPath)) {
 					debug$3(`Symlink cycle detected for path '${item.path}' and realpath '${realPath}'`);
@@ -26365,7 +26435,7 @@ function createTempDirectory() {
 	});
 }
 function getArchiveFileSizeInBytes(filePath) {
-	return fs$3.statSync(filePath).size;
+	return fs$2.statSync(filePath).size;
 }
 function resolvePaths(patterns) {
 	return __awaiter$7(this, void 0, void 0, function* () {
@@ -26398,7 +26468,7 @@ function resolvePaths(patterns) {
 }
 function unlinkFile(filePath) {
 	return __awaiter$7(this, void 0, void 0, function* () {
-		return util$1.promisify(fs$3.unlink)(filePath);
+		return util.promisify(fs$2.unlink)(filePath);
 	});
 }
 function getVersion(app_1) {
@@ -26436,7 +26506,7 @@ function getCacheFileName(compressionMethod) {
 }
 function getGnuTarPathOnWindows() {
 	return __awaiter$7(this, void 0, void 0, function* () {
-		if (fs$3.existsSync(GnuTarPathOnWindows)) return GnuTarPathOnWindows;
+		if (fs$2.existsSync(GnuTarPathOnWindows)) return GnuTarPathOnWindows;
 		return (yield getVersion("tar")).toLowerCase().includes("gnu tar") ? which("tar") : "";
 	});
 }
@@ -26494,7 +26564,7 @@ var AbortError$1 = class extends Error {
 };
 // node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/logger/log.js
 function log(message, ...args) {
-	process$1.stderr.write(`${util.format(message, ...args)}${EOL$1}`);
+	process$1.stderr.write(`${util$1.format(message, ...args)}${EOL$2}`);
 }
 // node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/env.js
 /**
@@ -27293,7 +27363,7 @@ function stringToUint8Array$1(value, format) {
 	return Buffer.from(value, format);
 }
 // node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/log.js
-const logger$4 = createClientLogger$1("ts-http-runtime");
+const logger$5 = createClientLogger$1("ts-http-runtime");
 // node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/util/requestBodyHeaders.js
 /**
 * Converts a flat `[name, value, ...]` raw header array to `[name, value]` pairs,
@@ -27537,11 +27607,30 @@ function createExpectContinueRequest(options) {
 const responseBodySources = /* @__PURE__ */ new WeakMap();
 const responseBodyDisposers = /* @__PURE__ */ new WeakMap();
 const requestCompletions = /* @__PURE__ */ new WeakMap();
+const responseBodyCompletions = /* @__PURE__ */ new WeakMap();
 function setRequestCompletion(response, completion) {
 	requestCompletions.set(response, completion);
 	completion.then(() => requestCompletions.get(response) === completion && requestCompletions.delete(response)).catch((error) => {
-		logger$4.warning("Error tracking request completion", error);
+		logger$5.warning("Error tracking request completion", error);
 	});
+}
+/**
+* Returns a promise that resolves when the response's outgoing request has completed.
+*
+* @param response - The response whose request completion should be observed.
+* @returns The request completion promise, if the transport provides one.
+*/
+function getRequestCompletion(response) {
+	return requestCompletions.get(response);
+}
+/**
+* Returns a promise that resolves when the response body has completed, errored, or been canceled.
+*
+* @param response - The response whose body completion should be observed.
+* @returns The response body completion promise, if the transport provides one.
+*/
+function getResponseBodyCompletion(response) {
+	return responseBodyCompletions.get(response);
 }
 function isNodeResponseBody(value) {
 	return typeof value === "object" && value !== null && "resume" in value && typeof value.resume === "function";
@@ -27574,7 +27663,7 @@ function disposeNodeResponseBody(readableStream, disposed = /* @__PURE__ */ new 
 		if (readableStream.destroy) {
 			if (isNodeEventEmitterBody(readableStream)) {
 				const onError = (error) => {
-					logger$4.warning("Error disposing Node stream", error);
+					logger$5.warning("Error disposing Node stream", error);
 				};
 				const onClose = () => {
 					readableStream.removeListener("error", onError);
@@ -27602,7 +27691,7 @@ function disposeNodeStream(stream) {
 	try {
 		disposeNodeResponseBody(stream);
 	} catch (error) {
-		logger$4.warning("Error disposing Node stream", error);
+		logger$5.warning("Error disposing Node stream", error);
 	}
 }
 /**
@@ -27628,7 +27717,7 @@ async function disposeResponseBody(response) {
 			dispose?.();
 		}
 	} catch (error) {
-		logger$4.warning("Error disposing response body", error);
+		logger$5.warning("Error disposing response body", error);
 	}
 }
 // node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/nodeHttpClient.js
@@ -27651,7 +27740,7 @@ function isStreamComplete(stream) {
 	});
 }
 function isArrayBuffer(body) {
-	return types.isArrayBuffer(body) || ArrayBuffer.isView(body);
+	return types$1.isArrayBuffer(body) || ArrayBuffer.isView(body);
 }
 function arrayBufferToBuffer(body) {
 	if (Buffer.isBuffer(body)) return body;
@@ -27702,7 +27791,7 @@ function createRequestLifecycle(request, options, isInsecure, resolve, reject) {
 	};
 	return {
 		createRequest: (onResponseCallback = onResponse) => {
-			clientRequest = isInsecure ? http.request(options, onResponseCallback) : https.request(options, onResponseCallback);
+			clientRequest = isInsecure ? http$1.request(options, onResponseCallback) : https$1.request(options, onResponseCallback);
 			clientRequest.once("finish", onComplete);
 			clientRequest.once("close", onComplete);
 			return clientRequest;
@@ -27732,7 +27821,7 @@ function sendRequestBody(clientRequest, body, request, onError) {
 	else if (body) {
 		if (typeof body === "string" || Buffer.isBuffer(body)) clientRequest.end(body);
 		else {
-			logger$4.error("Unrecognized body type", body);
+			logger$5.error("Unrecognized body type", body);
 			throw new RestError$2("Unrecognized body type", { request });
 		}
 	} else clientRequest.end();
@@ -27748,7 +27837,7 @@ function prepareRequestBody(request, useExpectContinue) {
 	if (!body || !request.onUploadProgress) return body;
 	const uploadReportStream = new ReportTransform(request.onUploadProgress);
 	uploadReportStream.on("error", (e) => {
-		logger$4.error("Error in upload progress", e);
+		logger$5.error("Error in upload progress", e);
 	});
 	if (isReadableStream(body)) pipeUploadStream(body, uploadReportStream, request);
 	else uploadReportStream.end(body);
@@ -27780,7 +27869,7 @@ var NodeHttpClient = class {
 		let timeoutId;
 		if (request.timeout > 0) timeoutId = setTimeout(() => {
 			const sanitizer = new Sanitizer();
-			logger$4.info(`request to '${sanitizer.sanitizeUrl(request.url)}' timed out. canceling...`);
+			logger$5.info(`request to '${sanitizer.sanitizeUrl(request.url)}' timed out. canceling...`);
 			abortController.abort();
 		}, request.timeout);
 		const acceptEncoding = request.headers.get("Accept-Encoding");
@@ -27812,7 +27901,7 @@ var NodeHttpClient = class {
 				setRequestCompletion(response, result.requestComplete);
 				const clearDisposer = setResponseBodyDisposer(response, result.disposeRequest);
 				result.requestComplete.then(clearDisposer).catch((error) => {
-					logger$4.warning("Error disposing request", error);
+					logger$5.warning("Error disposing request", error);
 				});
 			}
 			if ((typeof request.requestOverrides?.method === "string" ? request.requestOverrides.method.toUpperCase() : request.method) === "HEAD") {
@@ -27824,7 +27913,7 @@ var NodeHttpClient = class {
 			if (onDownloadProgress) {
 				const downloadReportStream = new ReportTransform(onDownloadProgress);
 				downloadReportStream.on("error", (e) => {
-					logger$4.error("Error in download progress", e);
+					logger$5.error("Error in download progress", e);
 				});
 				responseStream = pipeResponseStream(responseStream, downloadReportStream, abortController.signal);
 			}
@@ -27849,7 +27938,7 @@ var NodeHttpClient = class {
 				]).then(() => {
 					if (abortListener) requestAbortSignal.removeEventListener("abort", abortListener);
 				}).catch((e) => {
-					logger$4.warning("Error when cleaning up abortListener on httpRequest", e);
+					logger$5.warning("Error when cleaning up abortListener on httpRequest", e);
 				});
 			}
 		}
@@ -27903,16 +27992,16 @@ var NodeHttpClient = class {
 	getOrCreateAgent(request, isInsecure) {
 		const disableKeepAlive = request.disableKeepAlive;
 		if (isInsecure) {
-			if (disableKeepAlive) return http.globalAgent;
-			if (!this.cachedHttpAgent) this.cachedHttpAgent = new http.Agent({ keepAlive: true });
+			if (disableKeepAlive) return http$1.globalAgent;
+			if (!this.cachedHttpAgent) this.cachedHttpAgent = new http$1.Agent({ keepAlive: true });
 			return this.cachedHttpAgent;
 		} else {
-			if (disableKeepAlive && !request.tlsSettings) return https.globalAgent;
+			if (disableKeepAlive && !request.tlsSettings) return https$1.globalAgent;
 			const tlsSettings = request.tlsSettings ?? DEFAULT_TLS_SETTINGS;
 			let agent = this.cachedHttpsAgents.get(tlsSettings);
 			if (agent && agent.options.keepAlive === !disableKeepAlive) return agent;
-			logger$4.info("No cached TLS Agent exist, creating a new Agent");
-			agent = new https.Agent({
+			logger$5.info("No cached TLS Agent exist, creating a new Agent");
+			agent = new https$1.Agent({
 				keepAlive: !disableKeepAlive,
 				...tlsSettings
 			});
@@ -28023,7 +28112,7 @@ const logPolicyName = "logPolicy";
 * @param options - Options to configure logPolicy.
 */
 function logPolicy$1(options = {}) {
-	const logger = options.logger ?? logger$4.info;
+	const logger = options.logger ?? logger$5.info;
 	const sanitizer = new Sanitizer({
 		additionalAllowedHeaderNames: options.additionalAllowedHeaderNames,
 		additionalAllowedQueryParameters: options.additionalAllowedQueryParameters
@@ -29151,7 +29240,7 @@ var require_src = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 }));
 // node_modules/.pnpm/agent-base@9.0.0/node_modules/agent-base/dist/index.js
 const INTERNAL = Symbol("AgentBaseInternalState");
-var Agent$1 = class extends http$1.Agent {
+var Agent = class extends http.Agent {
 	constructor(opts) {
 		super(opts);
 		this[INTERNAL] = {};
@@ -29169,7 +29258,7 @@ var Agent$1 = class extends http$1.Agent {
 		return stack.split("\n").some((l) => l.indexOf("(https.js:") !== -1 || l.indexOf("node:https:") !== -1);
 	}
 	incrementSockets(name) {
-		if (this.maxSockets === Infinity && this.maxTotalSockets === Infinity) return null;
+		if (this.maxSockets === 1e400 && this.maxTotalSockets === 1e400) return null;
 		if (!this.sockets[name]) this.sockets[name] = [];
 		const fakeSocket = new net.Socket({ writable: false });
 		this.sockets[name].push(fakeSocket);
@@ -29187,7 +29276,7 @@ var Agent$1 = class extends http$1.Agent {
 		}
 	}
 	getName(options) {
-		if (this.isSecureEndpoint(options)) return Agent.prototype.getName.call(this, options);
+		if (this.isSecureEndpoint(options)) return Agent$1.prototype.getName.call(this, options);
 		return super.getName(options);
 	}
 	createSocket(req, options, cb) {
@@ -29346,7 +29435,7 @@ const setServernameFromNonIpHost = (options) => {
 * `https:` requests have their socket connection upgraded to TLS once
 * the connection to the proxy server has been established.
 */
-var HttpsProxyAgent = class extends Agent$1 {
+var HttpsProxyAgent = class extends Agent {
 	constructor(proxy, opts) {
 		super(opts);
 		this.options = { path: void 0 };
@@ -29488,7 +29577,7 @@ const debug = (0, import_src.default)("http-proxy-agent");
 * The `HttpProxyAgent` implements an HTTP Agent subclass that connects
 * to the specified "HTTP proxy server" in order to proxy HTTP requests.
 */
-var HttpProxyAgent = class extends Agent$1 {
+var HttpProxyAgent = class extends Agent {
 	constructor(proxy, opts) {
 		super(opts);
 		this.proxy = typeof proxy === "string" ? new URL$1(proxy) : proxy;
@@ -29660,7 +29749,7 @@ function getUrlFromProxySettings(settings) {
 function setProxyAgentOnRequest(request, cachedAgents, proxyUrl) {
 	if (request.agent) return;
 	const isInsecure = new URL(request.url).protocol !== "https:";
-	if (request.tlsSettings) logger$4.warning("TLS settings are not supported in combination with custom Proxy, certificates provided to the client will be ignored.");
+	if (request.tlsSettings) logger$5.warning("TLS settings are not supported in combination with custom Proxy, certificates provided to the client will be ignored.");
 	if (isInsecure) {
 		if (!cachedAgents.httpProxyAgent) cachedAgents.httpProxyAgent = new HttpProxyAgent(proxyUrl);
 		request.agent = cachedAgents.httpProxyAgent;
@@ -29739,7 +29828,7 @@ async function handleRedirect(next, response, maxRetries, allowCrossOriginRedire
 		if (!allowCrossOriginRedirects) {
 			const originalUrl = new URL(request.url);
 			if (url.origin !== originalUrl.origin) {
-				logger$4.verbose(`Skipping cross-origin redirect from ${originalUrl.origin} to ${url.origin}.`);
+				logger$5.verbose(`Skipping cross-origin redirect from ${originalUrl.origin} to ${url.origin}.`);
 				return response;
 			}
 		}
@@ -29905,7 +29994,7 @@ function createClientLogger(namespace) {
 	return context.createClientLogger(namespace);
 }
 // node_modules/.pnpm/@azure+core-rest-pipeline@1.23.0/node_modules/@azure/core-rest-pipeline/dist/esm/log.js
-const logger$3 = createClientLogger("core-rest-pipeline");
+const logger$4 = createClientLogger("core-rest-pipeline");
 // node_modules/.pnpm/@azure+core-rest-pipeline@1.23.0/node_modules/@azure/core-rest-pipeline/dist/esm/policies/logPolicy.js
 /**
 * A policy that logs all requests and responses.
@@ -29913,7 +30002,7 @@ const logger$3 = createClientLogger("core-rest-pipeline");
 */
 function logPolicy(options = {}) {
 	return logPolicy$1({
-		logger: logger$3.info,
+		logger: logger$4.info,
 		...options
 	});
 }
@@ -29943,7 +30032,7 @@ function getHeaderName() {
 */
 async function setPlatformSpecificData(map) {
 	if (process$1 && process$1.versions) {
-		const osInfo = `${os$1.type()} ${os$1.release()}; ${os$1.arch()}`;
+		const osInfo = `${os$2.type()} ${os$2.release()}; ${os$2.arch()}`;
 		const versions = process$1.versions;
 		if (versions.bun) map.set("Bun", `${versions.bun} (${osInfo})`);
 		else if (versions.deno) map.set("Deno", `${versions.deno} (${osInfo})`);
@@ -30502,7 +30591,7 @@ function tryCreateTracingClient() {
 			packageVersion: SDK_VERSION$1
 		});
 	} catch (e) {
-		logger$3.warning(`Error when creating the TracingClient: ${getErrorMessage(e)}`);
+		logger$4.warning(`Error when creating the TracingClient: ${getErrorMessage(e)}`);
 		return;
 	}
 }
@@ -30523,7 +30612,7 @@ function tryCreateSpan(tracingClient, request, spanAttributes) {
 			tracingContext: updatedOptions.tracingOptions.tracingContext
 		};
 	} catch (e) {
-		logger$3.warning(`Skipping creating a tracing span due to an error: ${getErrorMessage(e)}`);
+		logger$4.warning(`Skipping creating a tracing span due to an error: ${getErrorMessage(e)}`);
 		return;
 	}
 }
@@ -30536,7 +30625,7 @@ function tryProcessError(span, error) {
 		if (isRestError$1(error) && error.statusCode) span.setAttribute("http.status_code", error.statusCode);
 		span.end();
 	} catch (e) {
-		logger$3.warning(`Skipping tracing span processing due to an error: ${getErrorMessage(e)}`);
+		logger$4.warning(`Skipping tracing span processing due to an error: ${getErrorMessage(e)}`);
 	}
 }
 function tryProcessResponse(span, response) {
@@ -30547,7 +30636,7 @@ function tryProcessResponse(span, response) {
 		if (response.status >= 400) span.setStatus({ status: "error" });
 		span.end();
 	} catch (e) {
-		logger$3.warning(`Skipping tracing span processing due to an error: ${getErrorMessage(e)}`);
+		logger$4.warning(`Skipping tracing span processing due to an error: ${getErrorMessage(e)}`);
 	}
 }
 // node_modules/.pnpm/@azure+core-rest-pipeline@1.23.0/node_modules/@azure/core-rest-pipeline/dist/esm/util/wrapAbortSignal.js
@@ -30837,7 +30926,7 @@ async function authorizeRequestOnCaeChallenge(onChallengeOptions, caeClaims) {
 */
 function bearerTokenAuthenticationPolicy(options) {
 	const { credential, scopes, challengeCallbacks } = options;
-	const logger = options.logger || logger$3;
+	const logger = options.logger || logger$4;
 	const callbacks = {
 		authorizeRequest: challengeCallbacks?.authorizeRequest?.bind(challengeCallbacks) ?? defaultAuthorizeRequest,
 		authorizeRequestOnChallenge: challengeCallbacks?.authorizeRequestOnChallenge?.bind(challengeCallbacks)
@@ -32208,7 +32297,7 @@ function appendQueryParams(url, queryParams, sequenceParams, noOverwrite = false
 	return parsedUrl.toString();
 }
 // node_modules/.pnpm/@azure+core-client@1.11.2/node_modules/@azure/core-client/dist/esm/log.js
-const logger$2 = createClientLogger("core-client");
+const logger$3 = createClientLogger("core-client");
 // node_modules/.pnpm/@azure+core-client@1.11.2/node_modules/@azure/core-client/dist/esm/serviceClient.js
 /**
 * Initializes a new instance of the ServiceClient.
@@ -32243,7 +32332,7 @@ var ServiceClient = class {
 	constructor(options = {}) {
 		this._requestContentType = options.requestContentType;
 		this._endpoint = options.endpoint ?? options.baseUri;
-		if (options.baseUri) logger$2.warning("The baseUri option for SDK Clients has been deprecated, please use endpoint instead.");
+		if (options.baseUri) logger$3.warning("The baseUri option for SDK Clients has been deprecated, please use endpoint instead.");
 		this._allowInsecureConnection = options.allowInsecureConnection;
 		this._httpClient = options.httpClient || getCachedDefaultHttpClient$1();
 		this.pipeline = options.pipeline || createDefaultPipeline(options);
@@ -32764,7 +32853,7 @@ function convertHttpClient(requestPolicyClient) {
 		return toPipelineResponse(await requestPolicyClient.sendRequest(toWebResourceLike(request, { createProxy: true })));
 	} };
 }
-// node_modules/.pnpm/fast-xml-parser@5.12.0/node_modules/fast-xml-parser/src/util.js
+// node_modules/.pnpm/fast-xml-parser@5.12.1/node_modules/fast-xml-parser/src/util.js
 const regexName = /* @__PURE__ */ new RegExp("^[:A-Za-z_\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD][:A-Za-z_\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD\\-.\\d\\u00B7\\u0300-\\u036F\\u203F-\\u2040]*$");
 function getAllMatches(string, regex) {
 	const matches = [];
@@ -32803,7 +32892,7 @@ const criticalProperties = [
 	"constructor",
 	"prototype"
 ];
-// node_modules/.pnpm/fast-xml-parser@5.12.0/node_modules/fast-xml-parser/src/validator.js
+// node_modules/.pnpm/fast-xml-parser@5.12.1/node_modules/fast-xml-parser/src/validator.js
 const defaultOptions$2 = {
 	allowBooleanAttributes: false,
 	unpairedTags: []
@@ -32986,9 +33075,9 @@ function readAttributeStr(xmlData, i) {
 * and moving to the next starting position — one full backtrack per
 * position, which is quadratic in the length of the run.
 *
-* A single forward-only scan can never backtrack, so it can't be made slow
-* this way no matter how much whitespace the input contains — it's always
-* proportional to the length of the string, once.
+* The scan is forward-only: the cursor never moves backwards, so each
+* character is visited a constant number of times and the cost is linear
+* in the length of the string.
 *
 * Each returned token mirrors the shape the old regex match array had, so
 * the validation logic below (which reads token[1]..token[6]) didn't need
@@ -33015,7 +33104,7 @@ function scanAttributeTokens(attrStr) {
 		while (i < len && isWhiteSpace(attrStr[i])) i++;
 		if (i >= len) break;
 		if (attrStr[i] === "=") {
-			i = tokenStart + 1;
+			i++;
 			continue;
 		}
 		const leadingWs = attrStr.slice(tokenStart, i);
@@ -33633,7 +33722,7 @@ var EntityDecoder = class {
 		return this._applyNCRAction(effective, token, cp);
 	}
 };
-// node_modules/.pnpm/fast-xml-parser@5.12.0/node_modules/fast-xml-parser/src/xmlparser/OptionsBuilder.js
+// node_modules/.pnpm/fast-xml-parser@5.12.1/node_modules/fast-xml-parser/src/xmlparser/OptionsBuilder.js
 const defaultOnDangerousProperty = (name) => {
 	if (DANGEROUS_PROPERTY_NAMES.includes(name)) return "__" + name;
 	return name;
@@ -33705,7 +33794,7 @@ function normalizeProcessEntities(value, htmlEntities) {
 		enabled: value,
 		maxEntitySize: 1e4,
 		maxExpansionDepth: 1e4,
-		maxTotalExpansions: Infinity,
+		maxTotalExpansions: 1e400,
 		maxExpandedLength: 1e5,
 		maxEntityCount: 1e3,
 		allowedTags: null,
@@ -33716,7 +33805,7 @@ function normalizeProcessEntities(value, htmlEntities) {
 		enabled: value.enabled !== false,
 		maxEntitySize: Math.max(1, value.maxEntitySize ?? 1e4),
 		maxExpansionDepth: Math.max(1, value.maxExpansionDepth ?? 1e4),
-		maxTotalExpansions: Math.max(1, value.maxTotalExpansions ?? Infinity),
+		maxTotalExpansions: Math.max(1, value.maxTotalExpansions ?? 1e400),
 		maxExpandedLength: Math.max(1, value.maxExpandedLength ?? 1e5),
 		maxEntityCount: Math.max(1, value.maxEntityCount ?? 1e3),
 		allowedTags: value.allowedTags ?? null,
@@ -33759,7 +33848,7 @@ const buildOptions = function(options) {
 	});
 	return built;
 };
-// node_modules/.pnpm/fast-xml-parser@5.12.0/node_modules/fast-xml-parser/src/xmlparser/xmlNode.js
+// node_modules/.pnpm/fast-xml-parser@5.12.1/node_modules/fast-xml-parser/src/xmlparser/xmlNode.js
 let METADATA_SYMBOL$1;
 if (typeof Symbol !== "function") METADATA_SYMBOL$1 = "@@xmlMetadata";
 else METADATA_SYMBOL$1 = Symbol("XML Node Metadata");
@@ -33868,7 +33957,7 @@ const createValidator = (production, { xmlVersion = "1.0", asciiOnly = false, ma
 	};
 	return validator;
 };
-// node_modules/.pnpm/fast-xml-parser@5.12.0/node_modules/fast-xml-parser/src/xmlparser/DocTypeReader.js
+// node_modules/.pnpm/fast-xml-parser@5.12.1/node_modules/fast-xml-parser/src/xmlparser/DocTypeReader.js
 var DocTypeReader = class {
 	constructor(options, xmlVersion) {
 		this.suppressValidationErr = !options;
@@ -34395,7 +34484,7 @@ function parse_int(numStr, base) {
 * @returns {string|number|null} based on infinity option
 */
 function handleInfinity(str, num, options) {
-	const isPositive = num === Infinity;
+	const isPositive = num === 1e400;
 	switch (options.infinity.toLowerCase()) {
 		case "null": return null;
 		case "infinity": return num;
@@ -34403,7 +34492,7 @@ function handleInfinity(str, num, options) {
 		default: return str;
 	}
 }
-// node_modules/.pnpm/fast-xml-parser@5.12.0/node_modules/fast-xml-parser/src/ignoreAttributes.js
+// node_modules/.pnpm/fast-xml-parser@5.12.1/node_modules/fast-xml-parser/src/ignoreAttributes.js
 function getIgnoreAttributesFn$1(ignoreAttributes) {
 	if (typeof ignoreAttributes === "function") return ignoreAttributes;
 	if (Array.isArray(ignoreAttributes)) return (attrName) => {
@@ -36134,7 +36223,7 @@ function isUnsafe(value, context) {
 	for (const list of lists) if (matchList(value, list) !== null) return true;
 	return false;
 }
-// node_modules/.pnpm/fast-xml-parser@5.12.0/node_modules/fast-xml-parser/src/xmlparser/OrderedObjParser.js
+// node_modules/.pnpm/fast-xml-parser@5.12.1/node_modules/fast-xml-parser/src/xmlparser/OrderedObjParser.js
 /**
 * Extract raw attributes (without prefix) from prefixed attribute map
 * @param {object} prefixedAttrs - Attributes with prefix from buildAttributesMap
@@ -36254,7 +36343,10 @@ function resolveNameSpace(tagname) {
 	}
 	return tagname;
 }
-const attrsRegx = /* @__PURE__ */ new RegExp("([^\\s=]+)\\s*(=\\s*(['\"])([\\s\\S]*?)\\3)?", "gm");
+const attrsRegx = /([^\s=]+)\s*(=\s*(?:"([^"]*)"|'([^']*)'))?/gm;
+function attrValue(match) {
+	return match[3] !== void 0 ? match[3] : match[4];
+}
 function buildAttributesMap(attrStr, jPath, tagName, force = false) {
 	const options = this.options;
 	if (force === true || options.ignoreAttributes !== true && typeof attrStr === "string") {
@@ -36266,7 +36358,7 @@ function buildAttributesMap(attrStr, jPath, tagName, force = false) {
 		const rawAttrsForMatcher = {};
 		for (let i = 0; i < len; i++) {
 			const attrName = this.resolveNameSpace(matches[i][1]);
-			const oldVal = matches[i][4];
+			const oldVal = attrValue(matches[i]);
 			if (attrName.length && oldVal !== void 0) {
 				let val = oldVal;
 				if (options.trimValues) val = val.trim();
@@ -36286,7 +36378,7 @@ function buildAttributesMap(attrStr, jPath, tagName, force = false) {
 			if (attrName.length) {
 				if (options.transformAttributeName) aName = options.transformAttributeName(aName);
 				aName = sanitizeName(aName, options);
-				if (matches[i][4] !== void 0) {
+				if (attrValue(matches[i]) !== void 0) {
 					const oldVal = processedVals[i];
 					const newVal = options.attributeValueProcessor(attrName, oldVal, jPathStr);
 					if (newVal === null || newVal === void 0) attrs[aName] = oldVal;
@@ -36541,7 +36633,6 @@ function isItStopNode() {
 * @returns 
 */
 function tagExpWithClosingIndex(xmlData, i, closingChar = ">") {
-	let attrBoundary = 0;
 	const len = xmlData.length;
 	const closeCode0 = closingChar.charCodeAt(0);
 	const closeCode1 = closingChar.length > 1 ? closingChar.charCodeAt(1) : -1;
@@ -36549,10 +36640,10 @@ function tagExpWithClosingIndex(xmlData, i, closingChar = ">") {
 	let segmentStart = i;
 	for (let index = i; index < len; index++) {
 		const code = xmlData.charCodeAt(index);
-		if (attrBoundary) {
-			if (code === attrBoundary) attrBoundary = 0;
-		} else if (code === 34 || code === 39) attrBoundary = code;
-		else if (code === closeCode0) {
+		if (code === 34 || code === 39) {
+			index = xmlData.indexOf(xmlData[index], index + 1);
+			if (index === -1) return;
+		} else if (code === closeCode0) {
 			if (closeCode1 !== -1) {
 				if (xmlData.charCodeAt(index + 1) === closeCode1) {
 					result += xmlData.substring(segmentStart, index);
@@ -36568,7 +36659,7 @@ function tagExpWithClosingIndex(xmlData, i, closingChar = ">") {
 					index
 				};
 			}
-		} else if (code === 9 && !attrBoundary) {
+		} else if (code === 9) {
 			result += xmlData.substring(segmentStart, index) + " ";
 			segmentStart = index + 1;
 		}
@@ -36687,7 +36778,7 @@ function sanitizeName(name, options) {
 	else if (DANGEROUS_PROPERTY_NAMES.includes(name)) return options.onDangerousProperty(name);
 	return name;
 }
-// node_modules/.pnpm/fast-xml-parser@5.12.0/node_modules/fast-xml-parser/src/xmlparser/node2json.js
+// node_modules/.pnpm/fast-xml-parser@5.12.1/node_modules/fast-xml-parser/src/xmlparser/node2json.js
 const METADATA_SYMBOL = XmlNode.getMetaDataSymbol();
 /**
 * Helper function to strip attribute prefix from attribute map
@@ -36789,7 +36880,7 @@ function isLeafTag(obj, options) {
 	if (propCount === 1 && (obj[textNodeName] || typeof obj[textNodeName] === "boolean" || obj[textNodeName] === 0)) return true;
 	return false;
 }
-// node_modules/.pnpm/fast-xml-parser@5.12.0/node_modules/fast-xml-parser/src/xmlparser/XMLParser.js
+// node_modules/.pnpm/fast-xml-parser@5.12.1/node_modules/fast-xml-parser/src/xmlparser/XMLParser.js
 var XMLParser = class {
 	constructor(options) {
 		this.externalEntities = {};
@@ -36840,7 +36931,7 @@ var XMLParser = class {
 		return XmlNode.getMetaDataSymbol();
 	}
 };
-// node_modules/.pnpm/fast-xml-builder@1.3.1/node_modules/fast-xml-builder/src/util.js
+// node_modules/.pnpm/fast-xml-builder@1.3.2/node_modules/fast-xml-builder/src/util.js
 function valToStr(val) {
 	return typeof val === "number" && Object.is(val, -0) ? "-0" : String(val);
 }
@@ -36853,8 +36944,32 @@ function safeCdata(val) {
 function escapeAttribute(val) {
 	return valToStr(val).replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 }
-// node_modules/.pnpm/fast-xml-builder@1.3.1/node_modules/fast-xml-builder/src/orderedJs2Xml.js
-const EOL$2 = "\n";
+/**
+* Resolve a tag or attribute name through sanitizeName if configured.
+* Validation via xml-naming's qName is performed first; the sanitizeName
+* callback is invoked only when the name is invalid. If sanitizeName is
+* false (default), no validation occurs and the name is used as-is.
+*
+* @param {string}  name        - raw name from the JS object
+* @param {boolean} isAttribute - true when resolving an attribute name
+* @param {object}  options
+* @param {Matcher} matcher     - current matcher state (readonly from callback perspective)
+* @param {function} qNameValidator - function to validate tag names
+*/
+function resolveName(name, isAttribute, options, matcher, validator) {
+	if (!options.sanitizeName) return name;
+	const isPI = !isAttribute && name[0] === "?";
+	const bare = isPI ? name.slice(1) : name;
+	if (validator(bare)) return name;
+	const result = options.sanitizeName(bare, {
+		isAttribute,
+		matcher: matcher.readOnly()
+	});
+	if (typeof result !== "string" || !validator(result)) throw new Error(`sanitizeName returned an invalid XML name for "${bare}"`);
+	return isPI ? "?" + result : result;
+}
+// node_modules/.pnpm/fast-xml-builder@1.3.2/node_modules/fast-xml-builder/src/orderedJs2Xml.js
+const EOL = "\n";
 /**
 * Detect XML version from the first element of the ordered array input.
 * The first element must be a ?xml processing instruction with a version attribute.
@@ -36876,33 +36991,13 @@ function detectXmlVersionFromArray(jArray, options) {
 	return "1.0";
 }
 /**
-* Resolve a tag or attribute name through sanitizeName if configured.
-* Validation via xml-naming's qName is performed first; the sanitizeName
-* callback is invoked only when the name is invalid. If sanitizeName is
-* false (default), no validation occurs and the name is used as-is.
-*
-* @param {string}  name        - raw name from the JS object
-* @param {boolean} isAttribute - true when resolving an attribute name
-* @param {object}  options
-* @param {Matcher} matcher     - current matcher state (readonly from callback perspective)
-* @param {function} qNameValidator - function to validate tag names
-*/
-function resolveTagName$1(name, isAttribute, options, matcher, qNameValidator) {
-	if (!options.sanitizeName) return name;
-	if (qNameValidator(name)) return name;
-	return options.sanitizeName(name, {
-		isAttribute,
-		matcher: matcher.readOnly()
-	});
-}
-/**
 * @param {array} jArray
 * @param {any} options
 * @returns
 */
 function toXml(jArray, options) {
 	let indentation = "";
-	if (options.format) indentation = EOL$2;
+	if (options.format) indentation = EOL;
 	const stopNodeExpressions = [];
 	if (options.stopNodes && Array.isArray(options.stopNodes)) for (let i = 0; i < options.stopNodes.length; i++) {
 		const node = options.stopNodes[i];
@@ -36930,7 +37025,7 @@ function arrToStr(arr, options, indentation, matcher, stopNodeExpressions, qName
 		const tagObj = arr[i];
 		const rawTagName = propName(tagObj);
 		if (rawTagName === void 0) continue;
-		const tagName = rawTagName === options.textNodeName || rawTagName === options.cdataPropName || rawTagName === options.commentPropName || rawTagName[0] === "?" ? rawTagName : resolveTagName$1(rawTagName, false, options, matcher, qNameValidator);
+		const tagName = rawTagName === options.textNodeName || rawTagName === options.cdataPropName || rawTagName === options.commentPropName ? rawTagName : resolveName(rawTagName, false, options, matcher, qNameValidator);
 		const attrValues = extractAttributeValues(tagObj[":@"], options);
 		matcher.push(tagName, attrValues);
 		const isStopNode = checkStopNode(matcher, stopNodeExpressions);
@@ -36972,7 +37067,7 @@ function arrToStr(arr, options, indentation, matcher, stopNodeExpressions, qName
 		if (newIdentation !== "") newIdentation += options.indentBy;
 		const tagStart = indentation + `<${tagName}${attr_to_str(tagObj[":@"], options, isStopNode, matcher, qNameValidator)}`;
 		let tagValue;
-		if (isStopNode) tagValue = getRawContent(tagObj[rawTagName], options);
+		if (isStopNode) tagValue = getRawContent(tagObj[rawTagName], options, matcher.getDepth());
 		else tagValue = arrToStr(tagObj[rawTagName], options, newIdentation, matcher, stopNodeExpressions, qNameValidator);
 		if (options.unpairedTags.indexOf(tagName) !== -1) {
 			if (options.suppressUnpairedNode) xmlStr += tagStart + ">";
@@ -37010,7 +37105,8 @@ function extractAttributeValues(attrMap, options) {
 * Extract raw content from a stopNode without any processing
 * This preserves the content exactly as-is, including special characters
 */
-function getRawContent(arr, options) {
+function getRawContent(arr, options, depth = 0) {
+	if (options.maxNestedTags && depth > options.maxNestedTags) throw new Error("Maximum nested tags exceeded");
 	if (!Array.isArray(arr)) {
 		if (arr !== void 0 && arr !== null) return valToStr(arr);
 		return "";
@@ -37025,7 +37121,7 @@ function getRawContent(arr, options) {
 		else if (tagName && tagName[0] === "?") continue;
 		else if (tagName) {
 			const attStr = attr_to_str_raw(item[":@"], options);
-			const nestedContent = getRawContent(item[tagName], options);
+			const nestedContent = getRawContent(item[tagName], options, depth + 1);
 			if (!nestedContent || nestedContent.length === 0) content += `<${tagName}${attStr}/>`;
 			else content += `<${tagName}${attStr}>${nestedContent}</${tagName}>`;
 		}
@@ -37062,7 +37158,7 @@ function attr_to_str(attrMap, options, isStopNode, matcher, qNameValidator) {
 	if (attrMap && !options.ignoreAttributes) for (let attr in attrMap) {
 		if (!Object.prototype.hasOwnProperty.call(attrMap, attr)) continue;
 		const cleanAttrName = attr.substr(options.attributeNamePrefix.length);
-		const resolvedAttrName = isStopNode ? cleanAttrName : resolveTagName$1(cleanAttrName, true, options, matcher, qNameValidator);
+		const resolvedAttrName = isStopNode ? cleanAttrName : resolveName(cleanAttrName, true, options, matcher, qNameValidator);
 		let attrVal;
 		if (isStopNode) attrVal = attrMap[attr];
 		else {
@@ -37086,7 +37182,7 @@ function replaceEntitiesValue(textValue, options) {
 	}
 	return textValue;
 }
-// node_modules/.pnpm/fast-xml-builder@1.3.1/node_modules/fast-xml-builder/src/ignoreAttributes.js
+// node_modules/.pnpm/fast-xml-builder@1.3.2/node_modules/fast-xml-builder/src/ignoreAttributes.js
 function getIgnoreAttributesFn(ignoreAttributes) {
 	if (typeof ignoreAttributes === "function") return ignoreAttributes;
 	if (Array.isArray(ignoreAttributes)) return (attrName) => {
@@ -37097,7 +37193,7 @@ function getIgnoreAttributesFn(ignoreAttributes) {
 	};
 	return () => false;
 }
-// node_modules/.pnpm/fast-xml-builder@1.3.1/node_modules/fast-xml-builder/src/fxb.js
+// node_modules/.pnpm/fast-xml-builder@1.3.2/node_modules/fast-xml-builder/src/fxb.js
 const defaultOptions = {
 	attributeNamePrefix: "@_",
 	attributesGroupName: false,
@@ -37197,26 +37293,6 @@ function detectXmlVersionFromObj(jObj, options) {
 	}
 	return "1.0";
 }
-/**
-* Resolve a tag or attribute name through sanitizeName if configured.
-* Validation via xml-naming's qName is performed first; the sanitizeName
-* callback is invoked only when the name is invalid. If sanitizeName is
-* false (default), no validation occurs and the name is used as-is.
-*
-* @param {string}  name        - raw name from the JS object
-* @param {boolean} isAttribute - true when resolving an attribute name
-* @param {object}  options
-* @param {Matcher} matcher     - current matcher state (readonly from callback perspective)
-* @param {function} qNameValidator - function to validate tag names
-*/
-function resolveTagName(name, isAttribute, options, matcher, qNameValidator) {
-	if (!options.sanitizeName) return name;
-	if (qNameValidator(name)) return name;
-	return options.sanitizeName(name, {
-		isAttribute,
-		matcher: matcher.readOnly()
-	});
-}
 Builder.prototype.build = function(jObj) {
 	if (this.options.preserveOrder) return toXml(jObj, this.options);
 	else {
@@ -37235,7 +37311,7 @@ Builder.prototype.j2x = function(jObj, level, matcher, qNameValidator) {
 	const isCurrentStopNode = this.checkStopNode(matcher);
 	for (let key in jObj) {
 		if (!Object.prototype.hasOwnProperty.call(jObj, key)) continue;
-		const resolvedKey = key === this.options.textNodeName || key === this.options.cdataPropName || key === this.options.commentPropName || this.options.attributesGroupName && key === this.options.attributesGroupName || this.isAttribute(key) || key[0] === "?" ? key : resolveTagName(key, false, this.options, matcher, qNameValidator);
+		const resolvedKey = key === this.options.textNodeName || key === this.options.cdataPropName || key === this.options.commentPropName || this.options.attributesGroupName && key === this.options.attributesGroupName || this.isAttribute(key) ? key : resolveName(key, false, this.options, matcher, qNameValidator);
 		if (typeof jObj[key] === "undefined") {
 			if (this.isAttribute(key)) val += "";
 		} else if (jObj[key] === null) {
@@ -37247,7 +37323,7 @@ Builder.prototype.j2x = function(jObj, level, matcher, qNameValidator) {
 		else if (typeof jObj[key] !== "object") {
 			const attr = this.isAttribute(key);
 			if (attr && !this.ignoreAttributesFn(attr, jPath)) {
-				const resolvedAttr = resolveTagName(attr, true, this.options, matcher, qNameValidator);
+				const resolvedAttr = resolveName(attr, true, this.options, matcher, qNameValidator);
 				attrStr += this.buildAttrPairStr(resolvedAttr, valToStr(jObj[key]), isCurrentStopNode);
 			} else if (!attr) {
 				if (key === this.options.textNodeName) {
@@ -37303,7 +37379,7 @@ Builder.prototype.j2x = function(jObj, level, matcher, qNameValidator) {
 			const Ks = Object.keys(jObj[key]);
 			const L = Ks.length;
 			for (let j = 0; j < L; j++) {
-				const resolvedAttr = resolveTagName(Ks[j], true, this.options, matcher, qNameValidator);
+				const resolvedAttr = resolveName(Ks[j], true, this.options, matcher, qNameValidator);
 				attrStr += this.buildAttrPairStr(resolvedAttr, valToStr(jObj[key][Ks[j]]), isCurrentStopNode);
 			}
 		} else val += this.processTextOrObjNode(jObj[key], resolvedKey, level, matcher, qNameValidator);
@@ -37325,7 +37401,7 @@ function processTextOrObjNode(object, key, level, matcher, qNameValidator) {
 	const attrValues = this.extractAttributes(object);
 	matcher.push(key, attrValues);
 	if (this.checkStopNode(matcher)) {
-		const rawContent = this.buildRawContent(object);
+		const rawContent = this.buildRawContent(object, matcher.getDepth());
 		const attrStr = this.buildAttributesForStopNode(object);
 		matcher.pop();
 		return this.buildObjectNode(rawContent, key, attrStr, level);
@@ -37358,7 +37434,8 @@ Builder.prototype.extractAttributes = function(obj) {
 	}
 	return hasAttrs ? attrValues : null;
 };
-Builder.prototype.buildRawContent = function(obj) {
+Builder.prototype.buildRawContent = function(obj, depth = 0) {
+	if (this.options.maxNestedTags && depth >= this.options.maxNestedTags) throw new Error("Maximum nested tags exceeded");
 	if (typeof obj === "string") return obj;
 	if (typeof obj !== "object" || obj === null) return String(obj);
 	if (obj[this.options.textNodeName] !== void 0) return obj[this.options.textNodeName];
@@ -37372,13 +37449,13 @@ Builder.prototype.buildRawContent = function(obj) {
 		else if (Array.isArray(value)) {
 			for (let item of value) if (typeof item === "string" || typeof item === "number") content += `<${key}>${item}</${key}>`;
 			else if (typeof item === "object" && item !== null) {
-				const nestedContent = this.buildRawContent(item);
+				const nestedContent = this.buildRawContent(item, depth + 1);
 				const nestedAttrs = this.buildAttributesForStopNode(item);
 				if (nestedContent === "") content += `<${key}${nestedAttrs}/>`;
 				else content += `<${key}${nestedAttrs}>${nestedContent}</${key}>`;
 			}
 		} else if (typeof value === "object" && value !== null) {
-			const nestedContent = this.buildRawContent(value);
+			const nestedContent = this.buildRawContent(value, depth + 1);
 			const nestedAttrs = this.buildAttributesForStopNode(value);
 			if (nestedContent === "") content += `<${key}${nestedAttrs}/>`;
 			else content += `<${key}${nestedAttrs}>${nestedContent}</${key}>`;
@@ -37469,9 +37546,9 @@ function isAttribute(name) {
 	if (name.startsWith(this.options.attributeNamePrefix) && name !== this.options.textNodeName) return name.substr(this.attrPrefixLen);
 	else return false;
 }
-// node_modules/.pnpm/fast-xml-parser@5.12.0/node_modules/fast-xml-parser/src/xmlbuilder/json2xml.js
+// node_modules/.pnpm/fast-xml-parser@5.12.1/node_modules/fast-xml-parser/src/xmlbuilder/json2xml.js
 var json2xml_default = Builder;
-// node_modules/.pnpm/fast-xml-parser@5.12.0/node_modules/fast-xml-parser/src/fxp.js
+// node_modules/.pnpm/fast-xml-parser@5.12.1/node_modules/fast-xml-parser/src/fxp.js
 const XMLValidator = { validate };
 // node_modules/.pnpm/@azure+core-xml@1.6.1/node_modules/@azure/core-xml/dist/esm/xml.js
 function getCommonOptions(options) {
@@ -37541,7 +37618,7 @@ async function parseXML(str, opts = {}) {
 /**
 * The `@azure/logger` configuration for this package.
 */
-const logger$1 = createClientLogger("storage-blob");
+const logger$2 = createClientLogger("storage-blob");
 // node_modules/.pnpm/@azure+storage-common@12.5.0_@azure+core-client@1.11.2/node_modules/@azure/storage-common/dist/esm/BuffersStream.js
 /**
 * This class generates a readable stream from the data in an array of buffers.
@@ -37619,7 +37696,7 @@ var BuffersStream = class extends Readable {
 /**
 * maxBufferLength is max size of each buffer in the pooled buffers.
 */
-const maxBufferLength = buffer.constants.MAX_LENGTH;
+const maxBufferLength = buffer$1.constants.MAX_LENGTH;
 /**
 * This class provides a buffer container which conceptually has no hard size limit.
 * It accepts a capacity, an array of input buffers and the total length of input data.
@@ -37939,7 +38016,9 @@ var BufferScheduler = class {
 		if (!this.isError && this.resolveData() && !this.isStreamEnd) this.readable.resume();
 	}
 };
-// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0/node_modules/@azure/core-rest-pipeline/dist/esm/restError.js
+// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.1/node_modules/@azure/core-rest-pipeline/dist/esm/log.js
+const logger$1 = createClientLogger("core-rest-pipeline");
+// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.1/node_modules/@azure/core-rest-pipeline/dist/esm/restError.js
 /**
 * A custom error type for failed pipeline requests.
 */
@@ -37951,7 +38030,7 @@ const RestError = RestError$2;
 function isRestError(e) {
 	return isRestError$2(e);
 }
-// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0/node_modules/@azure/core-rest-pipeline/dist/esm/util/wrapAbortSignal.js
+// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.1/node_modules/@azure/core-rest-pipeline/dist/esm/util/wrapAbortSignal.js
 /**
 * Creates a native AbortSignal which reflects the state of the provided AbortSignalLike.
 * If the AbortSignalLike is already a native AbortSignal, it is returned as is.
@@ -37979,19 +38058,70 @@ function wrapAbortSignalLike(abortSignalLike) {
 		cleanup
 	};
 }
-// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.0/node_modules/@azure/core-rest-pipeline/dist/esm/defaultHttpClient.js
+// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.1/node_modules/@azure/core-rest-pipeline/dist/esm/util/cleanupOnCompletion.js
+/**
+* Runs the cleanup callback associated with the response and its request once they are complete.
+*/
+function cleanupOnRequestResponseCompletion(response, cleanup) {
+	const stream = response?.readableStreamBody;
+	const requestCompletion = response ? getRequestCompletion(response) : void 0;
+	const browserResponseCompletion = response ? getResponseBodyCompletion(response) : void 0;
+	let requestDone = requestCompletion === void 0;
+	let nodeResponseDone = !stream || !stream.readable;
+	let browserResponseDone = browserResponseCompletion === void 0;
+	let cleanedUp = false;
+	const cleanupIfComplete = () => {
+		if (cleanedUp || !requestDone || !nodeResponseDone || !browserResponseDone) return;
+		cleanedUp = true;
+		cleanup();
+	};
+	const onResponseComplete = () => {
+		stream?.removeListener("end", onResponseComplete);
+		stream?.removeListener("close", onResponseComplete);
+		stream?.removeListener("error", onResponseComplete);
+		nodeResponseDone = true;
+		try {
+			cleanupIfComplete();
+		} catch (error) {
+			logger$1.warning("Error cleaning up after response stream completion", error);
+		}
+	};
+	if (!nodeResponseDone && stream) {
+		stream.once("end", onResponseComplete);
+		stream.once("close", onResponseComplete);
+		stream.once("error", onResponseComplete);
+	}
+	if (requestCompletion) requestCompletion.then(() => {
+		requestDone = true;
+		return cleanupIfComplete();
+	}).catch((error) => {
+		logger$1.warning("Error cleaning up after request completion", error);
+	});
+	if (browserResponseCompletion) browserResponseCompletion.then(() => {
+		browserResponseDone = true;
+		return cleanupIfComplete();
+	}).catch((error) => {
+		logger$1.warning("Error cleaning up after response body completion", error);
+	});
+	cleanupIfComplete();
+}
+// node_modules/.pnpm/@azure+core-rest-pipeline@1.25.1/node_modules/@azure/core-rest-pipeline/dist/esm/defaultHttpClient.js
 /**
 * Create the correct HttpClient for the current environment.
 */
 function createDefaultHttpClient() {
 	const client = createDefaultHttpClient$2();
 	return { async sendRequest(request) {
-		const { abortSignal, cleanup } = request.abortSignal ? wrapAbortSignalLike(request.abortSignal) : {};
+		const originalAbortSignal = request.abortSignal;
+		const { abortSignal, cleanup } = originalAbortSignal ? wrapAbortSignalLike(originalAbortSignal) : {};
+		let response;
 		try {
 			request.abortSignal = abortSignal;
-			return await client.sendRequest(request);
+			response = await client.sendRequest(request);
+			return response;
 		} finally {
-			cleanup?.();
+			request.abortSignal = originalAbortSignal;
+			if (cleanup) cleanupOnRequestResponseCompletion(response, cleanup);
 		}
 	} };
 }
@@ -39656,7 +39786,7 @@ function getCoreClientOptions(pipeline) {
 			loggingOptions: {
 				additionalAllowedHeaderNames: StorageBlobLoggingAllowedHeaderNames,
 				additionalAllowedQueryParameters: StorageBlobLoggingAllowedQueryParameters,
-				logger: logger$1.info
+				logger: logger$2.info
 			},
 			userAgentOptions: { userAgentPrefix },
 			serializationOptions: {
@@ -55085,7 +55215,7 @@ async function streamToBuffer(stream, buffer, offset, end, encoding) {
 */
 async function readStreamToLocalFile(rs, file) {
 	return new Promise((resolve, reject) => {
-		const ws = fs.createWriteStream(file);
+		const ws = fs$3.createWriteStream(file);
 		rs.on("error", (err) => {
 			reject(err);
 		});
@@ -55101,8 +55231,8 @@ async function readStreamToLocalFile(rs, file) {
 *
 * Promisified version of fs.stat().
 */
-const fsStat = util.promisify(fs.stat);
-const fsCreateReadStream = fs.createReadStream;
+const fsStat = util$1.promisify(fs$3.stat);
+const fsCreateReadStream = fs$3.createReadStream;
 // node_modules/.pnpm/@azure+storage-blob@12.31.0/node_modules/@azure/storage-blob/dist/esm/Clients.js
 /**
 * A BlobClient represents a URL to an Azure Storage blob; the blob may be a block blob,
@@ -56842,7 +56972,7 @@ var BlockBlobClient = class BlockBlobClient extends BlobClient {
 			return this.uploadSeekableInternal((offset, count) => {
 				return () => fsCreateReadStream(filePath, {
 					autoClose: true,
-					end: count ? offset + count - 1 : Infinity,
+					end: count ? offset + count - 1 : 1e400,
 					start: offset
 				});
 			}, size, {
@@ -57941,7 +58071,7 @@ var __awaiter$4 = function(thisArg, _arguments, P, generator) {
 */
 function pipeResponseToStream(response, output) {
 	return __awaiter$4(this, void 0, void 0, function* () {
-		yield util$1.promisify(stream.pipeline)(response.message, output);
+		yield util.promisify(stream.pipeline)(response.message, output);
 	});
 }
 /**
@@ -58044,7 +58174,7 @@ var DownloadProgress = class {
 */
 function downloadCacheHttpClient(archiveLocation, archivePath) {
 	return __awaiter$4(this, void 0, void 0, function* () {
-		const writeStream = fs$3.createWriteStream(archivePath);
+		const writeStream = fs$2.createWriteStream(archivePath);
 		const httpClient = new HttpClient("actions/cache");
 		const downloadResponse = yield retryHttpClientResponse("downloadCache", () => __awaiter$4(this, void 0, void 0, function* () {
 			return httpClient.get(archiveLocation);
@@ -58071,7 +58201,7 @@ function downloadCacheHttpClient(archiveLocation, archivePath) {
 function downloadCacheHttpClientConcurrent(archiveLocation, archivePath, options) {
 	return __awaiter$4(this, void 0, void 0, function* () {
 		var _a;
-		const archiveDescriptor = yield fs$3.promises.open(archivePath, "w");
+		const archiveDescriptor = yield fs$2.promises.open(archivePath, "w");
 		const httpClient = new HttpClient("actions/cache", void 0, {
 			socketTimeout: options.timeoutInMs,
 			keepAlive: true
@@ -58166,9 +58296,9 @@ function downloadCacheStorageSDK(archiveLocation, archivePath, options) {
 			debug$3("Unable to determine content length, downloading file with http-client...");
 			yield downloadCacheHttpClient(archiveLocation, archivePath);
 		} else {
-			const maxSegmentSize = Math.min(134217728, buffer$1.constants.MAX_LENGTH);
+			const maxSegmentSize = Math.min(134217728, buffer.constants.MAX_LENGTH);
 			const downloadProgress = new DownloadProgress(contentLength);
-			const fd = fs$3.openSync(archivePath, "w");
+			const fd = fs$2.openSync(archivePath, "w");
 			try {
 				downloadProgress.startDisplayTimer();
 				const controller = new AbortController();
@@ -58185,11 +58315,11 @@ function downloadCacheStorageSDK(archiveLocation, archivePath, options) {
 					if (result === "timeout") {
 						controller.abort();
 						throw new Error("Aborting cache download as the download time exceeded the timeout.");
-					} else if (Buffer.isBuffer(result)) fs$3.writeFileSync(fd, result);
+					} else if (Buffer.isBuffer(result)) fs$2.writeFileSync(fd, result);
 				}
 			} finally {
 				downloadProgress.stopDisplayTimer();
-				fs$3.closeSync(fd);
+				fs$2.closeSync(fd);
 			}
 		}
 	});
@@ -58502,7 +58632,7 @@ function uploadFile(httpClient, cacheId, archivePath, options) {
 	return __awaiter$3(this, void 0, void 0, function* () {
 		const fileSize = getArchiveFileSizeInBytes(archivePath);
 		const resourceUrl = getCacheApiUrl(`caches/${cacheId.toString()}`);
-		const fd = fs$3.openSync(archivePath, "r");
+		const fd = fs$2.openSync(archivePath, "r");
 		const uploadOptions = getUploadOptions(options);
 		const concurrency = assertDefined("uploadConcurrency", uploadOptions.uploadConcurrency);
 		const maxChunkSize = assertDefined("uploadChunkSize", uploadOptions.uploadChunkSize);
@@ -58516,7 +58646,7 @@ function uploadFile(httpClient, cacheId, archivePath, options) {
 					const start = offset;
 					const end = offset + chunkSize - 1;
 					offset += maxChunkSize;
-					yield uploadChunk(httpClient, resourceUrl, () => fs$3.createReadStream(archivePath, {
+					yield uploadChunk(httpClient, resourceUrl, () => fs$2.createReadStream(archivePath, {
 						fd,
 						start,
 						end,
@@ -58527,7 +58657,7 @@ function uploadFile(httpClient, cacheId, archivePath, options) {
 				}
 			})));
 		} finally {
-			fs$3.closeSync(fd);
+			fs$2.closeSync(fd);
 		}
 	});
 }
@@ -60334,6 +60464,12 @@ var require_reflection_json_reader = /* @__PURE__ */ __commonJSMin(((exports) =>
 						if (json === null) return "";
 						if (typeof json !== "string") {
 							e = "extra whitespace";
+							break;
+						}
+						try {
+							encodeURIComponent(json);
+						} catch (e) {
+							e = "invalid UTF8";
 							break;
 						}
 						return json;
@@ -64530,7 +64666,7 @@ function generateManifestPath(imageName, imageTag, targetPlatformString, digest)
 */
 async function writeManifestToFile(manifest, manifestPath) {
 	try {
-		await fs$1.writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+		await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2));
 		return true;
 	} catch (error) {
 		warning(`Failed to save manifest to ${manifestPath}: ${String(error)}`);
@@ -64545,7 +64681,7 @@ async function writeManifestToFile(manifest, manifestPath) {
 */
 async function readManifestFromFile(manifestPath) {
 	try {
-		const manifestJson = await fs$1.readFile(manifestPath, "utf8");
+		const manifestJson = await fs.readFile(manifestPath, "utf8");
 		return JSON.parse(manifestJson);
 	} catch (error) {
 		debug$3(`Failed to load manifest from ${manifestPath}: ${String(error)}`);
