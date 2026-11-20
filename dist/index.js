@@ -7,32 +7,29 @@ import { constants, existsSync, promises, writeFileSync } from "fs";
 import * as path$2 from "path";
 import * as http from "http";
 import * as https from "https";
-import { Agent as Agent$1 } from "https";
-import * as net from "net";
-import * as tls from "tls";
-import * as events from "events";
-import { EventEmitter, once } from "events";
 import assert, { ok } from "assert";
-import * as util from "util";
-import http$1 from "node:http";
-import { Readable, Transform, finished } from "node:stream";
-import buffer$1 from "node:buffer";
-import util$1, { inspect, types as types$1 } from "node:util";
-import zlib from "node:zlib";
-import { createHmac } from "node:crypto";
-import * as child from "child_process";
 import { setTimeout as setTimeout$1 } from "timers";
-import fs$3, * as fs$1 from "node:fs";
-import * as fs from "node:fs/promises";
-import * as path from "node:path";
-import * as stream from "stream";
-import { Readable as Readable$1 } from "stream";
+import * as util from "util";
 import { URL as URL$1 } from "url";
 import os$2, { EOL as EOL$2 } from "node:os";
+import util$1, { inspect, types as types$1 } from "node:util";
 import process$1 from "node:process";
-import https$1 from "node:https";
+import { Readable, Transform, finished } from "node:stream";
 import * as buffer from "buffer";
 import { Buffer as Buffer$1 } from "buffer";
+import * as child from "child_process";
+import { createHmac } from "node:crypto";
+import * as events from "events";
+import { EventEmitter } from "events";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
+import buffer$1 from "node:buffer";
+import * as stream from "stream";
+import { Readable as Readable$1 } from "stream";
+import http$1 from "node:http";
+import https$1 from "node:https";
+import zlib from "node:zlib";
+import fs$3, * as fs$1 from "node:fs";
 // \0rolldown/runtime.js
 var __create = Object.create;
 var __defProp = Object.defineProperty;
@@ -193,8 +190,7 @@ function getProxyUrl(reqUrl) {
 }
 function checkBypass(reqUrl) {
 	if (!reqUrl.hostname) return false;
-	const reqHost = reqUrl.hostname;
-	if (isLoopbackAddress(reqHost)) return true;
+	if (isLoopbackAddress(reqUrl.hostname)) return true;
 	const noProxy = process.env["no_proxy"] || process.env["NO_PROXY"] || "";
 	if (!noProxy) return false;
 	let reqPort;
@@ -1977,7 +1973,7 @@ var require_dispatcher_base = /* @__PURE__ */ __commonJSMin(((exports, module) =
 		get webSocketOptions() {
 			return {
 				maxFragments: this[kWebSocketOptions].maxFragments ?? 131072,
-				maxPayloadSize: this[kWebSocketOptions].maxPayloadSize ?? 134217728
+				maxPayloadSize: this[kWebSocketOptions].maxPayloadSize ?? 0x8000000
 			};
 		}
 		get eventSourceOptions() {
@@ -17842,7 +17838,7 @@ function isDebug() {
 * Writes debug message to user log
 * @param message debug message
 */
-function debug$3(message) {
+function debug(message) {
 	issueCommand("debug", {}, message);
 }
 /**
@@ -22328,17 +22324,17 @@ function getComposeServicesFromFiles(composeFilePaths, excludedImagePatterns) {
 		try {
 			const composeDefinition = load(fs$1.readFileSync(currentComposeFile, "utf8"), { schema: COMPOSE_FILE_SCHEMA });
 			if (!composeDefinition) {
-				debug$3(`Empty or invalid YAML file: ${currentComposeFile}`);
+				debug(`Empty or invalid YAML file: ${currentComposeFile}`);
 				return [];
 			}
 			if (!composeDefinition.services) {
-				debug$3(`No services section found in ${currentComposeFile}`);
+				debug(`No services section found in ${currentComposeFile}`);
 				return [];
 			}
 			return Object.values(composeDefinition.services);
 		} catch (yamlParsingError) {
 			if (yamlParsingError instanceof YAMLException && yamlParsingError.reason === EMPTY_DOCUMENT_REASON) {
-				debug$3(`Empty or invalid YAML file: ${currentComposeFile}`);
+				debug(`Empty or invalid YAML file: ${currentComposeFile}`);
 				return [];
 			}
 			warning(`Failed to parse ${currentComposeFile}: ${String(yamlParsingError)}`);
@@ -22369,23 +22365,23 @@ function getOptions(copy) {
 	if (copy) {
 		if (typeof copy.followSymbolicLinks === "boolean") {
 			result.followSymbolicLinks = copy.followSymbolicLinks;
-			debug$3(`followSymbolicLinks '${result.followSymbolicLinks}'`);
+			debug(`followSymbolicLinks '${result.followSymbolicLinks}'`);
 		}
 		if (typeof copy.implicitDescendants === "boolean") {
 			result.implicitDescendants = copy.implicitDescendants;
-			debug$3(`implicitDescendants '${result.implicitDescendants}'`);
+			debug(`implicitDescendants '${result.implicitDescendants}'`);
 		}
 		if (typeof copy.matchDirectories === "boolean") {
 			result.matchDirectories = copy.matchDirectories;
-			debug$3(`matchDirectories '${result.matchDirectories}'`);
+			debug(`matchDirectories '${result.matchDirectories}'`);
 		}
 		if (typeof copy.omitBrokenSymbolicLinks === "boolean") {
 			result.omitBrokenSymbolicLinks = copy.omitBrokenSymbolicLinks;
-			debug$3(`omitBrokenSymbolicLinks '${result.omitBrokenSymbolicLinks}'`);
+			debug(`omitBrokenSymbolicLinks '${result.omitBrokenSymbolicLinks}'`);
 		}
 		if (typeof copy.excludeHiddenFiles === "boolean") {
 			result.excludeHiddenFiles = copy.excludeHiddenFiles;
-			debug$3(`excludeHiddenFiles '${result.excludeHiddenFiles}'`);
+			debug(`excludeHiddenFiles '${result.excludeHiddenFiles}'`);
 		}
 	}
 	return result;
@@ -24513,7 +24509,7 @@ var DefaultGlobber = class DefaultGlobber {
 			}
 			const stack = [];
 			for (const searchPath of getSearchPaths(patterns)) {
-				debug$3(`Search path '${searchPath}'`);
+				debug(`Search path '${searchPath}'`);
 				try {
 					yield __await(fs$2.promises.lstat(searchPath));
 				} catch (err) {
@@ -24566,7 +24562,7 @@ var DefaultGlobber = class DefaultGlobber {
 			} catch (err) {
 				if (err.code === "ENOENT") {
 					if (options.omitBrokenSymbolicLinks) {
-						debug$3(`Broken symlink '${item.path}'`);
+						debug(`Broken symlink '${item.path}'`);
 						return;
 					}
 					throw new Error(`No information found for the path '${item.path}'. This may indicate a broken symbolic link.`);
@@ -24578,7 +24574,7 @@ var DefaultGlobber = class DefaultGlobber {
 				const realPath = yield fs$2.promises.realpath(item.path);
 				while (traversalChain.length >= item.level) traversalChain.pop();
 				if (traversalChain.some((x) => x === realPath)) {
-					debug$3(`Symlink cycle detected for path '${item.path}' and realpath '${realPath}'`);
+					debug(`Symlink cycle detected for path '${item.path}' and realpath '${realPath}'`);
 					return;
 				}
 				traversalChain.push(realPath);
@@ -24633,7 +24629,7 @@ var require_constants = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 		MAX_SAFE_COMPONENT_LENGTH: 16,
 		MAX_SAFE_BUILD_LENGTH: 250,
 		MAX_SAFE_INTEGER: Number.MAX_SAFE_INTEGER || 
-		/* istanbul ignore next */ 9007199254740991,
+		/* istanbul ignore next */ 0x1fffffffffffff,
 		WHITESPACE_CHARACTERS: [
 			"	",
 			"\n",
@@ -26450,7 +26446,7 @@ function resolvePaths(patterns) {
 				_e = false;
 				const file = _c;
 				const relativeFile = path$2.relative(workspace, file).replace(new RegExp(`\\${path$2.sep}`, "g"), "/");
-				debug$3(`Matched: ${relativeFile}`);
+				debug(`Matched: ${relativeFile}`);
 				if (relativeFile === "") paths.push(".");
 				else paths.push(`${relativeFile}`);
 			}
@@ -26475,7 +26471,7 @@ function getVersion(app_1) {
 	return __awaiter$7(this, arguments, void 0, function* (app, additionalArgs = []) {
 		let versionOutput = "";
 		additionalArgs.push("--version");
-		debug$3(`Checking ${app} ${additionalArgs.join(" ")}`);
+		debug(`Checking ${app} ${additionalArgs.join(" ")}`);
 		try {
 			yield exec(`${app}`, additionalArgs, {
 				ignoreReturnCode: true,
@@ -26486,17 +26482,17 @@ function getVersion(app_1) {
 				}
 			});
 		} catch (err) {
-			debug$3(err.message);
+			debug(err.message);
 		}
 		versionOutput = versionOutput.trim();
-		debug$3(versionOutput);
+		debug(versionOutput);
 		return versionOutput;
 	});
 }
 function getCompressionMethod() {
 	return __awaiter$7(this, void 0, void 0, function* () {
 		const versionOutput = yield getVersion("zstd", ["--quiet"]);
-		debug$3(`zstd version: ${import_semver.clean(versionOutput)}`);
+		debug(`zstd version: ${import_semver.clean(versionOutput)}`);
 		if (versionOutput === "") return CompressionMethod.Gzip;
 		else return CompressionMethod.ZstdWithoutLong;
 	});
@@ -26526,7 +26522,7 @@ function getRuntimeToken() {
 	if (!token) throw new Error("Unable to get the ACTIONS_RUNTIME_TOKEN env variable");
 	return token;
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/abort-controller/AbortError.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/abort-controller/AbortError.js
 /**
 * This error is thrown when an asynchronous operation has been aborted.
 * Check for this error by testing the `name` that the name property of the
@@ -26562,11 +26558,11 @@ var AbortError$1 = class extends Error {
 		this.name = "AbortError";
 	}
 };
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/logger/log.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/logger/log.js
 function log(message, ...args) {
 	process$1.stderr.write(`${util$1.format(message, ...args)}${EOL$2}`);
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/env.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/env.js
 /**
 * Returns the value of the specified environment variable.
 *
@@ -26577,7 +26573,7 @@ function getEnvironmentVariable(name) {
 }
 typeof process$1.versions.deno === "string" && process$1.versions.deno.length;
 typeof process$1.versions.bun === "string" && process$1.versions.bun.length;
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/logger/debug.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/logger/debug.js
 const debugEnvVariable = getEnvironmentVariable("DEBUG");
 let enabledString;
 let enabledNamespaces = [];
@@ -26698,7 +26694,7 @@ function extend(namespace) {
 	newDebugger.log = this.log;
 	return newDebugger;
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/logger/logger.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/logger/logger.js
 const TYPESPEC_RUNTIME_LOG_LEVELS = [
 	"verbose",
 	"info",
@@ -26789,7 +26785,7 @@ context$1.logger;
 function createClientLogger$1(namespace) {
 	return context$1.createClientLogger(namespace);
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/httpHeaders.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/httpHeaders.js
 function normalizeName(name) {
 	return name.toLowerCase();
 }
@@ -26873,7 +26869,7 @@ var HttpHeadersImpl = class {
 function createHttpHeaders$1(rawHeaders) {
 	return new HttpHeadersImpl(rawHeaders);
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/util/uuidUtils.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/util/uuidUtils.js
 /**
 * Generated Universally Unique Identifier
 *
@@ -26882,7 +26878,7 @@ function createHttpHeaders$1(rawHeaders) {
 function randomUUID$1() {
 	return globalThis.crypto.randomUUID();
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/pipelineRequest.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/pipelineRequest.js
 var PipelineRequestImpl = class {
 	url;
 	method;
@@ -26933,7 +26929,7 @@ var PipelineRequestImpl = class {
 function createPipelineRequest$1(options) {
 	return new PipelineRequestImpl(options);
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/pipeline.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/pipeline.js
 const ValidPhaseNames = /* @__PURE__ */ new Set([
 	"Deserialize",
 	"Serialize",
@@ -27131,7 +27127,7 @@ var HttpPipeline = class HttpPipeline {
 function createEmptyPipeline$1() {
 	return HttpPipeline.create();
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/util/object.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/util/object.js
 /**
 * Helper to determine when an input is a generic JS object.
 * @returns true when input is an object type that is not null, Array, RegExp, or Date.
@@ -27139,7 +27135,7 @@ function createEmptyPipeline$1() {
 function isObject(input) {
 	return typeof input === "object" && input !== null && !Array.isArray(input) && !(input instanceof RegExp) && !(input instanceof Date);
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/util/error.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/util/error.js
 /**
 * Typeguard for an error object shape (has name and message)
 * @param e - Something caught by a catch clause.
@@ -27152,9 +27148,9 @@ function isError$1(e) {
 	}
 	return false;
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/util/inspect.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/util/inspect.js
 const custom = inspect.custom;
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/util/sanitizer.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/util/sanitizer.js
 const RedactedString = "REDACTED";
 const defaultAllowedHeaderNames = [
 	"x-ms-client-request-id",
@@ -27263,7 +27259,7 @@ var Sanitizer = class {
 		return sanitized;
 	}
 };
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/restError.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/restError.js
 const errorSanitizer = new Sanitizer();
 /**
 * A custom error type for failed pipeline requests.
@@ -27343,7 +27339,7 @@ function isRestError$2(e) {
 	if (e instanceof RestError$2) return true;
 	return isError$1(e) && e.name === "RestError";
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/util/bytesEncoding.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/util/bytesEncoding.js
 /**
 * The helper that transforms bytes with specific character encoding into string
 * @param bytes - the uint8array bytes
@@ -27362,9 +27358,9 @@ function uint8ArrayToString$1(bytes, format) {
 function stringToUint8Array$1(value, format) {
 	return Buffer.from(value, format);
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/log.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/log.js
 const logger$5 = createClientLogger$1("ts-http-runtime");
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/util/requestBodyHeaders.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/util/requestBodyHeaders.js
 /**
 * Converts a flat `[name, value, ...]` raw header array to `[name, value]` pairs,
 * or returns an existing pair array unchanged, preserving order and duplicates.
@@ -27456,7 +27452,7 @@ function removeExpectContinueHeader(request) {
 function removeRequestBodyHeaders(request) {
 	stripRequestBodyHeaders(request, true);
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/util/nodeExpectContinue.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/util/nodeExpectContinue.js
 const EXPECT_CONTINUE_TIMEOUT_IN_MS = 1e3;
 function getHeaderValues(headers, name) {
 	if (Array.isArray(headers)) return getHeaderPairs(headers).filter(([key]) => typeof key === "string" && key.toLowerCase() === name).flatMap(([, value]) => Array.isArray(value) ? value : [value]);
@@ -27603,7 +27599,7 @@ function createExpectContinueRequest(options) {
 	if (request.socket) onSocket();
 	else request.once("socket", onSocket);
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/util/responseBody.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/util/responseBody.js
 const responseBodySources = /* @__PURE__ */ new WeakMap();
 const responseBodyDisposers = /* @__PURE__ */ new WeakMap();
 const requestCompletions = /* @__PURE__ */ new WeakMap();
@@ -27720,7 +27716,7 @@ async function disposeResponseBody(response) {
 		logger$5.warning("Error disposing response body", error);
 	}
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/nodeHttpClient.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/nodeHttpClient.js
 const DEFAULT_TLS_SETTINGS = {};
 function isReadableStream(body) {
 	return typeof body === "object" && body !== null && "pipe" in body && typeof body.pipe === "function";
@@ -28095,14 +28091,14 @@ function getBodyLength(body) {
 function createNodeHttpClient() {
 	return new NodeHttpClient();
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/defaultHttpClient.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/defaultHttpClient.js
 /**
 * Create the correct HttpClient for the current environment.
 */
 function createDefaultHttpClient$2() {
 	return createNodeHttpClient();
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/policies/logPolicy.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/policies/logPolicy.js
 /**
 * The programmatic identifier of the logPolicy.
 */
@@ -28129,7 +28125,7 @@ function logPolicy$1(options = {}) {
 		}
 	};
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/util/random.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/util/random.js
 /**
 * Returns a random integer value between a lower and upper bound,
 * inclusive of both bounds.
@@ -28143,7 +28139,7 @@ function getRandomIntegerInclusive(min, max) {
 	max = Math.floor(max);
 	return Math.floor(Math.random() * (max - min + 1)) + min;
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/util/delay.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/util/delay.js
 /**
 * Calculates the delay interval for retry attempts using exponential delay with jitter.
 * @param retryAttempt - The current retry attempt number.
@@ -28155,7 +28151,7 @@ function calculateRetryDelay(retryAttempt, config) {
 	const clampedDelay = Math.min(config.maxRetryDelayInMs, exponentialDelay);
 	return { retryAfterInMs: clampedDelay / 2 + getRandomIntegerInclusive(0, clampedDelay / 2) };
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/util/helpers.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/util/helpers.js
 const StandardAbortMessage$1 = "The operation was aborted.";
 /**
 * A wrapper for setTimeout that resolves a promise after delayInMs milliseconds.
@@ -28200,7 +28196,7 @@ function parseHeaderValueAsNumber(response, headerName) {
 	if (Number.isNaN(valueAsNum)) return;
 	return valueAsNum;
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/retryStrategies/throttlingRetryStrategy.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/retryStrategies/throttlingRetryStrategy.js
 /**
 * The header that comes back from services representing
 * the amount of time (minimum) to wait to retry (in seconds or timestamp after which we can retry).
@@ -28259,7 +28255,7 @@ function throttlingRetryStrategy() {
 		}
 	};
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/retryStrategies/exponentialRetryStrategy.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/retryStrategies/exponentialRetryStrategy.js
 const DEFAULT_CLIENT_RETRY_INTERVAL = 1e3;
 const DEFAULT_CLIENT_MAX_RETRY_INTERVAL = 64e3;
 /**
@@ -28301,7 +28297,7 @@ function isSystemError(err) {
 	if (!err) return false;
 	return err.code === "ETIMEDOUT" || err.code === "ESOCKETTIMEDOUT" || err.code === "ECONNREFUSED" || err.code === "ECONNRESET" || err.code === "ENOENT" || err.code === "ENOTFOUND";
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/policies/retryPolicy.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/policies/retryPolicy.js
 const retryPolicyLogger = createClientLogger$1("ts-http-runtime retryPolicy");
 /**
 * The programmatic identifier of the retryPolicy.
@@ -28384,7 +28380,7 @@ function retryPolicy(strategies, options = { maxRetries: 3 }) {
 		}
 	};
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/policies/defaultRetryPolicy.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/policies/defaultRetryPolicy.js
 /**
 * Name of the {@link defaultRetryPolicy}
 */
@@ -28401,7 +28397,7 @@ function defaultRetryPolicy$1(options = {}) {
 		sendRequest: retryPolicy([throttlingRetryStrategy(), exponentialRetryStrategy(options)], { maxRetries: options.maxRetries ?? 3 }).sendRequest
 	};
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/formData.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/formData.js
 /**
 * If the request body is a native FormData, convert it to our FormDataMap
 * representation and clear the body. Node.js's HTTP stack doesn't handle
@@ -28420,7 +28416,7 @@ function convertBodyToFormDataMap(body) {
 		return formDataMap;
 	}
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/policies/formDataPolicy.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/policies/formDataPolicy.js
 /**
 * The programmatic identifier of the formDataPolicy.
 */
@@ -28475,7 +28471,7 @@ async function prepareFormData(formData, request) {
 	}
 	request.multipartBody = { parts };
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/policies/agentPolicy.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/policies/agentPolicy.js
 /**
 * Name of the Agent Policy
 */
@@ -28492,7 +28488,7 @@ function agentPolicy$1(agent) {
 		}
 	};
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/policies/tlsPolicy.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/policies/tlsPolicy.js
 /**
 * Name of the TLS Policy
 */
@@ -29238,424 +29234,551 @@ var require_src = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	if (typeof process === "undefined" || process.type === "renderer" || process.browser === true || process.__nwjs) module.exports = require_browser();
 	else module.exports = require_node();
 }));
-// node_modules/.pnpm/agent-base@9.0.0/node_modules/agent-base/dist/index.js
-const INTERNAL = Symbol("AgentBaseInternalState");
-var Agent = class extends http.Agent {
-	constructor(opts) {
-		super(opts);
-		this[INTERNAL] = {};
-	}
-	/**
-	* Determine whether this is an `http` or `https` request.
-	*/
-	isSecureEndpoint(options) {
-		if (options) {
-			if (typeof options.secureEndpoint === "boolean") return options.secureEndpoint;
-			if (typeof options.protocol === "string") return options.protocol === "https:";
-		}
-		const { stack } = /* @__PURE__ */ new Error();
-		if (typeof stack !== "string") return false;
-		return stack.split("\n").some((l) => l.indexOf("(https.js:") !== -1 || l.indexOf("node:https:") !== -1);
-	}
-	incrementSockets(name) {
-		if (this.maxSockets === 1e400 && this.maxTotalSockets === 1e400) return null;
-		if (!this.sockets[name]) this.sockets[name] = [];
-		const fakeSocket = new net.Socket({ writable: false });
-		this.sockets[name].push(fakeSocket);
-		this.totalSocketCount++;
-		return fakeSocket;
-	}
-	decrementSockets(name, socket) {
-		if (!this.sockets[name] || socket === null) return;
-		const sockets = this.sockets[name];
-		const index = sockets.indexOf(socket);
-		if (index !== -1) {
-			sockets.splice(index, 1);
-			this.totalSocketCount--;
-			if (sockets.length === 0) delete this.sockets[name];
-		}
-	}
-	getName(options) {
-		if (this.isSecureEndpoint(options)) return Agent$1.prototype.getName.call(this, options);
-		return super.getName(options);
-	}
-	createSocket(req, options, cb) {
-		const connectOpts = {
-			...options,
-			secureEndpoint: this.isSecureEndpoint(options)
+// node_modules/.pnpm/agent-base@7.1.4/node_modules/agent-base/dist/helpers.js
+var require_helpers = /* @__PURE__ */ __commonJSMin(((exports, module, this$10) => {
+	var __createBinding = this$10 && this$10.__createBinding || (Object.create ? (function(o, m, k, k2) {
+		if (k2 === void 0) k2 = k;
+		var desc = Object.getOwnPropertyDescriptor(m, k);
+		if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) desc = {
+			enumerable: true,
+			get: function() {
+				return m[k];
+			}
 		};
-		const name = this.getName(connectOpts);
-		const fakeSocket = this.incrementSockets(name);
-		Promise.resolve().then(() => this.connect(req, connectOpts)).then((socket) => {
-			this.decrementSockets(name, fakeSocket);
-			if (typeof socket.addRequest === "function") try {
-				return socket.addRequest(req, connectOpts);
-			} catch (err) {
-				return cb(err);
-			}
-			this[INTERNAL].currentSocket = socket;
-			super.createSocket(req, options, cb);
-		}, (err) => {
-			this.decrementSockets(name, fakeSocket);
-			cb(err);
+		Object.defineProperty(o, k2, desc);
+	}) : (function(o, m, k, k2) {
+		if (k2 === void 0) k2 = k;
+		o[k2] = m[k];
+	}));
+	var __setModuleDefault = this$10 && this$10.__setModuleDefault || (Object.create ? (function(o, v) {
+		Object.defineProperty(o, "default", {
+			enumerable: true,
+			value: v
 		});
-	}
-	createConnection() {
-		const socket = this[INTERNAL].currentSocket;
-		this[INTERNAL].currentSocket = void 0;
-		if (!socket) throw new Error("No socket was returned in the `connect()` function");
-		return socket;
-	}
-	get defaultPort() {
-		return this[INTERNAL].defaultPort ?? (this.protocol === "https:" ? 443 : 80);
-	}
-	set defaultPort(v) {
-		if (this[INTERNAL]) this[INTERNAL].defaultPort = v;
-	}
-	get protocol() {
-		return this[INTERNAL].protocol ?? (this.isSecureEndpoint() ? "https:" : "http:");
-	}
-	set protocol(v) {
-		if (this[INTERNAL]) this[INTERNAL].protocol = v;
-	}
-};
-// node_modules/.pnpm/https-proxy-agent@9.1.0/node_modules/https-proxy-agent/dist/parse-proxy-response.js
-var import_src = /* @__PURE__ */ __toESM(require_src(), 1);
-const debug$2 = (0, import_src.default)("https-proxy-agent:parse-proxy-response");
-function parseProxyResponse(socket) {
-	return new Promise((resolve, reject) => {
-		let buffersLength = 0;
-		const buffers = [];
-		function read() {
-			const b = socket.read();
-			if (b) ondata(b);
-			else socket.once("readable", read);
-		}
-		function cleanup() {
-			socket.removeListener("end", onend);
-			socket.removeListener("error", onerror);
-			socket.removeListener("readable", read);
-		}
-		function onend() {
-			cleanup();
-			debug$2("onend");
-			reject(/* @__PURE__ */ new Error("Proxy connection ended before receiving CONNECT response"));
-		}
-		function onerror(err) {
-			cleanup();
-			debug$2("onerror %o", err);
-			reject(err);
-		}
-		function ondata(b) {
-			buffers.push(b);
-			buffersLength += b.length;
-			const buffered = Buffer.concat(buffers, buffersLength);
-			const endOfHeaders = buffered.indexOf("\r\n\r\n");
-			if (endOfHeaders === -1) {
-				debug$2("have not received end of HTTP headers yet...");
-				read();
-				return;
-			}
-			const headerParts = buffered.slice(0, endOfHeaders).toString("ascii").split("\r\n");
-			const firstLine = headerParts.shift();
-			if (!firstLine) {
-				socket.destroy();
-				return reject(/* @__PURE__ */ new Error("No header received from proxy CONNECT response"));
-			}
-			const firstLineParts = firstLine.split(" ");
-			const statusCode = +firstLineParts[1];
-			const statusText = firstLineParts.slice(2).join(" ");
-			const headers = {};
-			for (const header of headerParts) {
-				if (!header) continue;
-				const firstColon = header.indexOf(":");
-				if (firstColon === -1) {
-					socket.destroy();
-					return reject(/* @__PURE__ */ new Error(`Invalid header from proxy CONNECT response: "${header}"`));
-				}
-				const key = header.slice(0, firstColon).toLowerCase();
-				const value = header.slice(firstColon + 1).trimStart();
-				const current = headers[key];
-				if (typeof current === "string") headers[key] = [current, value];
-				else if (Array.isArray(current)) current.push(value);
-				else headers[key] = value;
-			}
-			debug$2("got proxy server response: %o %o", firstLine, headers);
-			cleanup();
-			resolve({
-				connect: {
-					statusCode,
-					statusText,
-					headers
-				},
-				buffered
-			});
-		}
-		socket.on("error", onerror);
-		socket.on("end", onend);
-		read();
+	}) : function(o, v) {
+		o["default"] = v;
 	});
-}
-// node_modules/.pnpm/proxy-agent-negotiate@1.1.0/node_modules/proxy-agent-negotiate/dist/index.js
-function createNegotiateAuth() {
-	return async ({ response, scheme }) => {
-		if (scheme.toLowerCase() !== "negotiate") throw new Error(`Expected Negotiate scheme but got "${scheme}"`);
-		let kerberos;
+	var __importStar = this$10 && this$10.__importStar || function(mod) {
+		if (mod && mod.__esModule) return mod;
+		var result = {};
+		if (mod != null) {
+			for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+		}
+		__setModuleDefault(result, mod);
+		return result;
+	};
+	Object.defineProperty(exports, "__esModule", { value: true });
+	exports.req = exports.json = exports.toBuffer = void 0;
+	const http = __importStar(__require("http"));
+	const https = __importStar(__require("https"));
+	async function toBuffer(stream) {
+		let length = 0;
+		const chunks = [];
+		for await (const chunk of stream) {
+			length += chunk.length;
+			chunks.push(chunk);
+		}
+		return Buffer.concat(chunks, length);
+	}
+	exports.toBuffer = toBuffer;
+	async function json(stream) {
+		const str = (await toBuffer(stream)).toString("utf8");
 		try {
-			kerberos = await import("kerberos");
-		} catch {
-			throw new Error("The \"kerberos\" package is required for Negotiate proxy authentication. Install it with: npm install kerberos");
+			return JSON.parse(str);
+		} catch (_err) {
+			const err = _err;
+			err.message += ` (input: ${str})`;
+			throw err;
 		}
-		const proxyAuthenticate = response.headers["proxy-authenticate"] || "";
-		const challengeHeader = Array.isArray(proxyAuthenticate) ? proxyAuthenticate[0] : proxyAuthenticate;
-		const serverToken = typeof challengeHeader === "string" && challengeHeader.includes(" ") ? challengeHeader.split(" ").slice(1).join(" ") : void 0;
-		const token = await (await kerberos.initializeClient("HTTP@proxy", { mechOID: kerberos.GSS_MECH_OID_SPNEGO })).step(serverToken || "");
-		if (!token) throw new Error("Kerberos client.step() returned no token");
-		return { headers: { "Proxy-Authorization": `Negotiate ${token}` } };
-	};
-}
-// node_modules/.pnpm/https-proxy-agent@9.1.0/node_modules/https-proxy-agent/dist/index.js
-const debug$1 = (0, import_src.default)("https-proxy-agent");
-const setServernameFromNonIpHost = (options) => {
-	if (options.servername === void 0 && options.host && !net.isIP(options.host)) return {
-		...options,
-		servername: options.host
-	};
-	return options;
-};
-/**
-* The `HttpsProxyAgent` implements an HTTP Agent subclass that connects to
-* the specified "HTTP(s) proxy server" in order to proxy HTTPS requests.
-*
-* Outgoing HTTP requests are first tunneled through the proxy server using the
-* `CONNECT` HTTP request method to establish a connection to the proxy server,
-* and then the proxy server connects to the destination target and issues the
-* HTTP request from the proxy server.
-*
-* `https:` requests have their socket connection upgraded to TLS once
-* the connection to the proxy server has been established.
-*/
-var HttpsProxyAgent = class extends Agent {
-	constructor(proxy, opts) {
-		super(opts);
-		this.options = { path: void 0 };
-		this.proxy = typeof proxy === "string" ? new URL$1(proxy) : proxy;
-		this.proxyHeaders = opts?.headers ?? {};
-		debug$1("Creating new HttpsProxyAgent instance: %o", this.proxy.href);
-		if (opts?.negotiate) this.onProxyAuth = createNegotiateAuth();
-		else if (opts?.onProxyAuth) this.onProxyAuth = opts.onProxyAuth;
-		const host = (this.proxy.hostname || this.proxy.host).replace(/^\[|\]$/g, "");
-		const port = this.proxy.port ? parseInt(this.proxy.port, 10) : this.proxy.protocol === "https:" ? 443 : 80;
-		this.connectOpts = {
-			ALPNProtocols: ["http/1.1"],
-			...opts ? omit$1(opts, "headers", "onProxyAuth", "negotiate") : null,
-			host,
-			port
+	}
+	exports.json = json;
+	function req(url, opts = {}) {
+		const req = ((typeof url === "string" ? url : url.href).startsWith("https:") ? https : http).request(url, opts);
+		const promise = new Promise((resolve, reject) => {
+			req.once("response", resolve).once("error", reject).end();
+		});
+		req.then = promise.then.bind(promise);
+		return req;
+	}
+	exports.req = req;
+}));
+// node_modules/.pnpm/agent-base@7.1.4/node_modules/agent-base/dist/index.js
+var require_dist$2 = /* @__PURE__ */ __commonJSMin(((exports, module, this$9) => {
+	var __createBinding = this$9 && this$9.__createBinding || (Object.create ? (function(o, m, k, k2) {
+		if (k2 === void 0) k2 = k;
+		var desc = Object.getOwnPropertyDescriptor(m, k);
+		if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) desc = {
+			enumerable: true,
+			get: function() {
+				return m[k];
+			}
 		};
-	}
-	/**
-	* Called when the node-core HTTP client library is creating a
-	* new HTTP request.
-	*/
-	async connect(req, opts) {
-		const { proxy } = this;
-		if (!opts.host) throw new TypeError("No \"host\" provided");
-		let socket;
-		if (proxy.protocol === "https:") {
-			debug$1("Creating `tls.Socket`: %o", this.connectOpts);
-			socket = tls.connect(setServernameFromNonIpHost(this.connectOpts));
-		} else {
-			debug$1("Creating `net.Socket`: %o", this.connectOpts);
-			socket = net.connect(this.connectOpts);
-		}
-		const headers = typeof this.proxyHeaders === "function" ? this.proxyHeaders() : { ...this.proxyHeaders };
-		const host = net.isIPv6(opts.host) ? `[${opts.host}]` : opts.host;
-		let payload = `CONNECT ${host}:${opts.port} HTTP/1.1\r\n`;
-		if (proxy.username || proxy.password) {
-			const auth = `${decodeURIComponent(proxy.username)}:${decodeURIComponent(proxy.password)}`;
-			headers["Proxy-Authorization"] = `Basic ${Buffer.from(auth).toString("base64")}`;
-		}
-		headers.Host = `${host}:${opts.port}`;
-		if (!headers["Proxy-Connection"]) headers["Proxy-Connection"] = this.keepAlive ? "Keep-Alive" : "close";
-		for (const name of Object.keys(headers)) payload += `${name}: ${headers[name]}\r\n`;
-		const proxyResponsePromise = parseProxyResponse(socket);
-		socket.write(`${payload}\r\n`);
-		const { connect, buffered } = await proxyResponsePromise;
-		req.emit("proxyConnect", connect);
-		this.emit("proxyConnect", connect, req);
-		req.emit("proxy", {
-			proxy: this.proxy.href,
-			socket
+		Object.defineProperty(o, k2, desc);
+	}) : (function(o, m, k, k2) {
+		if (k2 === void 0) k2 = k;
+		o[k2] = m[k];
+	}));
+	var __setModuleDefault = this$9 && this$9.__setModuleDefault || (Object.create ? (function(o, v) {
+		Object.defineProperty(o, "default", {
+			enumerable: true,
+			value: v
 		});
-		if (connect.statusCode === 200) {
-			req.once("socket", resume);
-			if (opts.secureEndpoint) {
-				debug$1("Upgrading socket connection to TLS");
-				return tls.connect({
-					...omit$1(setServernameFromNonIpHost(opts), "host", "path", "port"),
-					socket
-				});
-			}
-			return socket;
-		}
-		if (connect.statusCode === 407 && this.onProxyAuth) {
-			debug$1("Got 407 response, invoking onProxyAuth callback");
-			socket.destroy();
-			const proxyAuthenticate = connect.headers["proxy-authenticate"] || "";
-			const scheme = Array.isArray(proxyAuthenticate) ? proxyAuthenticate[0].split(/\s/)[0] : proxyAuthenticate.split(/\s/)[0];
-			const authResponse = await this.onProxyAuth({
-				response: connect,
-				scheme
-			});
-			return this._connectWithAuth(req, opts, authResponse.headers);
-		}
-		socket.destroy();
-		const fakeSocket = new net.Socket({ writable: false });
-		fakeSocket.readable = true;
-		req.once("socket", (s) => {
-			debug$1("Replaying proxy buffer for failed request");
-			assert(s.listenerCount("data") > 0);
-			s.push(buffered);
-			s.push(null);
-		});
-		return fakeSocket;
-	}
-	/**
-	* Retry a CONNECT request with additional auth headers.
-	*/
-	async _connectWithAuth(req, opts, authHeaders) {
-		const { proxy } = this;
-		let socket;
-		if (proxy.protocol === "https:") socket = tls.connect(setServernameFromNonIpHost(this.connectOpts));
-		else socket = net.connect(this.connectOpts);
-		const headers = typeof this.proxyHeaders === "function" ? this.proxyHeaders() : { ...this.proxyHeaders };
-		const host = net.isIPv6(opts.host) ? `[${opts.host}]` : opts.host;
-		let payload = `CONNECT ${host}:${opts.port} HTTP/1.1\r\n`;
-		if (proxy.username || proxy.password) {
-			const auth = `${decodeURIComponent(proxy.username)}:${decodeURIComponent(proxy.password)}`;
-			headers["Proxy-Authorization"] = `Basic ${Buffer.from(auth).toString("base64")}`;
-		}
-		Object.assign(headers, authHeaders);
-		headers.Host = `${host}:${opts.port}`;
-		if (!headers["Proxy-Connection"]) headers["Proxy-Connection"] = this.keepAlive ? "Keep-Alive" : "close";
-		for (const name of Object.keys(headers)) payload += `${name}: ${headers[name]}\r\n`;
-		const proxyResponsePromise = parseProxyResponse(socket);
-		socket.write(`${payload}\r\n`);
-		const { connect } = await proxyResponsePromise;
-		req.emit("proxyConnect", connect);
-		this.emit("proxyConnect", connect, req);
-		if (connect.statusCode === 200) {
-			req.once("socket", resume);
-			if (opts.secureEndpoint) {
-				debug$1("Upgrading socket connection to TLS");
-				return tls.connect({
-					...omit$1(setServernameFromNonIpHost(opts), "host", "path", "port"),
-					socket
-				});
-			}
-			return socket;
-		}
-		socket.destroy();
-		throw new Error(`Proxy authentication failed with status ${connect.statusCode} after retry`);
-	}
-};
-HttpsProxyAgent.protocols = ["http", "https"];
-function resume(socket) {
-	setImmediate(() => {
-		socket.resume();
+	}) : function(o, v) {
+		o["default"] = v;
 	});
-}
-function omit$1(obj, ...keys) {
-	const ret = {};
-	let key;
-	for (key in obj) if (!keys.includes(key)) ret[key] = obj[key];
-	return ret;
-}
-// node_modules/.pnpm/http-proxy-agent@9.1.0/node_modules/http-proxy-agent/dist/index.js
-const debug = (0, import_src.default)("http-proxy-agent");
-/**
-* The `HttpProxyAgent` implements an HTTP Agent subclass that connects
-* to the specified "HTTP proxy server" in order to proxy HTTP requests.
-*/
-var HttpProxyAgent = class extends Agent {
-	constructor(proxy, opts) {
-		super(opts);
-		this.proxy = typeof proxy === "string" ? new URL$1(proxy) : proxy;
-		this.proxyHeaders = opts?.headers ?? {};
-		debug("Creating new HttpProxyAgent instance: %o", this.proxy.href);
-		if (opts?.negotiate) this.onProxyAuth = createNegotiateAuth();
-		else if (opts?.onProxyAuth) this.onProxyAuth = opts.onProxyAuth;
-		const host = (this.proxy.hostname || this.proxy.host).replace(/^\[|\]$/g, "");
-		const port = this.proxy.port ? parseInt(this.proxy.port, 10) : this.proxy.protocol === "https:" ? 443 : 80;
-		this.connectOpts = {
-			...opts ? omit(opts, "headers", "onProxyAuth", "negotiate") : null,
-			host,
-			port
-		};
-	}
-	addRequest(req, opts) {
-		req._header = null;
-		this.setRequestProps(req, opts);
-		super.addRequest(req, opts);
-	}
-	setRequestProps(req, opts) {
-		const { proxy } = this;
-		const base = `${opts.secureEndpoint ? "https:" : "http:"}//${req.getHeader("host") || "localhost"}`;
-		const url = new URL$1(req.path, base);
-		if (opts.port !== 80) url.port = String(opts.port);
-		req.path = String(url);
-		const headers = typeof this.proxyHeaders === "function" ? this.proxyHeaders() : { ...this.proxyHeaders };
-		if (proxy.username || proxy.password) {
-			const auth = `${decodeURIComponent(proxy.username)}:${decodeURIComponent(proxy.password)}`;
-			headers["Proxy-Authorization"] = `Basic ${Buffer.from(auth).toString("base64")}`;
+	var __importStar = this$9 && this$9.__importStar || function(mod) {
+		if (mod && mod.__esModule) return mod;
+		var result = {};
+		if (mod != null) {
+			for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
 		}
-		if (!headers["Proxy-Connection"]) headers["Proxy-Connection"] = this.keepAlive ? "Keep-Alive" : "close";
-		for (const name of Object.keys(headers)) {
-			const value = headers[name];
-			if (value) req.setHeader(name, value);
+		__setModuleDefault(result, mod);
+		return result;
+	};
+	var __exportStar = this$9 && this$9.__exportStar || function(m, exports) {
+		for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
+	};
+	Object.defineProperty(exports, "__esModule", { value: true });
+	exports.Agent = void 0;
+	const net = __importStar(__require("net"));
+	const http = __importStar(__require("http"));
+	const https_1 = __require("https");
+	__exportStar(require_helpers(), exports);
+	const INTERNAL = Symbol("AgentBaseInternalState");
+	var Agent = class extends http.Agent {
+		constructor(opts) {
+			super(opts);
+			this[INTERNAL] = {};
 		}
-	}
-	async connect(req, opts) {
-		req._header = null;
-		if (!req.path.includes("://")) this.setRequestProps(req, opts);
-		let first;
-		let endOfHeaders;
-		debug("Regenerating stored HTTP header string for request");
-		req._implicitHeader();
-		if (req.outputData && req.outputData.length > 0) {
-			debug("Patching connection write() output buffer with updated header");
-			first = req.outputData[0].data;
-			endOfHeaders = first.indexOf("\r\n\r\n") + 4;
-			req.outputData[0].data = req._header + first.substring(endOfHeaders);
-			debug("Output buffer: %o", req.outputData[0].data);
+		/**
+		* Determine whether this is an `http` or `https` request.
+		*/
+		isSecureEndpoint(options) {
+			if (options) {
+				if (typeof options.secureEndpoint === "boolean") return options.secureEndpoint;
+				if (typeof options.protocol === "string") return options.protocol === "https:";
+			}
+			const { stack } = /* @__PURE__ */ new Error();
+			if (typeof stack !== "string") return false;
+			return stack.split("\n").some((l) => l.indexOf("(https.js:") !== -1 || l.indexOf("node:https:") !== -1);
 		}
-		let socket;
-		if (this.proxy.protocol === "https:") {
-			debug("Creating `tls.Socket`: %o", this.connectOpts);
-			socket = tls.connect(this.connectOpts);
-		} else {
-			debug("Creating `net.Socket`: %o", this.connectOpts);
-			socket = net.connect(this.connectOpts);
+		incrementSockets(name) {
+			if (this.maxSockets === 1e400 && this.maxTotalSockets === 1e400) return null;
+			if (!this.sockets[name]) this.sockets[name] = [];
+			const fakeSocket = new net.Socket({ writable: false });
+			this.sockets[name].push(fakeSocket);
+			this.totalSocketCount++;
+			return fakeSocket;
 		}
-		await once(socket, "connect");
-		const connect = { socket };
-		req.emit("proxyConnect", connect);
-		this.emit("proxyConnect", connect, req);
-		req.emit("proxy", {
-			proxy: this.proxy.href,
-			socket
+		decrementSockets(name, socket) {
+			if (!this.sockets[name] || socket === null) return;
+			const sockets = this.sockets[name];
+			const index = sockets.indexOf(socket);
+			if (index !== -1) {
+				sockets.splice(index, 1);
+				this.totalSocketCount--;
+				if (sockets.length === 0) delete this.sockets[name];
+			}
+		}
+		getName(options) {
+			if (this.isSecureEndpoint(options)) return https_1.Agent.prototype.getName.call(this, options);
+			return super.getName(options);
+		}
+		createSocket(req, options, cb) {
+			const connectOpts = {
+				...options,
+				secureEndpoint: this.isSecureEndpoint(options)
+			};
+			const name = this.getName(connectOpts);
+			const fakeSocket = this.incrementSockets(name);
+			Promise.resolve().then(() => this.connect(req, connectOpts)).then((socket) => {
+				this.decrementSockets(name, fakeSocket);
+				if (socket instanceof http.Agent) try {
+					return socket.addRequest(req, connectOpts);
+				} catch (err) {
+					return cb(err);
+				}
+				this[INTERNAL].currentSocket = socket;
+				super.createSocket(req, options, cb);
+			}, (err) => {
+				this.decrementSockets(name, fakeSocket);
+				cb(err);
+			});
+		}
+		createConnection() {
+			const socket = this[INTERNAL].currentSocket;
+			this[INTERNAL].currentSocket = void 0;
+			if (!socket) throw new Error("No socket was returned in the `connect()` function");
+			return socket;
+		}
+		get defaultPort() {
+			return this[INTERNAL].defaultPort ?? (this.protocol === "https:" ? 443 : 80);
+		}
+		set defaultPort(v) {
+			if (this[INTERNAL]) this[INTERNAL].defaultPort = v;
+		}
+		get protocol() {
+			return this[INTERNAL].protocol ?? (this.isSecureEndpoint() ? "https:" : "http:");
+		}
+		set protocol(v) {
+			if (this[INTERNAL]) this[INTERNAL].protocol = v;
+		}
+	};
+	exports.Agent = Agent;
+}));
+// node_modules/.pnpm/https-proxy-agent@7.0.6/node_modules/https-proxy-agent/dist/parse-proxy-response.js
+var require_parse_proxy_response = /* @__PURE__ */ __commonJSMin(((exports, module, this$8) => {
+	var __importDefault = this$8 && this$8.__importDefault || function(mod) {
+		return mod && mod.__esModule ? mod : { "default": mod };
+	};
+	Object.defineProperty(exports, "__esModule", { value: true });
+	exports.parseProxyResponse = void 0;
+	const debug = (0, __importDefault(require_src()).default)("https-proxy-agent:parse-proxy-response");
+	function parseProxyResponse(socket) {
+		return new Promise((resolve, reject) => {
+			let buffersLength = 0;
+			const buffers = [];
+			function read() {
+				const b = socket.read();
+				if (b) ondata(b);
+				else socket.once("readable", read);
+			}
+			function cleanup() {
+				socket.removeListener("end", onend);
+				socket.removeListener("error", onerror);
+				socket.removeListener("readable", read);
+			}
+			function onend() {
+				cleanup();
+				debug("onend");
+				reject(/* @__PURE__ */ new Error("Proxy connection ended before receiving CONNECT response"));
+			}
+			function onerror(err) {
+				cleanup();
+				debug("onerror %o", err);
+				reject(err);
+			}
+			function ondata(b) {
+				buffers.push(b);
+				buffersLength += b.length;
+				const buffered = Buffer.concat(buffers, buffersLength);
+				const endOfHeaders = buffered.indexOf("\r\n\r\n");
+				if (endOfHeaders === -1) {
+					debug("have not received end of HTTP headers yet...");
+					read();
+					return;
+				}
+				const headerParts = buffered.slice(0, endOfHeaders).toString("ascii").split("\r\n");
+				const firstLine = headerParts.shift();
+				if (!firstLine) {
+					socket.destroy();
+					return reject(/* @__PURE__ */ new Error("No header received from proxy CONNECT response"));
+				}
+				const firstLineParts = firstLine.split(" ");
+				const statusCode = +firstLineParts[1];
+				const statusText = firstLineParts.slice(2).join(" ");
+				const headers = {};
+				for (const header of headerParts) {
+					if (!header) continue;
+					const firstColon = header.indexOf(":");
+					if (firstColon === -1) {
+						socket.destroy();
+						return reject(/* @__PURE__ */ new Error(`Invalid header from proxy CONNECT response: "${header}"`));
+					}
+					const key = header.slice(0, firstColon).toLowerCase();
+					const value = header.slice(firstColon + 1).trimStart();
+					const current = headers[key];
+					if (typeof current === "string") headers[key] = [current, value];
+					else if (Array.isArray(current)) current.push(value);
+					else headers[key] = value;
+				}
+				debug("got proxy server response: %o %o", firstLine, headers);
+				cleanup();
+				resolve({
+					connect: {
+						statusCode,
+						statusText,
+						headers
+					},
+					buffered
+				});
+			}
+			socket.on("error", onerror);
+			socket.on("end", onend);
+			read();
 		});
-		return socket;
 	}
-};
-HttpProxyAgent.protocols = ["http", "https"];
-function omit(obj, ...keys) {
-	const ret = {};
-	let key;
-	for (key in obj) if (!keys.includes(key)) ret[key] = obj[key];
-	return ret;
-}
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/policies/proxyPolicy.js
+	exports.parseProxyResponse = parseProxyResponse;
+}));
+// node_modules/.pnpm/https-proxy-agent@7.0.6/node_modules/https-proxy-agent/dist/index.js
+var require_dist$1 = /* @__PURE__ */ __commonJSMin(((exports, module, this$7) => {
+	var __createBinding = this$7 && this$7.__createBinding || (Object.create ? (function(o, m, k, k2) {
+		if (k2 === void 0) k2 = k;
+		var desc = Object.getOwnPropertyDescriptor(m, k);
+		if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) desc = {
+			enumerable: true,
+			get: function() {
+				return m[k];
+			}
+		};
+		Object.defineProperty(o, k2, desc);
+	}) : (function(o, m, k, k2) {
+		if (k2 === void 0) k2 = k;
+		o[k2] = m[k];
+	}));
+	var __setModuleDefault = this$7 && this$7.__setModuleDefault || (Object.create ? (function(o, v) {
+		Object.defineProperty(o, "default", {
+			enumerable: true,
+			value: v
+		});
+	}) : function(o, v) {
+		o["default"] = v;
+	});
+	var __importStar = this$7 && this$7.__importStar || function(mod) {
+		if (mod && mod.__esModule) return mod;
+		var result = {};
+		if (mod != null) {
+			for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+		}
+		__setModuleDefault(result, mod);
+		return result;
+	};
+	var __importDefault = this$7 && this$7.__importDefault || function(mod) {
+		return mod && mod.__esModule ? mod : { "default": mod };
+	};
+	Object.defineProperty(exports, "__esModule", { value: true });
+	exports.HttpsProxyAgent = void 0;
+	const net = __importStar(__require("net"));
+	const tls = __importStar(__require("tls"));
+	const assert_1 = __importDefault(__require("assert"));
+	const debug_1 = __importDefault(require_src());
+	const agent_base_1 = require_dist$2();
+	const url_1 = __require("url");
+	const parse_proxy_response_1 = require_parse_proxy_response();
+	const debug = (0, debug_1.default)("https-proxy-agent");
+	const setServernameFromNonIpHost = (options) => {
+		if (options.servername === void 0 && options.host && !net.isIP(options.host)) return {
+			...options,
+			servername: options.host
+		};
+		return options;
+	};
+	/**
+	* The `HttpsProxyAgent` implements an HTTP Agent subclass that connects to
+	* the specified "HTTP(s) proxy server" in order to proxy HTTPS requests.
+	*
+	* Outgoing HTTP requests are first tunneled through the proxy server using the
+	* `CONNECT` HTTP request method to establish a connection to the proxy server,
+	* and then the proxy server connects to the destination target and issues the
+	* HTTP request from the proxy server.
+	*
+	* `https:` requests have their socket connection upgraded to TLS once
+	* the connection to the proxy server has been established.
+	*/
+	var HttpsProxyAgent = class extends agent_base_1.Agent {
+		constructor(proxy, opts) {
+			super(opts);
+			this.options = { path: void 0 };
+			this.proxy = typeof proxy === "string" ? new url_1.URL(proxy) : proxy;
+			this.proxyHeaders = opts?.headers ?? {};
+			debug("Creating new HttpsProxyAgent instance: %o", this.proxy.href);
+			const host = (this.proxy.hostname || this.proxy.host).replace(/^\[|\]$/g, "");
+			const port = this.proxy.port ? parseInt(this.proxy.port, 10) : this.proxy.protocol === "https:" ? 443 : 80;
+			this.connectOpts = {
+				ALPNProtocols: ["http/1.1"],
+				...opts ? omit(opts, "headers") : null,
+				host,
+				port
+			};
+		}
+		/**
+		* Called when the node-core HTTP client library is creating a
+		* new HTTP request.
+		*/
+		async connect(req, opts) {
+			const { proxy } = this;
+			if (!opts.host) throw new TypeError("No \"host\" provided");
+			let socket;
+			if (proxy.protocol === "https:") {
+				debug("Creating `tls.Socket`: %o", this.connectOpts);
+				socket = tls.connect(setServernameFromNonIpHost(this.connectOpts));
+			} else {
+				debug("Creating `net.Socket`: %o", this.connectOpts);
+				socket = net.connect(this.connectOpts);
+			}
+			const headers = typeof this.proxyHeaders === "function" ? this.proxyHeaders() : { ...this.proxyHeaders };
+			const host = net.isIPv6(opts.host) ? `[${opts.host}]` : opts.host;
+			let payload = `CONNECT ${host}:${opts.port} HTTP/1.1\r\n`;
+			if (proxy.username || proxy.password) {
+				const auth = `${decodeURIComponent(proxy.username)}:${decodeURIComponent(proxy.password)}`;
+				headers["Proxy-Authorization"] = `Basic ${Buffer.from(auth).toString("base64")}`;
+			}
+			headers.Host = `${host}:${opts.port}`;
+			if (!headers["Proxy-Connection"]) headers["Proxy-Connection"] = this.keepAlive ? "Keep-Alive" : "close";
+			for (const name of Object.keys(headers)) payload += `${name}: ${headers[name]}\r\n`;
+			const proxyResponsePromise = (0, parse_proxy_response_1.parseProxyResponse)(socket);
+			socket.write(`${payload}\r\n`);
+			const { connect, buffered } = await proxyResponsePromise;
+			req.emit("proxyConnect", connect);
+			this.emit("proxyConnect", connect, req);
+			if (connect.statusCode === 200) {
+				req.once("socket", resume);
+				if (opts.secureEndpoint) {
+					debug("Upgrading socket connection to TLS");
+					return tls.connect({
+						...omit(setServernameFromNonIpHost(opts), "host", "path", "port"),
+						socket
+					});
+				}
+				return socket;
+			}
+			socket.destroy();
+			const fakeSocket = new net.Socket({ writable: false });
+			fakeSocket.readable = true;
+			req.once("socket", (s) => {
+				debug("Replaying proxy buffer for failed request");
+				(0, assert_1.default)(s.listenerCount("data") > 0);
+				s.push(buffered);
+				s.push(null);
+			});
+			return fakeSocket;
+		}
+	};
+	HttpsProxyAgent.protocols = ["http", "https"];
+	exports.HttpsProxyAgent = HttpsProxyAgent;
+	function resume(socket) {
+		socket.resume();
+	}
+	function omit(obj, ...keys) {
+		const ret = {};
+		let key;
+		for (key in obj) if (!keys.includes(key)) ret[key] = obj[key];
+		return ret;
+	}
+}));
+// node_modules/.pnpm/http-proxy-agent@7.0.2/node_modules/http-proxy-agent/dist/index.js
+var require_dist = /* @__PURE__ */ __commonJSMin(((exports, module, this$6) => {
+	var __createBinding = this$6 && this$6.__createBinding || (Object.create ? (function(o, m, k, k2) {
+		if (k2 === void 0) k2 = k;
+		var desc = Object.getOwnPropertyDescriptor(m, k);
+		if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) desc = {
+			enumerable: true,
+			get: function() {
+				return m[k];
+			}
+		};
+		Object.defineProperty(o, k2, desc);
+	}) : (function(o, m, k, k2) {
+		if (k2 === void 0) k2 = k;
+		o[k2] = m[k];
+	}));
+	var __setModuleDefault = this$6 && this$6.__setModuleDefault || (Object.create ? (function(o, v) {
+		Object.defineProperty(o, "default", {
+			enumerable: true,
+			value: v
+		});
+	}) : function(o, v) {
+		o["default"] = v;
+	});
+	var __importStar = this$6 && this$6.__importStar || function(mod) {
+		if (mod && mod.__esModule) return mod;
+		var result = {};
+		if (mod != null) {
+			for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+		}
+		__setModuleDefault(result, mod);
+		return result;
+	};
+	var __importDefault = this$6 && this$6.__importDefault || function(mod) {
+		return mod && mod.__esModule ? mod : { "default": mod };
+	};
+	Object.defineProperty(exports, "__esModule", { value: true });
+	exports.HttpProxyAgent = void 0;
+	const net = __importStar(__require("net"));
+	const tls = __importStar(__require("tls"));
+	const debug_1 = __importDefault(require_src());
+	const events_1 = __require("events");
+	const agent_base_1 = require_dist$2();
+	const url_1 = __require("url");
+	const debug = (0, debug_1.default)("http-proxy-agent");
+	/**
+	* The `HttpProxyAgent` implements an HTTP Agent subclass that connects
+	* to the specified "HTTP proxy server" in order to proxy HTTP requests.
+	*/
+	var HttpProxyAgent = class extends agent_base_1.Agent {
+		constructor(proxy, opts) {
+			super(opts);
+			this.proxy = typeof proxy === "string" ? new url_1.URL(proxy) : proxy;
+			this.proxyHeaders = opts?.headers ?? {};
+			debug("Creating new HttpProxyAgent instance: %o", this.proxy.href);
+			const host = (this.proxy.hostname || this.proxy.host).replace(/^\[|\]$/g, "");
+			const port = this.proxy.port ? parseInt(this.proxy.port, 10) : this.proxy.protocol === "https:" ? 443 : 80;
+			this.connectOpts = {
+				...opts ? omit(opts, "headers") : null,
+				host,
+				port
+			};
+		}
+		addRequest(req, opts) {
+			req._header = null;
+			this.setRequestProps(req, opts);
+			super.addRequest(req, opts);
+		}
+		setRequestProps(req, opts) {
+			const { proxy } = this;
+			const base = `${opts.secureEndpoint ? "https:" : "http:"}//${req.getHeader("host") || "localhost"}`;
+			const url = new url_1.URL(req.path, base);
+			if (opts.port !== 80) url.port = String(opts.port);
+			req.path = String(url);
+			const headers = typeof this.proxyHeaders === "function" ? this.proxyHeaders() : { ...this.proxyHeaders };
+			if (proxy.username || proxy.password) {
+				const auth = `${decodeURIComponent(proxy.username)}:${decodeURIComponent(proxy.password)}`;
+				headers["Proxy-Authorization"] = `Basic ${Buffer.from(auth).toString("base64")}`;
+			}
+			if (!headers["Proxy-Connection"]) headers["Proxy-Connection"] = this.keepAlive ? "Keep-Alive" : "close";
+			for (const name of Object.keys(headers)) {
+				const value = headers[name];
+				if (value) req.setHeader(name, value);
+			}
+		}
+		async connect(req, opts) {
+			req._header = null;
+			if (!req.path.includes("://")) this.setRequestProps(req, opts);
+			let first;
+			let endOfHeaders;
+			debug("Regenerating stored HTTP header string for request");
+			req._implicitHeader();
+			if (req.outputData && req.outputData.length > 0) {
+				debug("Patching connection write() output buffer with updated header");
+				first = req.outputData[0].data;
+				endOfHeaders = first.indexOf("\r\n\r\n") + 4;
+				req.outputData[0].data = req._header + first.substring(endOfHeaders);
+				debug("Output buffer: %o", req.outputData[0].data);
+			}
+			let socket;
+			if (this.proxy.protocol === "https:") {
+				debug("Creating `tls.Socket`: %o", this.connectOpts);
+				socket = tls.connect(this.connectOpts);
+			} else {
+				debug("Creating `net.Socket`: %o", this.connectOpts);
+				socket = net.connect(this.connectOpts);
+			}
+			await (0, events_1.once)(socket, "connect");
+			return socket;
+		}
+	};
+	HttpProxyAgent.protocols = ["http", "https"];
+	exports.HttpProxyAgent = HttpProxyAgent;
+	function omit(obj, ...keys) {
+		const ret = {};
+		let key;
+		for (key in obj) if (!keys.includes(key)) ret[key] = obj[key];
+		return ret;
+	}
+}));
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/policies/proxyPolicy.js
+var import_dist = require_dist$1();
+var import_dist$1 = require_dist();
 const HTTPS_PROXY = "HTTPS_PROXY";
 const HTTP_PROXY = "HTTP_PROXY";
 const ALL_PROXY = "ALL_PROXY";
@@ -29751,10 +29874,10 @@ function setProxyAgentOnRequest(request, cachedAgents, proxyUrl) {
 	const isInsecure = new URL(request.url).protocol !== "https:";
 	if (request.tlsSettings) logger$5.warning("TLS settings are not supported in combination with custom Proxy, certificates provided to the client will be ignored.");
 	if (isInsecure) {
-		if (!cachedAgents.httpProxyAgent) cachedAgents.httpProxyAgent = new HttpProxyAgent(proxyUrl);
+		if (!cachedAgents.httpProxyAgent) cachedAgents.httpProxyAgent = new import_dist$1.HttpProxyAgent(proxyUrl);
 		request.agent = cachedAgents.httpProxyAgent;
 	} else {
-		if (!cachedAgents.httpsProxyAgent) cachedAgents.httpsProxyAgent = new HttpsProxyAgent(proxyUrl);
+		if (!cachedAgents.httpsProxyAgent) cachedAgents.httpsProxyAgent = new import_dist.HttpsProxyAgent(proxyUrl);
 		request.agent = cachedAgents.httpsProxyAgent;
 	}
 }
@@ -29778,7 +29901,7 @@ function proxyPolicy$1(proxySettings, options) {
 		}
 	};
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/policies/decompressResponsePolicy.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/policies/decompressResponsePolicy.js
 /**
 * The programmatic identifier of the decompressResponsePolicy.
 */
@@ -29796,7 +29919,7 @@ function decompressResponsePolicy$1() {
 		}
 	};
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/policies/redirectPolicy.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/policies/redirectPolicy.js
 /**
 * The programmatic identifier of the redirectPolicy.
 */
@@ -29848,11 +29971,11 @@ async function handleRedirect(next, response, maxRetries, allowCrossOriginRedire
 	}
 	return response;
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/util/typeGuards.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/util/typeGuards.js
 function isBlob(x) {
 	return x instanceof Blob;
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/util/concat.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/util/concat.js
 async function* streamAsyncIterator() {
 	const reader = this.getReader();
 	try {
@@ -29897,7 +30020,7 @@ async function concat(sources) {
 		})());
 	};
 }
-// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.10/node_modules/@typespec/ts-http-runtime/dist/esm/policies/multipartPolicy.js
+// node_modules/.pnpm/@typespec+ts-http-runtime@0.3.11/node_modules/@typespec/ts-http-runtime/dist/esm/policies/multipartPolicy.js
 function generateBoundary() {
 	return `----AzSDKFormBoundary${randomUUID$1()}`;
 }
@@ -31794,10 +31917,9 @@ function getOperationArgumentValueFromParameter(operationArguments, parameter, f
 	} else {
 		if (parameterMapper.required) value = {};
 		for (const [propertyName, propertyPath] of Object.entries(parameterPath)) {
-			const propertyMapper = parameterMapper.type.modelProperties[propertyName];
 			const propertyValue = getOperationArgumentValueFromParameter(operationArguments, {
 				parameterPath: propertyPath,
-				mapper: propertyMapper
+				mapper: parameterMapper.type.modelProperties[propertyName]
 			}, fallbackObject);
 			if (propertyValue !== void 0) {
 				if (!value) value = {};
@@ -31869,8 +31991,7 @@ function deserializationPolicy(options = {}) {
 }
 function getOperationResponseMap(parsedResponse) {
 	let result;
-	const request = parsedResponse.request;
-	const operationInfo = getOperationRequestInfo(request);
+	const operationInfo = getOperationRequestInfo(parsedResponse.request);
 	const operationSpec = operationInfo?.operationSpec;
 	if (operationSpec) {
 		if (!operationInfo?.operationResponseGetter) result = operationSpec.responses[parsedResponse.status];
@@ -31879,8 +32000,7 @@ function getOperationResponseMap(parsedResponse) {
 	return result;
 }
 function shouldDeserializeResponse(parsedResponse) {
-	const request = parsedResponse.request;
-	const shouldDeserialize = getOperationRequestInfo(request)?.shouldDeserialize;
+	const shouldDeserialize = getOperationRequestInfo(parsedResponse.request)?.shouldDeserialize;
 	let result;
 	if (shouldDeserialize === void 0) result = true;
 	else if (typeof shouldDeserialize === "boolean") result = shouldDeserialize;
@@ -37043,15 +37163,13 @@ function arrToStr(arr, options, indentation, matcher, stopNodeExpressions, qName
 			continue;
 		} else if (tagName === options.cdataPropName) {
 			if (isPreviousElementTag) xmlStr += indentation;
-			const val = tagObj[rawTagName][0][options.textNodeName];
-			const safeVal = safeCdata(val);
+			const safeVal = safeCdata(tagObj[rawTagName][0][options.textNodeName]);
 			xmlStr += `<![CDATA[${safeVal}]]>`;
 			isPreviousElementTag = false;
 			matcher.pop();
 			continue;
 		} else if (tagName === options.commentPropName) {
-			const val = tagObj[rawTagName][0][options.textNodeName];
-			const safeVal = safeComment(val);
+			const safeVal = safeComment(tagObj[rawTagName][0][options.textNodeName]);
 			xmlStr += indentation + `<!--${safeVal}-->`;
 			isPreviousElementTag = true;
 			matcher.pop();
@@ -55958,14 +56076,13 @@ var BlobClient = class BlobClient extends StorageClient {
 			for (let off = offset; off < offset + count; off = off + blockSize) batch.addOperation(async () => {
 				let chunkEnd = offset + count;
 				if (off + blockSize < chunkEnd) chunkEnd = off + blockSize;
-				const stream = (await this.download(off, chunkEnd - off, {
+				await streamToBuffer((await this.download(off, chunkEnd - off, {
 					abortSignal: options.abortSignal,
 					conditions: options.conditions,
 					maxRetryRequests: options.maxRetryRequestsPerBlock,
 					customerProvidedKey: options.customerProvidedKey,
 					tracingOptions: updatedOptions.tracingOptions
-				})).readableStreamBody;
-				await streamToBuffer(stream, buffer, off - offset, chunkEnd - offset);
+				})).readableStreamBody, buffer, off - offset, chunkEnd - offset);
 				transferProgress += chunkEnd - off;
 				if (options.onProgress) options.onProgress({ loadedBytes: transferProgress });
 			});
@@ -56919,7 +57036,7 @@ var BlockBlobClient = class BlockBlobClient extends BlobClient {
 		const maxSingleShotSize = options.maxSingleShotSize ?? 268435456;
 		if (maxSingleShotSize < 0 || maxSingleShotSize > 268435456) throw new RangeError(`maxSingleShotSize option must be >= 0 and <= ${BLOCK_BLOB_MAX_UPLOAD_BLOB_BYTES}`);
 		if (blockSize === 0) {
-			if (size > 4194304e3 * 5e4) throw new RangeError(`${size} is too larger to upload to a block blob.`);
+			if (size > 2097152e8) throw new RangeError(`${size} is too larger to upload to a block blob.`);
 			if (size > maxSingleShotSize) {
 				blockSize = Math.ceil(size / BLOCK_BLOB_MAX_BLOCKS);
 				if (blockSize < 4194304) blockSize = DEFAULT_BLOB_DOWNLOAD_BLOCK_BYTES;
@@ -57917,12 +58034,12 @@ function uploadCacheArchiveSDK(signedUploadURL, archivePath, options) {
 		const uploadOptions = {
 			blockSize: options === null || options === void 0 ? void 0 : options.uploadChunkSize,
 			concurrency: options === null || options === void 0 ? void 0 : options.uploadConcurrency,
-			maxSingleShotSize: 134217728,
+			maxSingleShotSize: 0x8000000,
 			onProgress: uploadProgress.onProgress()
 		};
 		try {
 			uploadProgress.startDisplayTimer();
-			debug$3(`BlobClient: ${blobClient.name}:${blobClient.accountName}:${blobClient.containerName}`);
+			debug(`BlobClient: ${blobClient.name}:${blobClient.accountName}:${blobClient.containerName}`);
 			const response = yield blockBlobClient.uploadFile(archivePath, uploadOptions);
 			if (response._response.status >= 400) throw new InvalidResponseError(`uploadCacheArchiveSDK: upload failed with status code ${response._response.status}`);
 			return response;
@@ -58006,9 +58123,9 @@ function retry(name_1, method_1, getStatusCode_1) {
 				isRetryable = isRetryableStatusCode(statusCode);
 				errorMessage = `Cache service responded with ${statusCode}`;
 			}
-			debug$3(`${name} - Attempt ${attempt} of ${maxAttempts} failed with error: ${errorMessage}`);
+			debug(`${name} - Attempt ${attempt} of ${maxAttempts} failed with error: ${errorMessage}`);
 			if (!isRetryable) {
-				debug$3(`${name} - Error is not retryable`);
+				debug(`${name} - Error is not retryable`);
 				break;
 			}
 			yield sleep(delay);
@@ -58098,7 +58215,7 @@ var DownloadProgress = class {
 		this.segmentIndex = this.segmentIndex + 1;
 		this.segmentSize = segmentSize;
 		this.receivedBytes = 0;
-		debug$3(`Downloading segment at offset ${this.segmentOffset} with length ${this.segmentSize}...`);
+		debug(`Downloading segment at offset ${this.segmentOffset} with length ${this.segmentSize}...`);
 	}
 	/**
 	* Sets the number of bytes received for the current segment.
@@ -58181,7 +58298,7 @@ function downloadCacheHttpClient(archiveLocation, archivePath) {
 		}));
 		downloadResponse.message.socket.setTimeout(SocketTimeout, () => {
 			downloadResponse.message.destroy();
-			debug$3(`Aborting download, socket timed out after ${SocketTimeout} ms`);
+			debug(`Aborting download, socket timed out after ${SocketTimeout} ms`);
 		});
 		yield pipeResponseToStream(downloadResponse, writeStream);
 		const contentLengthHeader = downloadResponse.message.headers["content-length"];
@@ -58189,7 +58306,7 @@ function downloadCacheHttpClient(archiveLocation, archivePath) {
 			const expectedLength = parseInt(contentLengthHeader);
 			const actualLength = getArchiveFileSizeInBytes(archivePath);
 			if (actualLength !== expectedLength) throw new Error(`Incomplete download. Expected file size: ${expectedLength}, actual file size: ${actualLength}`);
-		} else debug$3("Unable to validate download, no Content-Length header");
+		} else debug("Unable to validate download, no Content-Length header");
 	});
 }
 /**
@@ -58293,10 +58410,10 @@ function downloadCacheStorageSDK(archiveLocation, archivePath, options) {
 		const client = new BlockBlobClient(archiveLocation, void 0, { retryOptions: { tryTimeoutInMs: options.timeoutInMs } });
 		const contentLength = (_a = (yield client.getProperties()).contentLength) !== null && _a !== void 0 ? _a : -1;
 		if (contentLength < 0) {
-			debug$3("Unable to determine content length, downloading file with http-client...");
+			debug("Unable to determine content length, downloading file with http-client...");
 			yield downloadCacheHttpClient(archiveLocation, archivePath);
 		} else {
-			const maxSegmentSize = Math.min(134217728, buffer.constants.MAX_LENGTH);
+			const maxSegmentSize = Math.min(0x8000000, buffer.constants.MAX_LENGTH);
 			const downloadProgress = new DownloadProgress(contentLength);
 			const fd = fs$2.openSync(archivePath, "w");
 			try {
@@ -58355,10 +58472,10 @@ function getUploadOptions(copy) {
 	* Add env var overrides
 	*/
 	result.uploadConcurrency = !isNaN(Number(process.env["CACHE_UPLOAD_CONCURRENCY"])) ? Math.min(32, Number(process.env["CACHE_UPLOAD_CONCURRENCY"])) : result.uploadConcurrency;
-	result.uploadChunkSize = !isNaN(Number(process.env["CACHE_UPLOAD_CHUNK_SIZE"])) ? Math.min(134217728, Number(process.env["CACHE_UPLOAD_CHUNK_SIZE"]) * 1024 * 1024) : result.uploadChunkSize;
-	debug$3(`Use Azure SDK: ${result.useAzureSdk}`);
-	debug$3(`Upload concurrency: ${result.uploadConcurrency}`);
-	debug$3(`Upload chunk size: ${result.uploadChunkSize}`);
+	result.uploadChunkSize = !isNaN(Number(process.env["CACHE_UPLOAD_CHUNK_SIZE"])) ? Math.min(0x8000000, Number(process.env["CACHE_UPLOAD_CHUNK_SIZE"]) * 1024 * 1024) : result.uploadChunkSize;
+	debug(`Use Azure SDK: ${result.useAzureSdk}`);
+	debug(`Upload concurrency: ${result.uploadConcurrency}`);
+	debug(`Upload chunk size: ${result.uploadChunkSize}`);
 	return result;
 }
 /**
@@ -58385,12 +58502,12 @@ function getDownloadOptions(copy) {
 	}
 	const segmentDownloadTimeoutMins = process.env["SEGMENT_DOWNLOAD_TIMEOUT_MINS"];
 	if (segmentDownloadTimeoutMins && !isNaN(Number(segmentDownloadTimeoutMins)) && isFinite(Number(segmentDownloadTimeoutMins))) result.segmentTimeoutInMs = Number(segmentDownloadTimeoutMins) * 60 * 1e3;
-	debug$3(`Use Azure SDK: ${result.useAzureSdk}`);
-	debug$3(`Download concurrency: ${result.downloadConcurrency}`);
-	debug$3(`Request timeout (ms): ${result.timeoutInMs}`);
-	debug$3(`Cache segment download timeout mins env var: ${process.env["SEGMENT_DOWNLOAD_TIMEOUT_MINS"]}`);
-	debug$3(`Segment download timeout (ms): ${result.segmentTimeoutInMs}`);
-	debug$3(`Lookup only: ${result.lookupOnly}`);
+	debug(`Use Azure SDK: ${result.useAzureSdk}`);
+	debug(`Download concurrency: ${result.downloadConcurrency}`);
+	debug(`Request timeout (ms): ${result.timeoutInMs}`);
+	debug(`Cache segment download timeout mins env var: ${process.env["SEGMENT_DOWNLOAD_TIMEOUT_MINS"]}`);
+	debug(`Segment download timeout (ms): ${result.segmentTimeoutInMs}`);
+	debug(`Lookup only: ${result.lookupOnly}`);
 	return result;
 }
 // node_modules/.pnpm/@actions+cache@6.3.0/node_modules/@actions/cache/lib/internal/config.js
@@ -58532,7 +58649,7 @@ function getCacheApiUrl(resource) {
 	const baseUrl = getCacheServiceURL();
 	if (!baseUrl) throw new Error("Cache Service Url not found, unable to restore cache.");
 	const url = `${baseUrl}_apis/artifactcache/${resource}`;
-	debug$3(`Resource Url: ${url}`);
+	debug(`Resource Url: ${url}`);
 	return url;
 }
 function createAcceptHeader(type, apiVersion) {
@@ -58567,8 +58684,8 @@ function getCacheEntry(keys, paths, options) {
 		const cacheDownloadUrl = cacheResult === null || cacheResult === void 0 ? void 0 : cacheResult.archiveLocation;
 		if (!cacheDownloadUrl) throw new Error("Cache not found.");
 		setSecret(cacheDownloadUrl);
-		debug$3(`Cache Result:`);
-		debug$3(JSON.stringify(cacheResult));
+		debug(`Cache Result:`);
+		debug(JSON.stringify(cacheResult));
 		return cacheResult;
 	});
 }
@@ -58582,8 +58699,8 @@ function printCachesListForDiagnostics(key, httpClient, version) {
 			const cacheListResult = response.result;
 			const totalCount = cacheListResult === null || cacheListResult === void 0 ? void 0 : cacheListResult.totalCount;
 			if (totalCount && totalCount > 0) {
-				debug$3(`No matching cache found for cache key '${key}', version '${version} and scope ${process.env["GITHUB_REF"]}. There exist one or more cache(s) with similar key but they have different version or scope. See more info on cache matching here: https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#matching-a-cache-key \nOther caches with similar key:`);
-				for (const cacheEntry of (cacheListResult === null || cacheListResult === void 0 ? void 0 : cacheListResult.artifactCaches) || []) debug$3(`Cache Key: ${cacheEntry === null || cacheEntry === void 0 ? void 0 : cacheEntry.cacheKey}, Cache Version: ${cacheEntry === null || cacheEntry === void 0 ? void 0 : cacheEntry.cacheVersion}, Cache Scope: ${cacheEntry === null || cacheEntry === void 0 ? void 0 : cacheEntry.scope}, Cache Created: ${cacheEntry === null || cacheEntry === void 0 ? void 0 : cacheEntry.creationTime}`);
+				debug(`No matching cache found for cache key '${key}', version '${version} and scope ${process.env["GITHUB_REF"]}. There exist one or more cache(s) with similar key but they have different version or scope. See more info on cache matching here: https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#matching-a-cache-key \nOther caches with similar key:`);
+				for (const cacheEntry of (cacheListResult === null || cacheListResult === void 0 ? void 0 : cacheListResult.artifactCaches) || []) debug(`Cache Key: ${cacheEntry === null || cacheEntry === void 0 ? void 0 : cacheEntry.cacheKey}, Cache Version: ${cacheEntry === null || cacheEntry === void 0 ? void 0 : cacheEntry.cacheVersion}, Cache Scope: ${cacheEntry === null || cacheEntry === void 0 ? void 0 : cacheEntry.scope}, Cache Created: ${cacheEntry === null || cacheEntry === void 0 ? void 0 : cacheEntry.creationTime}`);
 			}
 		}
 	});
@@ -58617,7 +58734,7 @@ function getContentRange(start, end) {
 }
 function uploadChunk(httpClient, resourceUrl, openStream, start, end) {
 	return __awaiter$3(this, void 0, void 0, function* () {
-		debug$3(`Uploading chunk of size ${end - start + 1} bytes at offset ${start} with content range: ${getContentRange(start, end)}`);
+		debug(`Uploading chunk of size ${end - start + 1} bytes at offset ${start} with content range: ${getContentRange(start, end)}`);
 		const additionalHeaders = {
 			"Content-Type": "application/octet-stream",
 			"Content-Range": getContentRange(start, end)
@@ -58637,7 +58754,7 @@ function uploadFile(httpClient, cacheId, archivePath, options) {
 		const concurrency = assertDefined("uploadConcurrency", uploadOptions.uploadConcurrency);
 		const maxChunkSize = assertDefined("uploadChunkSize", uploadOptions.uploadChunkSize);
 		const parallelUploads = [...new Array(concurrency).keys()];
-		debug$3("Awaiting all uploads");
+		debug("Awaiting all uploads");
 		let offset = 0;
 		try {
 			yield Promise.all(parallelUploads.map(() => __awaiter$3(this, void 0, void 0, function* () {
@@ -58676,9 +58793,9 @@ function saveCache$1(cacheId, archivePath, signedUploadURL, options) {
 			yield uploadCacheArchiveSDK(signedUploadURL, archivePath, options);
 		} else {
 			const httpClient = createHttpClient();
-			debug$3("Upload cache");
+			debug("Upload cache");
 			yield uploadFile(httpClient, cacheId, archivePath, options);
-			debug$3("Commiting cache");
+			debug("Commiting cache");
 			const cacheSize = getArchiveFileSizeInBytes(archivePath);
 			info(`Cache Size: ~${Math.round(cacheSize / 1048576)} MB (${cacheSize} B)`);
 			const commitCacheResponse = yield commitCache(httpClient, cacheId, cacheSize);
@@ -59053,8 +59170,8 @@ var require_goog_varint = /* @__PURE__ */ __commonJSMin(((exports) => {
 	*/
 	function int64toString(bitsLow, bitsHigh) {
 		if (bitsHigh >>> 0 <= 2097151) return "" + (TWO_PWR_32_DBL * bitsHigh + (bitsLow >>> 0));
-		let low = bitsLow & 16777215;
-		let mid = (bitsLow >>> 24 | bitsHigh << 8) >>> 0 & 16777215;
+		let low = bitsLow & 0xffffff;
+		let mid = (bitsLow >>> 24 | bitsHigh << 8) >>> 0 & 0xffffff;
 		let high = bitsHigh >> 16 & 65535;
 		let digitA = low + mid * 6777216 + high * 6710656;
 		let digitB = mid + high * 8147497;
@@ -59162,7 +59279,7 @@ var require_pb_long = /* @__PURE__ */ __commonJSMin(((exports) => {
 	}
 	const RE_DECIMAL_STR = /^-?[0-9]+$/;
 	const TWO_PWR_32_DBL = 4294967296;
-	const HALF_2_PWR_32 = 2147483648;
+	const HALF_2_PWR_32 = 0x80000000;
 	var SharedPbLong = class {
 		/**
 		* Create a new instance with the given bits.
@@ -59524,9 +59641,9 @@ var require_assert = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.assertNever = assertNever;
 	const FLOAT32_MAX = 34028234663852886e22;
 	const FLOAT32_MIN = -34028234663852886e22;
-	const UINT32_MAX = 4294967295;
-	const INT32_MAX = 2147483647;
-	const INT32_MIN = -2147483648;
+	const UINT32_MAX = 0xffffffff;
+	const INT32_MAX = 0x7fffffff;
+	const INT32_MIN = -0x80000000;
 	function assertInt32(arg) {
 		if (typeof arg !== "number") throw new Error("invalid int 32: " + typeof arg);
 		if (!Number.isInteger(arg) || arg > INT32_MAX || arg < INT32_MIN) throw new Error("invalid int 32: " + arg);
@@ -63649,7 +63766,7 @@ function maskSigUrl(url) {
 			setSecret(encodeURIComponent(signature));
 		}
 	} catch (error) {
-		debug$3(`Failed to parse URL: ${url} ${error instanceof Error ? error.message : String(error)}`);
+		debug(`Failed to parse URL: ${url} ${error instanceof Error ? error.message : String(error)}`);
 	}
 }
 /**
@@ -63675,7 +63792,7 @@ function maskSigUrl(url) {
 */
 function maskSecretUrls(body) {
 	if (typeof body !== "object" || body === null) {
-		debug$3("body is not an object or is null");
+		debug("body is not an object or is null");
 		return;
 	}
 	if ("signed_upload_url" in body && typeof body.signed_upload_url === "string") maskSigUrl(body.signed_upload_url);
@@ -63731,7 +63848,7 @@ var CacheServiceClient = class {
 	request(service, method, contentType, data) {
 		return __awaiter$2(this, void 0, void 0, function* () {
 			const url = new URL(`/twirp/${service}/${method}`, this.baseUrl).href;
-			debug$3(`[Request] ${method} ${url}`);
+			debug(`[Request] ${method} ${url}`);
 			const headers = { "Content-Type": contentType };
 			try {
 				const { body } = yield this.retryableRequest(() => __awaiter$2(this, void 0, void 0, function* () {
@@ -63754,11 +63871,11 @@ var CacheServiceClient = class {
 					const response = yield operation();
 					const statusCode = response.message.statusCode;
 					rawBody = yield response.readBody();
-					debug$3(`[Response] - ${response.message.statusCode}`);
-					debug$3(`Headers: ${JSON.stringify(response.message.headers, null, 2)}`);
+					debug(`[Response] - ${response.message.statusCode}`);
+					debug(`Headers: ${JSON.stringify(response.message.headers, null, 2)}`);
 					const body = JSON.parse(rawBody);
 					maskSecretUrls(body);
-					debug$3(`Body: ${JSON.stringify(body, null, 2)}`);
+					debug(`Body: ${JSON.stringify(body, null, 2)}`);
 					if (this.isSuccessStatusCode(statusCode)) return {
 						response,
 						body
@@ -63778,7 +63895,7 @@ var CacheServiceClient = class {
 						throw new RateLimitError(`Rate limited: ${errorMessage}`);
 					}
 				} catch (error) {
-					if (error instanceof SyntaxError) debug$3(`Raw Body: ${rawBody}`);
+					if (error instanceof SyntaxError) debug(`Raw Body: ${rawBody}`);
 					if (error instanceof UsageError) throw error;
 					if (error instanceof RateLimitError) throw error;
 					if (NetworkError.isNetworkErrorCode(error === null || error === void 0 ? void 0 : error.code)) throw new NetworkError(error === null || error === void 0 ? void 0 : error.code);
@@ -63993,7 +64110,7 @@ function execReadCommands(archivePath, compressionMethod, type) {
 			if (tempDirectory) try {
 				yield rmRF(tempDirectory);
 			} catch (error) {
-				debug$3(`Failed to delete temporary tar directory: ${error}`);
+				debug(`Failed to delete temporary tar directory: ${error}`);
 			}
 		}
 	});
@@ -64113,12 +64230,12 @@ function checkKey(key) {
 function restoreCache(paths_1, primaryKey_1, restoreKeys_1, options_1) {
 	return __awaiter(this, arguments, void 0, function* (paths, primaryKey, restoreKeys, options, enableCrossOsArchive = false) {
 		const cacheServiceVersion = getCacheServiceVersion();
-		debug$3(`Cache service version: ${cacheServiceVersion}`);
+		debug(`Cache service version: ${cacheServiceVersion}`);
 		checkPaths(paths);
 		const cacheMode = getCacheMode();
 		if (!isCacheReadable(cacheMode)) {
 			info(`Cache restore skipped: the effective cache-mode '${cacheMode}' does not permit reads.`);
-			debug$3(`Skipped restore for paths [${paths.join(", ")}] with primary key '${primaryKey}'.`);
+			debug(`Skipped restore for paths [${paths.join(", ")}] with primary key '${primaryKey}'.`);
 			return;
 		}
 		switch (cacheServiceVersion) {
@@ -64142,8 +64259,8 @@ function restoreCacheV1(paths_1, primaryKey_1, restoreKeys_1, options_1) {
 		var _a;
 		restoreKeys = restoreKeys || [];
 		const keys = [primaryKey, ...restoreKeys];
-		debug$3("Resolved Keys:");
-		debug$3(JSON.stringify(keys));
+		debug("Resolved Keys:");
+		debug(JSON.stringify(keys));
 		if (keys.length > 10) throw new ValidationError(`Key Validation Error: Keys are limited to a maximum of 10.`);
 		for (const key of keys) checkKey(key);
 		const compressionMethod = yield getCompressionMethod();
@@ -64166,7 +64283,7 @@ function restoreCacheV1(paths_1, primaryKey_1, restoreKeys_1, options_1) {
 				return cacheEntry.cacheKey;
 			}
 			archivePath = path$2.join(yield createTempDirectory(), getCacheFileName(compressionMethod));
-			debug$3(`Archive Path: ${archivePath}`);
+			debug(`Archive Path: ${archivePath}`);
 			yield downloadCache(cacheEntry.archiveLocation, archivePath, options);
 			if (isDebug()) yield listTar(archivePath, compressionMethod);
 			const archiveFileSize = getArchiveFileSizeInBytes(archivePath);
@@ -64183,7 +64300,7 @@ function restoreCacheV1(paths_1, primaryKey_1, restoreKeys_1, options_1) {
 			try {
 				yield unlinkFile(archivePath);
 			} catch (error) {
-				debug$3(`Failed to delete archive: ${error}`);
+				debug(`Failed to delete archive: ${error}`);
 			}
 		}
 	});
@@ -64204,8 +64321,8 @@ function restoreCacheV2(paths_1, primaryKey_1, restoreKeys_1, options_1) {
 		options = Object.assign(Object.assign({}, options), { useAzureSdk: true });
 		restoreKeys = restoreKeys || [];
 		const keys = [primaryKey, ...restoreKeys];
-		debug$3("Resolved Keys:");
-		debug$3(JSON.stringify(keys));
+		debug("Resolved Keys:");
+		debug(JSON.stringify(keys));
 		if (keys.length > 10) throw new ValidationError(`Key Validation Error: Keys are limited to a maximum of 10.`);
 		for (const key of keys) checkKey(key);
 		let archivePath = "";
@@ -64226,7 +64343,7 @@ function restoreCacheV2(paths_1, primaryKey_1, restoreKeys_1, options_1) {
 				throw error;
 			}
 			if (!response.ok) {
-				debug$3(`Cache not found for version ${request.version} of keys: ${keys.join(", ")}`);
+				debug(`Cache not found for version ${request.version} of keys: ${keys.join(", ")}`);
 				return;
 			}
 			if (request.key !== response.matchedKey) info(`Cache hit for restore-key: ${response.matchedKey}`);
@@ -64236,8 +64353,8 @@ function restoreCacheV2(paths_1, primaryKey_1, restoreKeys_1, options_1) {
 				return response.matchedKey;
 			}
 			archivePath = path$2.join(yield createTempDirectory(), getCacheFileName(compressionMethod));
-			debug$3(`Archive path: ${archivePath}`);
-			debug$3(`Starting download of archive to: ${archivePath}`);
+			debug(`Archive path: ${archivePath}`);
+			debug(`Starting download of archive to: ${archivePath}`);
 			yield downloadCache(response.signedDownloadUrl, archivePath, options);
 			const archiveFileSize = getArchiveFileSizeInBytes(archivePath);
 			info(`Cache Size: ~${Math.round(archiveFileSize / 1048576)} MB (${archiveFileSize} B)`);
@@ -64254,7 +64371,7 @@ function restoreCacheV2(paths_1, primaryKey_1, restoreKeys_1, options_1) {
 			try {
 				if (archivePath) yield unlinkFile(archivePath);
 			} catch (error) {
-				debug$3(`Failed to delete archive: ${error}`);
+				debug(`Failed to delete archive: ${error}`);
 			}
 		}
 	});
@@ -64271,13 +64388,13 @@ function restoreCacheV2(paths_1, primaryKey_1, restoreKeys_1, options_1) {
 function saveCache(paths_1, key_1, options_1) {
 	return __awaiter(this, arguments, void 0, function* (paths, key, options, enableCrossOsArchive = false) {
 		const cacheServiceVersion = getCacheServiceVersion();
-		debug$3(`Cache service version: ${cacheServiceVersion}`);
+		debug(`Cache service version: ${cacheServiceVersion}`);
 		checkPaths(paths);
 		checkKey(key);
 		const cacheMode = getCacheMode();
 		if (!isCacheWritable(cacheMode)) {
 			info(`Cache save skipped: the effective cache-mode '${cacheMode}' does not permit writes.`);
-			debug$3(`Skipped save for paths [${paths.join(", ")}] with key '${key}'.`);
+			debug(`Skipped save for paths [${paths.join(", ")}] with key '${key}'.`);
 			return -1;
 		}
 		switch (cacheServiceVersion) {
@@ -64301,20 +64418,20 @@ function saveCacheV1(paths_1, key_1, options_1) {
 		const compressionMethod = yield getCompressionMethod();
 		let cacheId = -1;
 		const cachePaths = yield resolvePaths(paths);
-		debug$3("Cache Paths:");
-		debug$3(`${JSON.stringify(cachePaths)}`);
+		debug("Cache Paths:");
+		debug(`${JSON.stringify(cachePaths)}`);
 		if (cachePaths.length === 0) throw new Error(`Path Validation Error: Path(s) specified in the action for caching do(es) not exist, hence no cache is being saved.`);
 		const archiveFolder = yield createTempDirectory();
 		const archivePath = path$2.join(archiveFolder, getCacheFileName(compressionMethod));
-		debug$3(`Archive Path: ${archivePath}`);
+		debug(`Archive Path: ${archivePath}`);
 		try {
 			yield createTar(archiveFolder, cachePaths, compressionMethod);
 			if (isDebug()) yield listTar(archivePath, compressionMethod);
-			const fileSizeLimit = 10737418240;
+			const fileSizeLimit = 0x280000000;
 			const archiveFileSize = getArchiveFileSizeInBytes(archivePath);
-			debug$3(`File Size: ${archiveFileSize}`);
+			debug(`File Size: ${archiveFileSize}`);
 			if (archiveFileSize > fileSizeLimit && !isGhes()) throw new Error(`Cache size of ~${Math.round(archiveFileSize / 1048576)} MB (${archiveFileSize} B) is over the 10GB limit, not saving cache.`);
-			debug$3("Reserving Cache");
+			debug("Reserving Cache");
 			const reserveCacheResponse = yield reserveCache(key, paths, {
 				compressionMethod,
 				enableCrossOsArchive,
@@ -64327,7 +64444,7 @@ function saveCacheV1(paths_1, key_1, options_1) {
 				if (detailMessage === null || detailMessage === void 0 ? void 0 : detailMessage.startsWith("cache write denied:")) throw new CacheWriteDeniedError(`Unable to reserve cache with key ${key}. More details: ${detailMessage}`);
 				throw new ReserveCacheError(`Unable to reserve cache with key ${key}, another job may be creating this cache. More details: ${(_f = reserveCacheResponse === null || reserveCacheResponse === void 0 ? void 0 : reserveCacheResponse.error) === null || _f === void 0 ? void 0 : _f.message}`);
 			}
-			debug$3(`Saving Cache (ID: ${cacheId})`);
+			debug(`Saving Cache (ID: ${cacheId})`);
 			yield saveCache$1(cacheId, archivePath, "", options);
 		} catch (error$4) {
 			const typedError = error$4;
@@ -64339,7 +64456,7 @@ function saveCacheV1(paths_1, key_1, options_1) {
 			try {
 				yield unlinkFile(archivePath);
 			} catch (error) {
-				debug$3(`Failed to delete archive: ${error}`);
+				debug(`Failed to delete archive: ${error}`);
 			}
 		}
 		return cacheId;
@@ -64366,19 +64483,19 @@ function saveCacheV2(paths_1, key_1, options_1) {
 		const twirpClient = internalCacheTwirpClient();
 		let cacheId = -1;
 		const cachePaths = yield resolvePaths(paths);
-		debug$3("Cache Paths:");
-		debug$3(`${JSON.stringify(cachePaths)}`);
+		debug("Cache Paths:");
+		debug(`${JSON.stringify(cachePaths)}`);
 		if (cachePaths.length === 0) throw new Error(`Path Validation Error: Path(s) specified in the action for caching do(es) not exist, hence no cache is being saved.`);
 		const archiveFolder = yield createTempDirectory();
 		const archivePath = path$2.join(archiveFolder, getCacheFileName(compressionMethod));
-		debug$3(`Archive Path: ${archivePath}`);
+		debug(`Archive Path: ${archivePath}`);
 		try {
 			yield createTar(archiveFolder, cachePaths, compressionMethod);
 			if (isDebug()) yield listTar(archivePath, compressionMethod);
 			const archiveFileSize = getArchiveFileSizeInBytes(archivePath);
-			debug$3(`File Size: ${archiveFileSize}`);
+			debug(`File Size: ${archiveFileSize}`);
 			options.archiveSizeBytes = archiveFileSize;
-			debug$3("Reserving Cache");
+			debug("Reserving Cache");
 			const version = getCacheVersion(paths, compressionMethod, enableCrossOsArchive);
 			const request = {
 				key,
@@ -64393,12 +64510,12 @@ function saveCacheV2(paths_1, key_1, options_1) {
 				}
 				signedUploadUrl = response.signedUploadUrl;
 			} catch (error) {
-				debug$3(`Failed to reserve cache: ${error}`);
+				debug(`Failed to reserve cache: ${error}`);
 				const errorMessage = (_a = error === null || error === void 0 ? void 0 : error.message) !== null && _a !== void 0 ? _a : "";
 				if (errorMessage.startsWith("cache write denied:")) throw new CacheWriteDeniedError(`Unable to reserve cache with key ${key}. More details: ${errorMessage}`);
 				throw new ReserveCacheError(`Unable to reserve cache with key ${key}, another job may be creating this cache.`);
 			}
-			debug$3(`Attempting to upload cache located at: ${archivePath}`);
+			debug(`Attempting to upload cache located at: ${archivePath}`);
 			yield saveCache$1(cacheId, archivePath, signedUploadUrl, options);
 			const finalizeRequest = {
 				key,
@@ -64406,7 +64523,7 @@ function saveCacheV2(paths_1, key_1, options_1) {
 				sizeBytes: `${archiveFileSize}`
 			};
 			const finalizeResponse = yield twirpClient.FinalizeCacheEntryUpload(finalizeRequest);
-			debug$3(`FinalizeCacheEntryUploadResponse: ${finalizeResponse.ok}`);
+			debug(`FinalizeCacheEntryUploadResponse: ${finalizeResponse.ok}`);
 			if (!finalizeResponse.ok) {
 				if (finalizeResponse.message) throw new FinalizeCacheError(finalizeResponse.message);
 				throw new Error(`Unable to finalize cache with key ${key}, another job may be finalizing this cache.`);
@@ -64423,7 +64540,7 @@ function saveCacheV2(paths_1, key_1, options_1) {
 			try {
 				yield unlinkFile(archivePath);
 			} catch (error) {
-				debug$3(`Failed to delete archive: ${error}`);
+				debug(`Failed to delete archive: ${error}`);
 			}
 		}
 		return cacheId;
@@ -64684,7 +64801,7 @@ async function readManifestFromFile(manifestPath) {
 		const manifestJson = await fs.readFile(manifestPath, "utf8");
 		return JSON.parse(manifestJson);
 	} catch (error) {
-		debug$3(`Failed to load manifest from ${manifestPath}: ${String(error)}`);
+		debug(`Failed to load manifest from ${manifestPath}: ${String(error)}`);
 		return;
 	}
 }
@@ -64705,7 +64822,7 @@ async function restoreFromCache(targetFilePaths, cacheKey, restoreKeys) {
 		};
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : String(error);
-		debug$3(`Failed to restore from cache: ${errorMessage}`);
+		debug(`Failed to restore from cache: ${errorMessage}`);
 		return {
 			success: false,
 			error: errorMessage
@@ -64723,13 +64840,13 @@ async function saveToCache(targetFilePaths, cacheKey) {
 	try {
 		const savedCacheId = await saveCache([...targetFilePaths], cacheKey);
 		if (savedCacheId !== -1) {
-			debug$3(`Successfully cached with key ${cacheKey}`);
+			debug(`Successfully cached with key ${cacheKey}`);
 			return {
 				success: true,
 				cacheKey
 			};
 		} else {
-			debug$3(`Cache was not saved (cache ID: ${savedCacheId})`);
+			debug(`Cache was not saved (cache ID: ${savedCacheId})`);
 			return {
 				success: false,
 				error: "Cache save returned invalid ID"
@@ -64738,13 +64855,13 @@ async function saveToCache(targetFilePaths, cacheKey) {
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : String(error);
 		if (errorMessage.includes("already exists")) {
-			debug$3(`Cache already exists: ${errorMessage}`);
+			debug(`Cache already exists: ${errorMessage}`);
 			return {
 				success: true,
 				cacheKey
 			};
 		} else {
-			debug$3(`Error saving cache: ${errorMessage}`);
+			debug(`Error saving cache: ${errorMessage}`);
 			return {
 				success: false,
 				error: errorMessage
@@ -65005,7 +65122,7 @@ async function tryRestoreFromCacheWithoutDigest(completeImageName, imageNameWith
 	const cacheResult = await restoreFromCache([fallbackTarPath], `${cacheKeyPrefixWithoutDigest}-fallback`, [cacheKeyPrefixWithoutDigest]);
 	if (!cacheResult.success) return;
 	if (!await loadImageFromTar(fallbackTarPath)) {
-		debug$3(`Failed to load image from fallback cache: ${completeImageName}`);
+		debug(`Failed to load image from fallback cache: ${completeImageName}`);
 		return;
 	}
 	const imageSize = (await inspectImageLocal(completeImageName))?.Size;
@@ -65046,7 +65163,7 @@ async function processCacheHit(completeImageName, imageTarPath, manifestPath, ma
 		};
 	}
 	if (!manifestCacheHitKey) {
-		debug$3(`No manifest cache for ${completeImageName}`);
+		debug(`No manifest cache for ${completeImageName}`);
 		return {
 			success: true,
 			restoredFromCache: true,
@@ -65059,7 +65176,7 @@ async function processCacheHit(completeImageName, imageTarPath, manifestPath, ma
 	}
 	const [cachedManifest, remoteManifest] = await Promise.all([readManifestFromFile(manifestPath), inspectImageRemote(completeImageName)]);
 	if (!cachedManifest || !remoteManifest) {
-		debug$3(`Cannot compare manifests for ${completeImageName}: missing data`);
+		debug(`Cannot compare manifests for ${completeImageName}: missing data`);
 		return {
 			success: true,
 			restoredFromCache: true,
@@ -65071,7 +65188,7 @@ async function processCacheHit(completeImageName, imageTarPath, manifestPath, ma
 		};
 	}
 	if (cachedManifest.digest === remoteManifest.digest) {
-		debug$3(`Manifest match confirmed for ${completeImageName}`);
+		debug(`Manifest match confirmed for ${completeImageName}`);
 		return {
 			success: true,
 			restoredFromCache: true,
@@ -65143,7 +65260,7 @@ async function processService(serviceDefinition, cacheKeyPrefix, skipLatestCheck
 	const manifestPath = generateManifestPath(imageNameWithoutTag, imageTagOrLatest, serviceDefinition.platform, imageDigest);
 	if (serviceDefinition.platform) info(`Using platform ${serviceDefinition.platform} for ${completeImageName}`);
 	info(`Cache key for ${completeImageName}: ${imageCacheKey}`);
-	debug$3(`Cache path: ${imageTarPath}`);
+	debug(`Cache path: ${imageTarPath}`);
 	if (forceRefresh) {
 		info(`Force refresh enabled for ${completeImageName}, pulling fresh image`);
 		const pullResult = await pullAndCacheImage(completeImageName, serviceDefinition.platform, imageCacheKey, manifestCacheKey, imageTarPath, manifestPath, imageDigest, manifest);
